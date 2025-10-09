@@ -1,35 +1,188 @@
-import React from 'react'
+import React, { useState } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Box,
+  Avatar,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Badge,
+  Switch,
+  FormControlLabel,
+  CssBaseline,
+} from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import {
+  Menu as MenuIcon,
+  Notifications,
+  Brightness4,
+  Brightness7,
+  Person,
+  Settings,
+  Logout,
+  Translate,
+} from '@mui/icons-material';
+import { Select, FormControl } from '@mui/material';
 
-export default function TopBar({ role, setRole, user, onLogout, theme, toggleTheme, sidebarOpen, setSidebarOpen }) {
+const muiTheme = createTheme(); // Default MUI theme, can be customized
+
+export default function TopBar({
+  role,
+  setRole,
+  user,
+  onLogout,
+  theme,
+  toggleTheme,
+  language,
+  toggleLanguage,
+  sidebarOpen,
+  setSidebarOpen
+}) {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleProfileMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'light': return <Brightness7 />;
+      case 'dark': return <Brightness4 />;
+      case 'system': return <Brightness4 />; // Or custom icon
+      default: return <Brightness7 />;
+    }
+  };
+
   return (
-    <div className="sticky top-0 z-40 flex h-14 items-center border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur px-3 sm:px-4">
-      <div className="md:hidden mr-2">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={sidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-16 6h16"} />
-          </svg>
-        </button>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="font-semibold tracking-tight">UpNext School Suite</div>
-        <span className="ml-2 text-xs bg-slate-100 dark:bg-slate-800 border rounded px-2 py-0.5">Beta</span>
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        <span className="text-sm text-slate-700 dark:text-slate-300">Welcome, {user?.username || user?.email}</span>
-        <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-          {theme === 'light' ? '🌙' : '☀️'}
-        </button>
-        <select value={role} onChange={(e)=>setRole(e.target.value)} className="border rounded-lg px-2 py-1 text-sm bg-white dark:bg-slate-800">
-          <option value="superadmin">Super Admin</option>
-          <option value="admin">Admin (Principal)</option>
-          <option value="operator">Operator</option>
-        </select>
-        <button className="px-3 py-1.5 border rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Profile</button>
-        <button className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600" onClick={onLogout}>Logout</button>
-      </div>
-    </div>
-  )
+    <ThemeProvider theme={muiTheme}>
+      <CssBaseline />
+      <AppBar position="static" elevation={1}>
+        <Toolbar>
+          <IconButton
+            size="large"
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+            sx={{ mr: 2, display: { md: 'none' } }}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="h6" noWrap component="div" sx={{ mr: 2 }}>
+              EduManage Pro
+            </Typography>
+            <Typography variant="caption" sx={{ px: 1, py: 0.5, bgcolor: 'secondary.main', color: 'secondary.contrastText', borderRadius: 1 }}>
+              v2.0
+            </Typography>
+          </Box>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+            <IconButton sx={{ ml: 1 }} color="inherit" onClick={toggleLanguage}>
+              <Translate />
+            </IconButton>
+
+            <IconButton sx={{ ml: 1 }} color="inherit" onClick={toggleTheme}>
+              {getThemeIcon()}
+            </IconButton>
+
+            <IconButton sx={{ ml: 1 }} color="inherit">
+              <Badge badgeContent={4} color="error">
+                <Notifications />
+              </Badge>
+            </IconButton>
+          </Box>
+
+          <Tooltip title="Account settings">
+            <IconButton
+              size="large"
+              edge="end"
+              aria-label="account of current user"
+              aria-controls={open ? 'account-menu' : undefined}
+              aria-haspopup="true"
+              aria-expanded={open ? 'true' : undefined}
+              onClick={handleProfileMenuOpen}
+              color="inherit"
+            >
+              <Avatar sx={{ bgcolor: '#ff6b35', color: 'white', border: '2px solid #ff6b35' }}>
+                <Person />
+              </Avatar>
+            </IconButton>
+          </Tooltip>
+
+          <Menu
+            anchorEl={anchorEl}
+            id="account-menu"
+            open={open}
+            onClose={handleProfileMenuClose}
+            onClick={handleProfileMenuClose}
+            PaperProps={{
+              elevation: 0,
+              sx: {
+                overflow: 'visible',
+                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                mt: 1.5,
+                '& .MuiAvatar-root': {
+                  width: 32,
+                  height: 32,
+                  ml: -0.5,
+                  mr: 1,
+                },
+                '&:before': {
+                  content: '""',
+                  display: 'block',
+                  position: 'absolute',
+                  top: 0,
+                  right: 14,
+                  width: 10,
+                  height: 10,
+                  bgcolor: 'background.paper',
+                  transform: 'translateY(-50%) rotate(45deg)',
+                  zIndex: 0,
+                },
+              },
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem>
+              <Avatar /> Profile
+            </MenuItem>
+            <MenuItem>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  size="small"
+                >
+                  <MenuItem value="superadmin">Super Admin</MenuItem>
+                  <MenuItem value="admin">Admin (Principal)</MenuItem>
+                  <MenuItem value="operator">Operator</MenuItem>
+                </Select>
+              </FormControl>
+            </MenuItem>
+            <MenuItem>
+              <Settings sx={{ mr: 1 }} />
+              Settings
+            </MenuItem>
+            <MenuItem onClick={onLogout}>
+              <Logout sx={{ mr: 1 }} />
+              Logout
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+    </ThemeProvider>
+  );
 }
