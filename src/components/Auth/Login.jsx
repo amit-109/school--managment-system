@@ -1,13 +1,15 @@
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
 
 export default function Login({ onLogin, onSwitch }) {
+  const { loggingIn } = useSelector((state) => state.auth);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (username && password) {
-      onLogin(username);
+      onLogin({ username, password });
     }
   };
 
@@ -90,9 +92,11 @@ export default function Login({ onLogin, onSwitch }) {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+              disabled={loggingIn}
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 flex items-center justify-center"
             >
-              Sign In
+              {loggingIn && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>}
+              {loggingIn ? "Signing In..." : "Sign In"}
             </button>
           </form>
 

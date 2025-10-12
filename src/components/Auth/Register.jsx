@@ -1,13 +1,21 @@
 import React, { useState } from "react";
+import { useSelector } from "react-redux";
 
 export default function Register({ onRegister, onSwitch }) {
+  const { registering } = useSelector((state) => state.auth);
+  const selectedPlan = useSelector((state) => state.auth.selectedPlan);
+
   const [form, setForm] = useState({
-    schooldetails: "",
-    username: "",
+    schoolName: "",
+    address: "",
+    phone: "",
     email: "",
+    firstName: "",
+    lastName: "",
+    username: "",
     password: "",
     confirmPassword: "",
-    role: "student",
+    adminPhone: "",
   });
 
   const handleRegister = (e) => {
@@ -16,8 +24,23 @@ export default function Register({ onRegister, onSwitch }) {
       alert("Passwords do not match");
       return;
     }
-    if (form.schooldetails && form.username && form.email && form.password) {
-      onRegister(form);
+    if (form.schoolName && form.username && form.email && form.password && selectedPlan) {
+      const registerData = {
+        schoolName: form.schoolName,
+        address: form.address,
+        phone: form.phone,
+        email: form.email,
+        planId: selectedPlan,
+        isTrial: true,
+        trialDays: 30,
+        adminFirstName: form.firstName,
+        adminLastName: form.lastName,
+        adminUsername: form.username,
+        adminEmail: form.email,
+        adminPassword: form.password,
+        adminPhone: form.adminPhone,
+      };
+      onRegister(registerData);
     }
   };
 
@@ -54,20 +77,42 @@ export default function Register({ onRegister, onSwitch }) {
           <form onSubmit={handleRegister} className="space-y-4">
             {[
               {
-                label: "School/Organization Name",
-                type: "text",
-                name: "schooldetails",
+                label: "School Name",
+                name: "schoolName",
                 placeholder: "Enter school name",
               },
               {
+                label: "School Address",
+                name: "address",
+                placeholder: "Enter school address",
+              },
+              {
+                label: "School Phone",
+                name: "phone",
+                placeholder: "Enter school phone",
+              },
+              {
+                label: "Admin First Name",
+                name: "firstName",
+                placeholder: "Enter first name",
+              },
+              {
+                label: "Admin Last Name",
+                name: "lastName",
+                placeholder: "Enter last name",
+              },
+              {
                 label: "Username",
-                type: "text",
                 name: "username",
                 placeholder: "Enter username",
               },
               {
+                label: "Admin Phone",
+                name: "adminPhone",
+                placeholder: "Enter admin phone",
+              },
+              {
                 label: "Email",
-                type: "email",
                 name: "email",
                 placeholder: "Enter email",
               },
@@ -77,7 +122,7 @@ export default function Register({ onRegister, onSwitch }) {
                   {field.label}
                 </label>
                 <input
-                  type={field.type}
+                  type={field.type || "text"}
                   value={form[field.name]}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, [field.name]: e.target.value }))
@@ -88,22 +133,6 @@ export default function Register({ onRegister, onSwitch }) {
                 />
               </div>
             ))}
-
-            {/* Role */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Role
-              </label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                className="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 transition-all duration-200"
-              >
-                <option value="admin">School Admin</option>
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-              </select>
-            </div>
 
             {/* Password Fields */}
             {[
@@ -139,9 +168,11 @@ export default function Register({ onRegister, onSwitch }) {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+              disabled={registering}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 flex items-center justify-center"
             >
-              Register
+              {registering && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>}
+              {registering ? "Registering..." : "Register"}
             </button>
           </form>
 
