@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import Swal from 'sweetalert2'
-import TopBar from './components/layout/TopBar.jsx'
+import toast from 'react-hot-toast'
+import TopBar from './components/layout/TopBar.tsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import Dashboard from './components/modules/Dashboard.jsx'
 import Employees from './components/modules/Employees.jsx'
@@ -16,14 +16,15 @@ import Login from './components/Auth/Login.jsx'
 import Register from './components/Auth/Register.jsx'
 import LandingPage from './components/LandingPage.jsx'
 import PricingPage from './components/PricingPage.jsx'
-import { registerUserAsync, loginUserAsync, logoutUserAsync } from './components/Auth/store'
+import LoadingOverlay from './components/shared/LoadingOverlay.jsx'
+import { useLoading } from './components/shared/LoadingContext.jsx'
+import { registerUserAsync, loginUserAsync, logoutUserAsync, setTokens } from './components/Auth/store'
 import { logoutUser } from './components/Auth/authService'
 import TokenManager from './components/Auth/tokenManager'
-import CircularIndeterminate from './components/Auth/CircularIndeterminate'
 
 export default function App() {
   const dispatch = useDispatch()
-  const { registering, loggingIn, loggingOut, plans } = useSelector((state) => state.auth)
+  const { registering, loggingIn, loggingOut, plans, isAuthenticated, accessToken } = useSelector((state) => state.auth)
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
@@ -33,7 +34,7 @@ export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en')
-  const [isGlobalLoading, setIsGlobalLoading] = useState(false)
+  const { isLoading, setIsLoading } = useLoading()
 
   const handleNavigate = (tab) => {
     setTab(tab)
@@ -57,20 +58,44 @@ export default function App() {
       setShowRegister(false)
       setShowLanding(true)
       setShowPricing(false)
-      Swal.fire('Logged out', 'You have been logged out successfully.', 'info')
+      toast.info('You have been logged out successfully.')
     }
   }, [])
 
-  // Check authentication on app startup
+  // Check authentication on app startup using Redux state
   useEffect(() => {
-    if (TokenManager.getInstance().isAuthenticated()) {
-      // Load user from localStorage or token or set dummy
-      const username = localStorage.getItem('lastUser') || 'User'
-      setUser({ username })
-      setAuthenticated(true)
-      setShowLanding(false)
+    // Initialize Redux state with token if exists
+    const token = TokenManager.getInstance().getAccessToken();
+    const refreshToken = TokenManager.getInstance().getRefreshToken();
+
+    if (token && refreshToken) {
+      dispatch(setTokens({
+        accessToken: token,
+        refreshToken: refreshToken,
+        isAuthenticated: true
+      }));
+
+      // Load user data
+      const username = localStorage.getItem('lastUser') || 'User';
+      setUser({ username });
+      setAuthenticated(true);
+      setShowLanding(false);
     }
-  }, [])
+  }, [dispatch])
+
+  // Sync authentication state
+  useEffect(() => {
+    setAuthenticated(isAuthenticated);
+    if (isAuthenticated) {
+      const username = localStorage.getItem('lastUser') || 'User';
+      setUser({ username });
+      setShowLanding(false);
+    } else {
+      setUser(null);
+      setAuthenticated(false);
+      setShowLanding(true);
+    }
+  }, [isAuthenticated])
 
   // Auto logout after inactivity
   useEffect(() => {
@@ -103,7 +128,7 @@ export default function App() {
           } else {
             handleLogout()
           }
-        })
+        }) || toast.warning('Session expiring soon!', { duration: 60000 })
       }, WARNING_TIME)
 
       logoutTimer = setTimeout(() => {
@@ -133,32 +158,33 @@ export default function App() {
 
   // Global loading management
   useEffect(() => {
-    setIsGlobalLoading(registering || loggingIn || loggingOut)
-  }, [registering, loggingIn, loggingOut])
+    setIsLoading(registering || loggingIn || loggingOut)
+  }, [registering, loggingIn, loggingOut, setIsLoading])
 
   const handleLogoutWrapper = async () => {
-    try {
-      await dispatch(logoutUserAsync()).unwrap()
-      // After successful logout, clear tokens and reset state
-      TokenManager.getInstance().clearTokens()
-      setAuthenticated(false)
-      setUser(null)
-      setShowRegister(false)
-      setShowLanding(true)
-      setShowPricing(false)
-      Swal.fire('Logged out', 'You have been logged out successfully.', 'info')
-    } catch (error) {
-      console.error('Logout failed:', error)
-      // Still clear tokens and redirect even if API fails
-      TokenManager.getInstance().clearTokens()
-      setAuthenticated(false)
-      setUser(null)
-      setShowRegister(false)
-      setShowLanding(true)
-      setShowPricing(false)
-      Swal.fire('Logged out', 'You have been logged out successfully.', 'info')
-    }
+    dispatch(logoutUserAsync())
+      .then(() => {
+        // Clear tokens and reset state after successful logout
+        TokenManager.getInstance().clearTokens()
+        setAuthenticated(false)
+        setUser(null)
+        setShowRegister(false)
+        setShowLanding(true)
+        setShowPricing(false)
+      })
+      .catch((error) => {
+        console.error('Logout failed:', error)
+        // Still clear tokens and redirect even if API fails
+        TokenManager.getInstance().clearTokens()
+        setAuthenticated(false)
+        setUser(null)
+        setShowRegister(false)
+        setShowLanding(true)
+        setShowPricing(false)
+      })
   }
+
+
 
   useEffect(() => {
     const root = document.documentElement
@@ -191,7 +217,7 @@ export default function App() {
   const handleLogin = async ({ username, password }) => {
     try {
       const response = await dispatch(loginUserAsync({ username, password })).unwrap()
-      // Store tokens (assuming response has access_token, refresh_token, expires_in)
+      // Still set tokens in TokenManager for API requests
       if (response.access_token && response.refresh_token) {
         TokenManager.getInstance().setTokens(response)
       }
@@ -199,9 +225,9 @@ export default function App() {
       setAuthenticated(true)
       setShowLanding(false)
       localStorage.setItem('lastUser', username)
-      Swal.fire('Welcome!', 'Login successful!', 'success')
+      toast.success('Login successful!')
     } catch (error) {
-      Swal.fire('Login Failed', error, 'error')
+      toast.error(`Login Failed: ${error}`)
     }
   }
 
@@ -220,23 +246,25 @@ export default function App() {
   }
 
   if (!authenticated) {
-    if (showPricing) {
-      return <PricingPage onContinue={() => { setShowRegister(true); setShowPricing(false); }} />
-    }
-    if (showLanding) {
-      return <LandingPage onSignIn={() => { setShowLanding(false); setShowRegister(false); }} onRegister={() => { setShowLanding(false); setShowPricing(true); }} />
-    }
-    return showRegister ? <Register onRegister={handleRegister} onSwitch={() => setShowRegister(false)} /> : <Login onLogin={handleLogin} onSwitch={() => setShowPricing(true)} />
+    return (
+      <LoadingOverlay isLoading={isLoading}>
+        {showPricing ? (
+          <PricingPage onContinue={() => { setShowRegister(true); setShowPricing(false); }} />
+        ) : showLanding ? (
+          <LandingPage onSignIn={() => { setShowLanding(false); setShowRegister(false); }} onRegister={() => { setShowLanding(false); setShowPricing(true); }} />
+        ) : showRegister ? (
+          <Register onRegister={handleRegister} onSwitch={() => setShowRegister(false)} />
+        ) : (
+          <Login onLogin={handleLogin} onSwitch={() => setShowPricing(true)} />
+        )}
+      </LoadingOverlay>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
-      {isGlobalLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <CircularIndeterminate />
-        </div>
-      )}
-      <TopBar role={role} setRole={setRole} user={user} onLogout={handleLogoutWrapper} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+    <LoadingOverlay isLoading={isLoading}>
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
+      <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-5">
         <div className="flex">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -258,6 +286,7 @@ export default function App() {
           </main>
         </div>
       </div>
-    </div>
+      </div>
+    </LoadingOverlay>
   )
 }

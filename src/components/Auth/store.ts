@@ -1,5 +1,6 @@
 import { configureStore, createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { SubscriptionPlan, RegisterData, LoginData, getSubscriptionPlans, registerUser, loginUser, logoutUser } from './authService';
+import TokenManager from './tokenManager';
 
 // Define the state interface
 interface AuthState {
@@ -10,6 +11,9 @@ interface AuthState {
   registering: boolean;
   loggingIn: boolean;
   loggingOut: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
 }
 
 // Initial state
@@ -21,6 +25,9 @@ const initialState: AuthState = {
   registering: false,
   loggingIn: false,
   loggingOut: false,
+  accessToken: null,
+  refreshToken: null,
+  isAuthenticated: false,
 };
 
 // Async thunk for fetching subscription plans
@@ -65,13 +72,16 @@ export const loginUserAsync = createAsyncThunk(
 // Async thunk for logging out user
 export const logoutUserAsync = createAsyncThunk(
   'auth/logoutUser',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const refreshToken = localStorage.getItem('tokens') ?
-        JSON.parse(localStorage.getItem('tokens')!).refreshToken : null;
+      const state = getState() as RootState;
+      const refreshToken = state.auth.refreshToken || TokenManager.getInstance().getRefreshToken();
+
       if (refreshToken) {
         const result = await logoutUser(refreshToken);
         return result;
+      } else {
+        throw new Error('No refresh token available');
       }
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -86,6 +96,17 @@ const authSlice = createSlice({
   reducers: {
     setSelectedPlan: (state, action: PayloadAction<number>) => {
       state.selectedPlan = action.payload;
+    },
+    setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string; isAuthenticated: boolean }>) => {
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.isAuthenticated = action.payload.isAuthenticated;
+    },
+    clearTokens: (state) => {
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.isAuthenticated = false;
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -117,8 +138,25 @@ const authSlice = createSlice({
         state.loggingIn = true;
         state.error = null;
       })
-      .addCase(loginUserAsync.fulfilled, (state) => {
+      .addCase(loginUserAsync.fulfilled, (state, action: PayloadAction<any>) => {
         state.loggingIn = false;
+
+        // Handle both direct response and nested data structure
+        const responseData = action.payload?.data || action.payload;
+
+        if (responseData?.accessToken && responseData?.refreshToken) {
+          state.accessToken = responseData.accessToken;
+          state.refreshToken = responseData.refreshToken;
+          state.isAuthenticated = true;
+
+          console.log('Login fulfilled - setting tokens:', {
+            accessToken: responseData.accessToken.substring(0, 20) + '...',
+            refreshToken: responseData.refreshToken.substring(0, 20) + '...',
+            isAuthenticated: true
+          });
+        } else {
+          console.log('Login fulfilled - no valid token data:', responseData);
+        }
       })
       .addCase(loginUserAsync.rejected, (state, action: PayloadAction<any>) => {
         state.loggingIn = false;
@@ -130,7 +168,9 @@ const authSlice = createSlice({
       })
       .addCase(logoutUserAsync.fulfilled, (state) => {
         state.loggingOut = false;
-        // Optionally clear errors or update state
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
       })
       .addCase(logoutUserAsync.rejected, (state, action: PayloadAction<any>) => {
         state.loggingOut = false;
@@ -139,7 +179,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { setSelectedPlan } = authSlice.actions;
+export const { setSelectedPlan, setTokens, clearTokens } = authSlice.actions;
 
 // Export the reducer
 export const authReducer = authSlice.reducer;

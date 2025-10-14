@@ -92,11 +92,9 @@ export default function Login({ onLogin, onSwitch }) {
 
             <button
               type="submit"
-              disabled={loggingIn}
-              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 flex items-center justify-center"
+              className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
             >
-              {loggingIn && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>}
-              {loggingIn ? "Signing In..." : "Sign In"}
+              Sign In
             </button>
           </form>
 

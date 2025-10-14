@@ -10,9 +10,6 @@ import {
   MenuItem,
   Tooltip,
   Badge,
-  Switch,
-  FormControlLabel,
-  CssBaseline,
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import {
@@ -26,30 +23,60 @@ import {
   Translate,
 } from '@mui/icons-material';
 import { Select, FormControl } from '@mui/material';
+import { SelectChangeEvent } from '@mui/material';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch } from '../Auth/store';
+import { logoutUserAsync } from '../Auth/store';
+import TokenManager from '../Auth/tokenManager';
+import toast from 'react-hot-toast';
 
 const muiTheme = createTheme(); // Default MUI theme, can be customized
+
+interface TopBarProps {
+  role: string;
+  setRole: (role: string) => void;
+  user: { username: string } | null;
+  theme: string;
+  toggleTheme: () => void;
+  language: string;
+  toggleLanguage: () => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+}
+
+interface AuthState {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+}
 
 export default function TopBar({
   role,
   setRole,
   user,
-  onLogout,
   theme,
   toggleTheme,
   language,
   toggleLanguage,
   sidebarOpen,
   setSidebarOpen
-}) {
-  const [anchorEl, setAnchorEl] = useState(null);
+}: TopBarProps) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const dispatch = useDispatch<AppDispatch>();
+  const authState = useSelector((state: any) => state.auth);
+  const refreshToken = authState.refreshToken;
 
-  const handleProfileMenuOpen = (event) => {
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleRoleChange = (event: SelectChangeEvent<string>) => {
+    setRole(event.target.value);
   };
 
   const getThemeIcon = () => {
@@ -61,9 +88,23 @@ export default function TopBar({
     }
   };
 
+  const handleLogoutClick = () => {
+    handleProfileMenuClose();
+
+    // Simple, synchronous logout without any async calls or state management
+    // Just clear everything and let the app handle the state change naturally
+
+    // Clear local storage tokens first
+    TokenManager.getInstance().clearTokens();
+
+    // Dispatch Redux action to clear state (this is synchronous)
+    dispatch(logoutUserAsync());
+
+    toast.success('Logged out successfully!');
+  };
+
   return (
     <ThemeProvider theme={muiTheme}>
-      <CssBaseline />
       <AppBar position="static" elevation={1}>
         <Toolbar>
           <IconButton
@@ -163,7 +204,7 @@ export default function TopBar({
               <FormControl fullWidth size="small">
                 <Select
                   value={role}
-                  onChange={(e) => setRole(e.target.value)}
+                  onChange={handleRoleChange}
                   size="small"
                 >
                   <MenuItem value="superadmin">Super Admin</MenuItem>
@@ -176,7 +217,7 @@ export default function TopBar({
               <Settings sx={{ mr: 1 }} />
               Settings
             </MenuItem>
-            <MenuItem onClick={onLogout}>
+            <MenuItem onClick={handleLogoutClick}>
               <Logout sx={{ mr: 1 }} />
               Logout
             </MenuItem>
