@@ -1,9 +1,16 @@
-import React, { useMemo, useRef, useCallback } from 'react'
-import { AgGridReact } from 'ag-grid-react'
-import 'ag-grid-community/styles/ag-grid.css'
-import 'ag-grid-community/styles/ag-theme-quartz.css'
+import React, { useMemo, useRef, useCallback, FC } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-quartz.css';
 
-const ActionRenderer = ({ data, onEdit, onView, onDelete }) => {
+interface ActionRendererProps {
+  data: any;
+  onEdit?: (data: any) => void;
+  onView?: (data: any) => void;
+  onDelete?: (data: any) => void;
+}
+
+const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelete }) => {
   return (
     <div className="flex items-center gap-2 justify-center">
       {onView && (
@@ -41,21 +48,42 @@ const ActionRenderer = ({ data, onEdit, onView, onDelete }) => {
         </button>
       )}
     </div>
-  )
+  );
+};
+
+interface AgGridBoxProps {
+  title: string;
+  columnDefs: any[];
+  rowData: any[];
+  toolbar?: React.ReactNode;
+  onEdit?: (data: any) => void;
+  onView?: (data: any) => void;
+  onDelete?: (data: any) => void;
+  showActions?: boolean;
 }
 
-export default function AgGridBox({ title, columnDefs, rowData, toolbar, onEdit, onView, onDelete, showActions = true }) {
-  const gridRef = useRef(null)
+const AgGridBox: FC<AgGridBoxProps> = ({
+  title,
+  columnDefs,
+  rowData,
+  toolbar,
+  onEdit,
+  onView,
+  onDelete,
+  showActions = true
+}) => {
+  const gridRef = useRef<AgGridReact>(null);
+
   const defaultColDef = useMemo(() => ({
     sortable: true,
     filter: true,
     resizable: true,
     minWidth: 120,
     flex: 1,
-  }), [])
+  }), []);
 
   const finalColumnDefs = useMemo(() => {
-    const cols = [...columnDefs]
+    const cols = [...columnDefs];
     if (showActions && (onEdit || onView || onDelete)) {
       cols.push({
         headerName: 'Actions',
@@ -63,7 +91,7 @@ export default function AgGridBox({ title, columnDefs, rowData, toolbar, onEdit,
         width: 140,
         minWidth: 140,
         maxWidth: 140,
-        cellRenderer: (params) => (
+        cellRenderer: (params: any) => (
           <ActionRenderer
             data={params.data}
             onEdit={onEdit}
@@ -76,18 +104,18 @@ export default function AgGridBox({ title, columnDefs, rowData, toolbar, onEdit,
         sortable: false,
         filter: false,
         resizable: false,
-      })
+      });
     }
-    return cols
-  }, [columnDefs, onEdit, onView, onDelete, showActions])
+    return cols;
+  }, [columnDefs, onEdit, onView, onDelete, showActions]);
 
   const autoSizeAll = useCallback(() => {
-    const api = gridRef.current?.api
-    if (!api) return
-    const allIds = []
-    api.getColumns()?.forEach(c => allIds.push(c.getId()))
-    api.autoSizeColumns(allIds, false)
-  }, [])
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const allIds: string[] = [];
+    api.getColumns()?.forEach(c => allIds.push(c.getId()));
+    api.autoSizeColumns(allIds, false);
+  }, []);
 
   return (
     <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
@@ -131,12 +159,14 @@ export default function AgGridBox({ title, columnDefs, rowData, toolbar, onEdit,
             domLayout="autoHeight"
             onGridReady={(params) => {
               setTimeout(() => {
-                autoSizeAll()
-              }, 100)
+                autoSizeAll();
+              }, 100);
             }}
           />
         </div>
       </div>
     </section>
-  )
-}
+  );
+};
+
+export default AgGridBox;

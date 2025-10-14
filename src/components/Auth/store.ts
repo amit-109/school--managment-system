@@ -14,6 +14,8 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  userRole: string | null;
+  userRoles: string[];
 }
 
 // Initial state
@@ -28,6 +30,8 @@ const initialState: AuthState = {
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
+  userRole: null,
+  userRoles: [],
 };
 
 // Async thunk for fetching subscription plans
@@ -144,14 +148,37 @@ const authSlice = createSlice({
         // Handle both direct response and nested data structure
         const responseData = action.payload?.data || action.payload;
 
-        if (responseData?.accessToken && responseData?.refreshToken) {
-          state.accessToken = responseData.accessToken;
-          state.refreshToken = responseData.refreshToken;
+        // Check for both old format (accessToken) and new format (access_token)
+        const accessToken = responseData?.accessToken || responseData?.access_token;
+        const refreshToken = responseData?.refreshToken || responseData?.refresh_token;
+
+        if (accessToken && refreshToken) {
+          state.accessToken = accessToken;
+          state.refreshToken = refreshToken;
           state.isAuthenticated = true;
 
-          console.log('Login fulfilled - setting tokens:', {
-            accessToken: responseData.accessToken.substring(0, 20) + '...',
-            refreshToken: responseData.refreshToken.substring(0, 20) + '...',
+          // Extract roles from response - check multiple possible locations
+          let roles = responseData?.roles || responseData?.role || responseData?.userRoles;
+
+          if (roles) {
+            if (Array.isArray(roles)) {
+              state.userRoles = roles;
+              state.userRole = roles[0] || null; // Use first role as primary
+            } else {
+              state.userRoles = [roles];
+              state.userRole = roles;
+            }
+          } else {
+            console.log('No roles found in response, setting default');
+            state.userRole = 'Operator'; // Default role
+            state.userRoles = ['Operator'];
+          }
+
+          console.log('Login fulfilled - setting tokens and roles:', {
+            accessToken: accessToken.substring(0, 20) + '...',
+            refreshToken: refreshToken.substring(0, 20) + '...',
+            userRole: state.userRole,
+            userRoles: state.userRoles,
             isAuthenticated: true
           });
         } else {

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import AgGridBox from '../shared/AgGridBox.jsx'
+import AgGridBox from '../shared/AgGridBox'
 import { demoFeeStructures } from '../../data/feeStructures.js'
 import { demoClasses } from '../../data/classes.js'
 import { demoSessions } from '../../data/sessions.js'

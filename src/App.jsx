@@ -3,7 +3,14 @@ import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import TopBar from './components/layout/TopBar.tsx'
 import Sidebar from './components/layout/Sidebar.jsx'
-import Dashboard from './components/modules/Dashboard.jsx'
+import Dashboard from './components/modules/Dashboard.tsx'
+import AdminDashboard from './components/modules/AdminDashboard.tsx'
+import SuperAdminDashboard from './components/modules/SuperAdminDashboard.tsx'
+import UserManagement from './components/modules/UserManagement.tsx'
+import SubscriptionManagement from './components/modules/SubscriptionManagement.tsx'
+import ModuleManagement from './components/modules/ModuleManagement.tsx'
+import RoleManagement from './components/modules/RoleManagement.tsx'
+import TenantManagement from './components/modules/TenantManagement.tsx'
 import Employees from './components/modules/Employees.jsx'
 import Students from './components/modules/Students.jsx'
 import Fees from './components/modules/Fees.jsx'
@@ -19,18 +26,19 @@ import PricingPage from './components/PricingPage.jsx'
 import LoadingOverlay from './components/shared/LoadingOverlay.jsx'
 import { useLoading } from './components/shared/LoadingContext.jsx'
 import { registerUserAsync, loginUserAsync, logoutUserAsync, setTokens } from './components/Auth/store'
+import { store } from './store'
 import { logoutUser } from './components/Auth/authService'
 import TokenManager from './components/Auth/tokenManager'
 
 export default function App() {
   const dispatch = useDispatch()
-  const { registering, loggingIn, loggingOut, plans, isAuthenticated, accessToken } = useSelector((state) => state.auth)
+  const { registering, loggingIn, loggingOut, plans, isAuthenticated, accessToken, userRole, userRoles } = useSelector((state) => state.auth)
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
   const [showLanding, setShowLanding] = useState(true)
   const [showPricing, setShowPricing] = useState(false)
-  const [role, setRole] = useState('operator')
+  const [role, setRole] = useState('operator') // This will be updated based on userRole from auth state
   const [tab, setTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en')
@@ -64,11 +72,13 @@ export default function App() {
 
   // Check authentication on app startup using Redux state
   useEffect(() => {
+    console.log('App: Checking for existing authentication...');
     // Initialize Redux state with token if exists
     const token = TokenManager.getInstance().getAccessToken();
     const refreshToken = TokenManager.getInstance().getRefreshToken();
 
     if (token && refreshToken) {
+      console.log('App: Found existing tokens, setting authentication');
       dispatch(setTokens({
         accessToken: token,
         refreshToken: refreshToken,
@@ -80,22 +90,40 @@ export default function App() {
       setUser({ username });
       setAuthenticated(true);
       setShowLanding(false);
+      setTab('dashboard'); // Set to dashboard on reload
+    } else {
+      console.log('App: No existing tokens found');
     }
   }, [dispatch])
 
-  // Sync authentication state
+  // Sync authentication state and role
   useEffect(() => {
+    console.log('App: Sync effect triggered - isAuthenticated:', isAuthenticated, 'userRole:', userRole);
     setAuthenticated(isAuthenticated);
-    if (isAuthenticated) {
+    if (isAuthenticated && userRole) {
+      // Update local role state based on userRole from Redux
+      if (userRole === 'SuperAdmin') {
+        setRole('superadmin');
+      } else if (userRole === 'Admin') {
+        setRole('admin');
+      } else if (userRole === 'Teacher' || userRole === 'Student' || userRole === 'Parent') {
+        setRole('operator'); // Map other roles to operator permissions
+      } else {
+        setRole('operator'); // Default fallback
+      }
+
       const username = localStorage.getItem('lastUser') || 'User';
       setUser({ username });
       setShowLanding(false);
+      console.log('App: User authenticated with role:', userRole, 'local role:', role);
     } else {
+      console.log('App: User not authenticated or no userRole');
       setUser(null);
       setAuthenticated(false);
       setShowLanding(true);
+      setRole('operator'); // Reset to default
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, userRole])
 
   // Auto logout after inactivity
   useEffect(() => {
@@ -216,18 +244,41 @@ export default function App() {
 
   const handleLogin = async ({ username, password }) => {
     try {
-      const response = await dispatch(loginUserAsync({ username, password })).unwrap()
-      // Still set tokens in TokenManager for API requests
-      if (response.access_token && response.refresh_token) {
-        TokenManager.getInstance().setTokens(response)
-      }
-      setUser({ username })
-      setAuthenticated(true)
-      setShowLanding(false)
-      localStorage.setItem('lastUser', username)
-      toast.success('Login successful!')
+      console.log('App: Attempting login...');
+      const response = await dispatch(loginUserAsync({ username, password })).unwrap();
+      console.log('App: Login response:', response);
+
+      // Wait for Redux state to be updated and then set tokens
+      setTimeout(() => {
+        const authState = store.getState().auth;
+        console.log('App: Setting tokens after Redux update:', {
+          accessToken: authState.accessToken?.substring(0, 20) + '...',
+          refreshToken: authState.refreshToken?.substring(0, 20) + '...',
+        });
+
+        if (authState.accessToken && authState.refreshToken) {
+          TokenManager.getInstance().setTokens({
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken,
+          });
+        } else if (response.access_token && response.refresh_token) {
+          TokenManager.getInstance().setTokens({
+            access_token: response.access_token,
+            refresh_token: response.refresh_token,
+          });
+        }
+      }, 100);
+
+      setUser({ username });
+      setAuthenticated(true);
+      setShowLanding(false);
+      localStorage.setItem('lastUser', username);
+      console.log('App: Login successful, setting tab to dashboard');
+      setTab('dashboard'); // Ensure we start on dashboard
+      toast.success('Login successful!');
     } catch (error) {
-      toast.error(`Login Failed: ${error}`)
+      console.error('App: Login failed:', error);
+      toast.error(`Login Failed: ${error}`);
     }
   }
 
@@ -269,7 +320,13 @@ export default function App() {
         <div className="flex">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <main className="flex-1 p-3 sm:p-6 space-y-5">
+            {/* Show ALL components during development */}
             {tab === 'dashboard' && <Dashboard role={role} />}
+            {tab === 'users' && <UserManagement />}
+            {tab === 'subscriptions' && <SubscriptionManagement />}
+            {tab === 'modules' && <ModuleManagement />}
+            {tab === 'roles' && <RoleManagement />}
+            {tab === 'tenants' && <TenantManagement />}
             {tab === 'employees' && <Employees />}
             {tab === 'students' && <Students />}
             {tab === 'fees' && <Fees />}
@@ -278,6 +335,11 @@ export default function App() {
             {tab === 'sessions' && <Sessions />}
             {tab === 'subjects' && <Subjects />}
             {tab === 'fee-structures' && <FeeStructures />}
+
+            {/* Show specific dashboard overrides temporarily commented out */}
+            {/* {tab === 'dashboard' && role === 'superadmin' && <SuperAdminDashboard />} */}
+            {/* {tab === 'dashboard' && role === 'admin' && <AdminDashboard />} */}
+
             <section className="bg-white dark:bg-slate-800 border rounded-2xl p-4">
               <h3 className="font-semibold mb-1">Policy Questions (to finalize)</h3>
               <p className="text-sm text-slate-600">1) Allow one-time total fee payment?</p>

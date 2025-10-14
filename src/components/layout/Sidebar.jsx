@@ -1,6 +1,24 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 
 export default function Sidebar({ current, onNavigate, open, onClose }) {
+  // Get user role from Redux store
+  const { userRole } = useSelector((state) => state.auth);
+  const [role, setRole] = useState('operator');
+
+  // Update local role state when Redux userRole changes
+  useEffect(() => {
+    if (userRole) {
+      if (userRole === 'SuperAdmin') {
+        setRole('superadmin');
+      } else if (userRole === 'Admin') {
+        setRole('admin');
+      } else {
+        setRole('operator');
+      }
+    }
+  }, [userRole]);
+
   const Item = ({ id, label, icon }) => (
     <button
       onClick={()=>onNavigate(id)}
@@ -14,6 +32,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
       )}
     </button>
   )
+
   return (
     <>
       {open && (
@@ -27,22 +46,64 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
         </div>
         <nav className="px-2 space-y-2">
           <Item id="dashboard" label="Dashboard" icon="📊" />
-          <Item id="employees" label="Employees" icon="👥" />
-          <Item id="students" label="Students" icon="🎓" />
-          <Item id="fees" label="Fees" icon="💰" />
-          <Item id="reports" label="Reports" icon="📈" />
+
+          {/* Show ALL tabs for development/testing */}
+          {/* SuperAdmin-specific tabs */}
+          {/* {role === 'superadmin' && ( */}
+            <>
+              <Item id="users" label="Users" icon="👥" />
+              <Item id="subscriptions" label="Subscriptions" icon="💎" />
+              <Item id="modules" label="Modules" icon="🧩" />
+              <Item id="roles" label="Roles" icon="🎭" />
+              <Item id="tenants" label="Tenants" icon="🏢" />
+            </>
+          {/* )} */}
+
+          {/* Admin-specific tabs */}
+          {/* {role === 'admin' && ( */}
+            /* <>
+              <Item id="users" label="Users" icon="👥" />
+              <Item id="subscriptions" label="Subscriptions" icon="💎" />
+            </>
+          {/* )} */}
+
+          {/* Operator/Default tabs */}
+          {/* {role === 'operator' && ( */}
+            <>
+              <Item id="employees" label="Employees" icon="🧑" />
+              <Item id="students" label="Students" icon="🎓" />
+              <Item id="fees" label="Fees" icon="💰" />
+              <Item id="reports" label="Reports" icon="📈" />
+            </>
+          {/* )} */}
         </nav>
 
-        {/* Master Data Section */}
-        <div className="px-2 pt-6 pb-3 border-t border-slate-200 dark:border-slate-700 mt-4">
-          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-wide">Master Data</div>
-        </div>
-        <nav className="px-2 space-y-2">
-          <Item id="classes" label="Classes" icon="🏫" />
-          <Item id="sessions" label="Sessions" icon="📅" />
-          <Item id="subjects" label="Subjects" icon="📚" />
-          <Item id="fee-structures" label="Fee Structures" icon="💳" />
-        </nav>
+        {/* Master Data Section - Show for all roles during development */}
+        {/* {role === 'operator' && ( */}
+          <>
+            <div className="px-2 pt-6 pb-3 border-t border-slate-200 dark:border-slate-700 mt-4">
+              <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-wide">Master Data</div>
+            </div>
+            <nav className="px-2 space-y-2">
+              <Item id="classes" label="Classes" icon="🏫" />
+              <Item id="sessions" label="Sessions" icon="📅" />
+              <Item id="subjects" label="Subjects" icon="📚" />
+              <Item id="fee-structures" label="Fee Structures" icon="💳" />
+            </nav>
+          </>
+        {/* )} */}
+
+        {/* System Management Section - Show for all roles during development */}
+        {/* {role === 'superadmin' && ( */}
+          <>
+            <div className="px-2 pt-6 pb-3 border-t border-slate-200 dark:border-slate-700 mt-4">
+              <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1 uppercase tracking-wide">System</div>
+            </div>
+            <nav className="px-2 space-y-2">
+              <Item id="reports" label="Reports" icon="📈" />
+            </nav>
+          </>
+        {/* )} */}
       </aside>
     </>
   )

@@ -1,0 +1,315 @@
+import apiClient from '../Auth/base';
+
+// Type Definitions
+export interface Module {
+  moduleId: number;
+  moduleName: string;
+  description: string;
+  isEnabled: boolean;
+  permissions: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Role {
+  roleId: number;
+  roleName: string;
+  description: string;
+  permissions: string[];
+  isSystemRole: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tenant {
+  tenantId: number;
+  tenantName: string;
+  domain: string;
+  contactEmail: string;
+  contactPhone?: string;
+  subscriptionPlan: string;
+  subscriptionStatus: 'active' | 'inactive' | 'suspended' | 'trial';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AnalyticsData {
+  totalTenants: number;
+  activeTenants: number;
+  totalModules: number;
+  systemUptime: number;
+  apiRequestCount: number;
+  errorRate: number;
+  revenueData: {
+    totalRevenue: number;
+    monthlyRevenue: number[];
+    subscriptionBreakdown: Record<string, number>;
+  };
+}
+
+export interface SystemLog {
+  logId: number;
+  level: 'info' | 'warning' | 'error' | 'debug';
+  message: string;
+  source: string;
+  userId?: number;
+  tenantId?: number;
+  timestamp: string;
+  metadata?: any;
+}
+
+export interface ModuleCreateData {
+  moduleName: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface ModuleUpdateData {
+  moduleName?: string;
+  description?: string;
+  isEnabled?: boolean;
+  permissions?: string[];
+}
+
+export interface RoleCreateData {
+  roleName: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface RoleUpdateData {
+  roleName?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+export interface TenantCreateData {
+  tenantName: string;
+  domain: string;
+  contactEmail: string;
+  contactPhone?: string;
+  subscriptionPlan: string;
+  subscriptionStatus?: 'active' | 'inactive' | 'suspended' | 'trial';
+}
+
+export interface TenantUpdateData {
+  tenantName?: string;
+  domain?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  subscriptionPlan?: string;
+  subscriptionStatus?: 'active' | 'inactive' | 'suspended' | 'trial';
+}
+
+export interface PageableResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+}
+
+// API Response wrapper
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+// Module Management APIs
+export const getModules = async (page = 0, size = 10, search?: string): Promise<PageableResponse<Module>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+  if (search) params.append('search', search);
+
+  const response = await apiClient.get<ApiResponse<PageableResponse<Module>>>(`/superadmin/modules?${params}`);
+  return response.data.data;
+};
+
+export const getModuleById = async (moduleId: number): Promise<Module> => {
+  const response = await apiClient.get<ApiResponse<Module>>(`/SuperAdmin/modules/${moduleId}`);
+  return response.data.data;
+};
+
+export const createModule = async (moduleData: ModuleCreateData): Promise<Module> => {
+  const response = await apiClient.post<ApiResponse<Module>>('/SuperAdmin/modules', moduleData);
+  return response.data.data;
+};
+
+export const updateModule = async (moduleId: number, moduleData: ModuleUpdateData): Promise<Module> => {
+  const response = await apiClient.put<ApiResponse<Module>>(`/SuperAdmin/modules/${moduleId}`, moduleData);
+  return response.data.data;
+};
+
+export const deleteModule = async (moduleId: number): Promise<void> => {
+  await apiClient.delete(`/SuperAdmin/modules/${moduleId}`);
+};
+
+export const toggleModuleStatus = async (moduleId: number, isEnabled: boolean): Promise<Module> => {
+  const response = await apiClient.patch<ApiResponse<Module>>(`/SuperAdmin/modules/${moduleId}/status`, { isEnabled });
+  return response.data.data;
+};
+
+// Role Management APIs
+export const getRoles = async (page = 0, size = 10, search?: string): Promise<PageableResponse<Role>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+  if (search) params.append('search', search);
+
+  const response = await apiClient.get<ApiResponse<any>>(`/superadmin/roles?${params}`);
+  // Handle both paginated and direct array responses
+  const data = response.data.data;
+  console.log('getRoles API response:', data);
+
+  if (Array.isArray(data)) {
+    // Direct array response - wrap in pageable format
+    console.log('Converting array response to pageable:', data);
+    return {
+      content: data,
+      totalElements: data.length,
+      totalPages: 1,
+      size: data.length,
+      number: 0,
+      first: true,
+      last: true,
+    };
+  } else {
+    // Already paginated response
+    console.log('Using paginated response:', data);
+    return data;
+  }
+};
+
+export const getRoleById = async (roleId: number): Promise<Role> => {
+  const response = await apiClient.get<ApiResponse<Role>>(`/SuperAdmin/roles/${roleId}`);
+  return response.data.data;
+};
+
+export const createRole = async (roleData: RoleCreateData): Promise<Role> => {
+  const response = await apiClient.post<ApiResponse<Role>>('/SuperAdmin/roles', roleData);
+  return response.data.data;
+};
+
+export const updateRole = async (roleId: number, roleData: RoleUpdateData): Promise<Role> => {
+  const response = await apiClient.put<ApiResponse<Role>>(`/SuperAdmin/roles/${roleId}`, roleData);
+  return response.data.data;
+};
+
+export const deleteRole = async (roleId: number): Promise<void> => {
+  await apiClient.delete(`/SuperAdmin/roles/${roleId}`);
+};
+
+export const assignRoleToUsers = async (roleId: number, userIds: number[]): Promise<void> => {
+  await apiClient.post(`/SuperAdmin/roles/${roleId}/assign`, { userIds });
+};
+
+export const revokeRoleFromUsers = async (roleId: number, userIds: number[]): Promise<void> => {
+  await apiClient.post(`/SuperAdmin/roles/${roleId}/revoke`, { userIds });
+};
+
+// Tenant Management APIs
+export const getTenants = async (page = 0, size = 10, search?: string, status?: string): Promise<PageableResponse<Tenant>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+  if (search) params.append('search', search);
+  if (status) params.append('status', status);
+
+  const response = await apiClient.get<ApiResponse<PageableResponse<Tenant>>>(`/superadmin/tenants?${params}`);
+  return response.data.data;
+};
+
+export const getTenantById = async (tenantId: number): Promise<Tenant> => {
+  const response = await apiClient.get<ApiResponse<Tenant>>(`/superadmin/tenants/${tenantId}`);
+  return response.data.data;
+};
+
+export const createTenant = async (tenantData: TenantCreateData): Promise<Tenant> => {
+  const response = await apiClient.post<ApiResponse<Tenant>>('/superadmin/tenants', tenantData);
+  return response.data.data;
+};
+
+export const updateTenant = async (tenantId: number, tenantData: TenantUpdateData): Promise<Tenant> => {
+  const response = await apiClient.put<ApiResponse<Tenant>>(`/superadmin/tenants/${tenantId}`, tenantData);
+  return response.data.data;
+};
+
+export const deleteTenant = async (tenantId: number): Promise<void> => {
+  await apiClient.delete(`/superadmin/tenants/${tenantId}`);
+};
+
+export const suspendTenant = async (tenantId: number, reason?: string): Promise<Tenant> => {
+  const response = await apiClient.patch<ApiResponse<Tenant>>(`/superadmin/tenants/${tenantId}/suspend`, { reason });
+  return response.data.data;
+};
+
+export const reactivateTenant = async (tenantId: number): Promise<Tenant> => {
+  const response = await apiClient.patch<ApiResponse<Tenant>>(`/superadmin/tenants/${tenantId}/reactivate`);
+  return response.data.data;
+};
+
+// Analytics & Dashboard APIs
+export const getAnalyticsData = async (period = 'month'): Promise<AnalyticsData> => {
+  const response = await apiClient.get<ApiResponse<AnalyticsData>>(`/SuperAdmin/analytics?period=${period}`);
+  return response.data.data;
+};
+
+export const getSystemLogs = async (page = 0, size = 10, level?: string, source?: string): Promise<PageableResponse<SystemLog>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+  if (level) params.append('level', level);
+  if (source) params.append('source', source);
+
+  const response = await apiClient.get<ApiResponse<PageableResponse<SystemLog>>>(`/SuperAdmin/logs?${params}`);
+  return response.data.data;
+};
+
+export const getSystemHealth = async (): Promise<any> => {
+  const response = await apiClient.get<ApiResponse<any>>('/SuperAdmin/health');
+  return response.data.data;
+};
+
+// Permission Management APIs
+export const getAllSystemPermissions = async (): Promise<string[]> => {
+  const response = await apiClient.get<ApiResponse<string[]>>('/SuperAdmin/permissions/system');
+  return response.data.data;
+};
+
+export const createPermission = async (permission: string, description?: string): Promise<{ message: string }> => {
+  const response = await apiClient.post<ApiResponse<{ message: string }>>('/SuperAdmin/permissions', { permission, description });
+  return response.data.data;
+};
+
+export const deletePermission = async (permission: string): Promise<{ message: string }> => {
+  const response = await apiClient.delete<ApiResponse<{ message: string }>>(`/SuperAdmin/permissions/${encodeURIComponent(permission)}`);
+  return response.data.data;
+};
+
+// System Configuration APIs
+export const getSystemConfig = async (): Promise<any> => {
+  const response = await apiClient.get<ApiResponse<any>>('/SuperAdmin/config');
+  return response.data.data;
+};
+
+export const updateSystemConfig = async (config: any): Promise<any> => {
+  const response = await apiClient.put<ApiResponse<any>>('/SuperAdmin/config', config);
+  return response.data.data;
+};
+
+export const backupSystem = async (): Promise<{ backupId: string; downloadUrl: string }> => {
+  const response = await apiClient.post<ApiResponse<{ backupId: string; downloadUrl: string }>>('/SuperAdmin/backup');
+  return response.data.data;
+};
+
+export const restoreSystem = async (backupId: string): Promise<void> => {
+  await apiClient.post(`/SuperAdmin/restore/${backupId}`);
+};

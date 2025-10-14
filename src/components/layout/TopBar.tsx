@@ -28,6 +28,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../Auth/store';
 import { logoutUserAsync } from '../Auth/store';
 import TokenManager from '../Auth/tokenManager';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  userRole: string | null;
+  userRoles: string[];
+}
 import toast from 'react-hot-toast';
 
 const muiTheme = createTheme(); // Default MUI theme, can be customized

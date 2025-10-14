@@ -18,11 +18,11 @@ class TokenManager {
     return TokenManager.instance;
   }
 
-  setTokens(tokens: { access_token: string; refresh_token: string; expires_in?: number }): void {
+  setTokens(tokens: { access_token?: string; refresh_token?: string; accessToken?: string; refreshToken?: string; expires_in?: number }): void {
     const expiresIn = tokens.expires_in || 1800; // default 30 mins
     this.tokens = {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
+      accessToken: tokens.access_token || tokens.accessToken || '',
+      refreshToken: tokens.refresh_token || tokens.refreshToken || '',
       expiresAt: Date.now() + (expiresIn * 1000)
     };
     localStorage.setItem('tokens', JSON.stringify(this.tokens));
