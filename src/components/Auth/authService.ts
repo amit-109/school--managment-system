@@ -37,6 +37,31 @@ export interface LoginData {
   password: string;
 }
 
+// RBAC Permission structures
+export interface Permission {
+  permissionId: number;
+  permissionName: string;
+  description?: string;
+}
+
+export interface SubModule {
+  subModuleId: number;
+  subModuleName: string;
+  displayName?: string;
+  permissions: Permission[];
+}
+
+export interface Module {
+  moduleId: number;
+  moduleName: string;
+  displayName?: string;
+  subModules: SubModule[];
+}
+
+export interface PermissionsData {
+  modules: Module[];
+}
+
 export const registerUser = async (data: RegisterData): Promise<any> => {
   const response = await apiClient.post('/Auth/register', data);
   return response.data;

@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import AgGridBox from '../shared/AgGridBox'
 import { demoStudents } from '../../data/students.js'
+import { usePermissions } from '../Auth/usePermissions'
 
 export default function Students() {
+  const { canCreate, canUpdate, canDelete, canRead } = usePermissions()
   const [rows, setRows] = useState(demoStudents)
   const [show, setShow] = useState(false)
   const [editMode, setEditMode] = useState(false)

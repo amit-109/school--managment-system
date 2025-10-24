@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import toast from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
 import TopBar from './components/layout/TopBar.tsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import Dashboard from './components/modules/Dashboard.tsx'
@@ -9,6 +9,7 @@ import SuperAdminDashboard from './components/modules/SuperAdminDashboard.tsx'
 import UserManagement from './components/modules/UserManagement.tsx'
 import SubscriptionManagement from './components/modules/SubscriptionManagement.tsx'
 import ModuleManagement from './components/modules/ModuleManagement.tsx'
+import SubModuleManagement from './components/modules/SubModuleManagement.tsx'
 import RoleManagement from './components/modules/RoleManagement.tsx'
 import TenantManagement from './components/modules/TenantManagement.tsx'
 import Employees from './components/modules/Employees.jsx'
@@ -139,24 +140,11 @@ export default function App() {
       clearTimeout(warningTimer)
 
       warningTimer = setTimeout(() => {
-        Swal.fire({
-          title: 'Inactivity Warning',
-          text: 'You will be automatically logged out in 1 minute due to inactivity. Click "Continue" to extend your session.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Continue Session',
-          cancelButtonText: 'Logout Now',
-          timer: 60 * 1000,
-          timerProgressBar: true,
-        }).then((result) => {
-          if (result.isConfirmed) {
-            resetTimers()
-          } else if (result.dismiss === Swal.DismissReason.timer) {
-            handleLogout()
-          } else {
-            handleLogout()
-          }
-        }) || toast.warning('Session expiring soon!', { duration: 60000 })
+        toast.error('Session expiring soon! You will be logged out in 1 minute.', { duration: 60000 })
+        // Auto-logout after warning period
+        setTimeout(() => {
+          handleLogout()
+        }, 60 * 1000)
       }, WARNING_TIME)
 
       logoutTimer = setTimeout(() => {
@@ -285,14 +273,13 @@ export default function App() {
   const handleRegister = async (userData) => {
     try {
       await dispatch(registerUserAsync(userData)).unwrap()
-      Swal.fire('Success!', 'Account created successfully! Please login now.', 'success').then(() => {
-        setShowLanding(false)
-        setShowRegister(false)
-        setShowPricing(false)
-        // Go to login, don't authenticate yet
-      })
+      toast.success('Account created successfully! Please login now.')
+      setShowLanding(false)
+      setShowRegister(false)
+      setShowPricing(false)
+      // Go to login, don't authenticate yet
     } catch (error) {
-      Swal.fire('Registration Failed', error, 'error')
+      toast.error(`Registration Failed: ${error}`)
     }
   }
 
@@ -325,6 +312,7 @@ export default function App() {
             {tab === 'users' && <UserManagement />}
             {tab === 'subscriptions' && <SubscriptionManagement />}
             {tab === 'modules' && <ModuleManagement />}
+            {tab === 'submodules' && <SubModuleManagement />}
             {tab === 'roles' && <RoleManagement />}
             {tab === 'tenants' && <TenantManagement />}
             {tab === 'employees' && <Employees />}

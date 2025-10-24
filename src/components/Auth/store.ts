@@ -1,5 +1,5 @@
 import { configureStore, createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { SubscriptionPlan, RegisterData, LoginData, getSubscriptionPlans, registerUser, loginUser, logoutUser } from './authService';
+import { SubscriptionPlan, RegisterData, LoginData, PermissionsData, getSubscriptionPlans, registerUser, loginUser, logoutUser } from './authService';
 import TokenManager from './tokenManager';
 
 // Define the state interface
@@ -16,6 +16,7 @@ interface AuthState {
   isAuthenticated: boolean;
   userRole: string | null;
   userRoles: string[];
+  permissions: PermissionsData | null;
 }
 
 // Initial state
@@ -32,6 +33,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   userRole: null,
   userRoles: [],
+  permissions: null,
 };
 
 // Async thunk for fetching subscription plans
@@ -157,6 +159,14 @@ const authSlice = createSlice({
           state.refreshToken = refreshToken;
           state.isAuthenticated = true;
 
+          // Extract permissions from response
+          const permissions = responseData?.permissions;
+          if (permissions && typeof permissions === 'object') {
+            state.permissions = permissions;
+          } else {
+            state.permissions = null;
+          }
+
           // Extract roles from response - check multiple possible locations
           let roles = responseData?.roles || responseData?.role || responseData?.userRoles;
 
@@ -174,11 +184,12 @@ const authSlice = createSlice({
             state.userRoles = ['Operator'];
           }
 
-          console.log('Login fulfilled - setting tokens and roles:', {
+          console.log('Login fulfilled - setting tokens, roles, and permissions:', {
             accessToken: accessToken.substring(0, 20) + '...',
             refreshToken: refreshToken.substring(0, 20) + '...',
             userRole: state.userRole,
             userRoles: state.userRoles,
+            hasPermissions: !!state.permissions,
             isAuthenticated: true
           });
         } else {
@@ -210,6 +221,42 @@ export const { setSelectedPlan, setTokens, clearTokens } = authSlice.actions;
 
 // Export the reducer
 export const authReducer = authSlice.reducer;
+
+// Permission checking utility functions
+export const hasPermission = (state: RootState, permissionName: string): boolean => {
+  const { permissions } = state.auth;
+  if (!permissions?.modules) return false;
+
+  // Search through all modules, submodules, and permissions
+  for (const module of permissions.modules) {
+    for (const subModule of module.subModules) {
+      const foundPermission = subModule.permissions.find(
+        permission => permission.permissionName === permissionName
+      );
+      if (foundPermission) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+export const getAccessibleModules = (state: RootState): { moduleName: string; displayName?: string }[] => {
+  const { permissions } = state.auth;
+  if (!permissions?.modules) return [];
+
+  // Return modules the user has access to (based on having at least one permission in a submodule)
+  return permissions.modules
+    .filter(module =>
+      module.subModules.some(subModule =>
+        subModule.permissions.length > 0
+      )
+    )
+    .map(module => ({
+      moduleName: module.moduleName,
+      displayName: module.displayName || module.moduleName
+    }));
+};
 
 // Configure the store
 export const store = configureStore({

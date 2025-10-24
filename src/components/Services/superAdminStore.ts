@@ -5,6 +5,10 @@ import {
   Tenant,
   AnalyticsData,
   SystemLog,
+  SubscriptionPlan,
+  SubModule,
+  SubModuleCreateData,
+  SubModuleUpdateData,
   ModuleCreateData,
   ModuleUpdateData,
   RoleCreateData,
@@ -42,6 +46,11 @@ import {
   updateSystemConfig,
   backupSystem,
   restoreSystem,
+  getSubscriptionPlans,
+  getSubModules,
+  createSubModule,
+  updateSubModule,
+  deleteSubModule,
 } from './superAdminService';
 
 // Define super admin state interface
@@ -49,6 +58,8 @@ interface SuperAdminState {
   modules: Module[];
   roles: Role[];
   tenants: Tenant[];
+  subscriptionPlans: SubscriptionPlan[];
+  subModules: SubModule[];
   currentModule: Module | null;
   currentRole: Role | null;
   currentTenant: Tenant | null;
@@ -57,6 +68,11 @@ interface SuperAdminState {
   systemHealth: any;
   systemConfig: any;
   systemPermissions: string[];
+  subscriptionPlansLoading: boolean;
+  subModulesLoading: boolean;
+  creatingSubModule: boolean;
+  updatingSubModule: boolean;
+  deletingSubModule: boolean;
 
   // Loading states
   loading: boolean;
@@ -123,6 +139,8 @@ const initialState: SuperAdminState = {
   modules: [],
   roles: [],
   tenants: [],
+  subscriptionPlans: [],
+  subModules: [],
   currentModule: null,
   currentRole: null,
   currentTenant: null,
@@ -131,6 +149,11 @@ const initialState: SuperAdminState = {
   systemHealth: null,
   systemConfig: null,
   systemPermissions: [],
+  subscriptionPlansLoading: false,
+  subModulesLoading: false,
+  creatingSubModule: false,
+  updatingSubModule: false,
+  deletingSubModule: false,
 
   loading: false,
   modulesLoading: false,
@@ -551,6 +574,74 @@ export const deletePermissionAsync = createAsyncThunk(
   }
 );
 
+// Async thunks for Subscription Plans
+export const fetchSubscriptionPlansAsync = createAsyncThunk(
+  'superAdmin/fetchSubscriptionPlans',
+  async ({ page = 0, size = 10 }: { page?: number; size?: number }, { rejectWithValue }) => {
+    try {
+      const response = await getSubscriptionPlans(page, size);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Async thunks for SubModules
+export const fetchSubModulesAsync = createAsyncThunk(
+  'superAdmin/fetchSubModules',
+  async ({ page = 0, size = 10 }: { page?: number; size?: number }, { rejectWithValue }) => {
+    try {
+      const response = await getSubModules(page, size);
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const createSubModuleAsync = createAsyncThunk(
+  'superAdmin/createSubModule',
+  async (subModuleData: SubModuleCreateData, { rejectWithValue }) => {
+    try {
+      console.log('Creating SubModule with payload:', subModuleData);
+      const subModule = await createSubModule(subModuleData);
+      return subModule;
+    } catch (error: any) {
+      console.error('SubModule creation API error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create submodule';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const updateSubModuleAsync = createAsyncThunk(
+  'superAdmin/updateSubModule',
+  async ({ subModuleId, subModuleData }: { subModuleId: number; subModuleData: SubModuleUpdateData }, { rejectWithValue }) => {
+    try {
+      console.log('Updating SubModule with payload:', { subModuleId, subModuleData });
+      const subModule = await updateSubModule(subModuleId, subModuleData);
+      return subModule;
+    } catch (error: any) {
+      console.error('SubModule update API error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update submodule';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const deleteSubModuleAsync = createAsyncThunk(
+  'superAdmin/deleteSubModule',
+  async (subModuleId: number, { rejectWithValue }) => {
+    try {
+      await deleteSubModule(subModuleId);
+      return subModuleId;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // Create the slice
 const superAdminSlice = createSlice({
   name: 'superAdmin',
@@ -803,6 +894,69 @@ const superAdminSlice = createSlice({
       .addCase(deletePermissionAsync.fulfilled, (state, action: PayloadAction<string>) => {
         // Permission deleted successfully, can refresh permissions list if needed
         console.log('Permission deleted successfully:', action.payload);
+      })
+      .addCase(fetchSubscriptionPlansAsync.pending, (state) => {
+        state.subscriptionPlansLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchSubscriptionPlansAsync.fulfilled, (state, action: PayloadAction<PageableResponse<SubscriptionPlan>>) => {
+        state.subscriptionPlansLoading = false;
+        state.subscriptionPlans = action.payload.content;
+      })
+      .addCase(fetchSubscriptionPlansAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.subscriptionPlansLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchSubModulesAsync.pending, (state) => {
+        state.subModulesLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchSubModulesAsync.fulfilled, (state, action: PayloadAction<PageableResponse<SubModule>>) => {
+        state.subModulesLoading = false;
+        state.subModules = action.payload.content;
+      })
+      .addCase(fetchSubModulesAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.subModulesLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(createSubModuleAsync.pending, (state) => {
+        state.creatingSubModule = true;
+        state.error = null;
+      })
+      .addCase(createSubModuleAsync.fulfilled, (state, action: PayloadAction<SubModule>) => {
+        state.creatingSubModule = false;
+        state.subModules.push(action.payload);
+      })
+      .addCase(createSubModuleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.creatingSubModule = false;
+        state.error = action.payload;
+      })
+      .addCase(updateSubModuleAsync.pending, (state) => {
+        state.updatingSubModule = true;
+        state.error = null;
+      })
+      .addCase(updateSubModuleAsync.fulfilled, (state, action: PayloadAction<SubModule>) => {
+        state.updatingSubModule = false;
+        const index = state.subModules.findIndex(subModule => subModule.subModuleId === action.payload.subModuleId);
+        if (index !== -1) {
+          state.subModules[index] = action.payload;
+        }
+      })
+      .addCase(updateSubModuleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.updatingSubModule = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteSubModuleAsync.pending, (state) => {
+        state.deletingSubModule = true;
+        state.error = null;
+      })
+      .addCase(deleteSubModuleAsync.fulfilled, (state, action: PayloadAction<number>) => {
+        state.deletingSubModule = false;
+        state.subModules = state.subModules.filter(subModule => subModule.subModuleId !== action.payload);
+      })
+      .addCase(deleteSubModuleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.deletingSubModule = false;
+        state.error = action.payload;
       })
   },
 });

@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import { AppDispatch, RootState } from '../../store';
+import { usePermissions } from '../Auth/usePermissions';
 import {
   fetchUsersAsync,
   createUserAsync,
@@ -33,6 +34,7 @@ interface UserManagementProps {
 
 const UserManagement: FC<UserManagementProps> = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const { canCreate, canUpdate, canDelete, canRead } = usePermissions();
   const {
     users,
     usersPagination,
@@ -134,7 +136,7 @@ const UserManagement: FC<UserManagementProps> = () => {
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
+  const handleDeleteUser = useCallback(async (user: User) => {
     const result = await Swal.fire({
       title: 'Are you sure?',
       text: `Delete user "${user.firstName} ${user.lastName}"? This action cannot be undone.`,
@@ -154,7 +156,7 @@ const UserManagement: FC<UserManagementProps> = () => {
         toast.error(`Failed to delete user: ${error}`);
       }
     }
-  };
+  }, [dispatch, loadUsers]);
 
   const handleToggleUserStatus = async (user: User) => {
     try {
@@ -166,7 +168,7 @@ const UserManagement: FC<UserManagementProps> = () => {
     }
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = useCallback((user: User) => {
     dispatch(setSelectedUser(user));
     setUserForm({
       username: user.username,
@@ -178,7 +180,7 @@ const UserManagement: FC<UserManagementProps> = () => {
       role: user.role,
     });
     setShowEditModal(true);
-  };
+  }, [dispatch]);
 
   const resetForm = (): void => {
     setUserForm({
@@ -272,15 +274,17 @@ const UserManagement: FC<UserManagementProps> = () => {
 
   const toolbarButtons = (
     <div className="flex items-center gap-3">
-      <button
-        onClick={() => setShowCreateModal(true)}
-        className="btn-primary flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-        Add User
-      </button>
+      {canCreate('UserManagement') && (
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Add User
+        </button>
+      )}
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -305,8 +309,8 @@ const UserManagement: FC<UserManagementProps> = () => {
           title="Users"
           columnDefs={userColumns}
           rowData={Array.isArray(users) ? users : []}
-          onEdit={handleEditUser}
-          onDelete={handleDeleteUser}
+          onEdit={canUpdate('UserManagement') ? handleEditUser : undefined}
+          onDelete={canDelete('UserManagement') ? handleDeleteUser : undefined}
           toolbar={toolbarButtons}
         />
 

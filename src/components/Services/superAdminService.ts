@@ -5,10 +5,12 @@ export interface Module {
   moduleId: number;
   moduleName: string;
   description: string;
-  isEnabled: boolean;
-  permissions: string[];
-  createdAt: string;
-  updatedAt: string;
+  icon?: string;
+  routePath?: string;
+  orderNo?: number;
+  isActive: boolean;
+  createdOn: string;
+  assignedRoleIds: number[];
 }
 
 export interface Role {
@@ -61,7 +63,11 @@ export interface SystemLog {
 export interface ModuleCreateData {
   moduleName: string;
   description: string;
-  permissions: string[];
+  icon?: string;
+  routePath?: string;
+  orderNo?: number;
+  isActive?: boolean;
+  assignedRoleIds?: number[];
 }
 
 export interface ModuleUpdateData {
@@ -101,6 +107,52 @@ export interface TenantUpdateData {
   subscriptionStatus?: 'active' | 'inactive' | 'suspended' | 'trial';
 }
 
+export interface SubscriptionPlan {
+  planId: number;
+  planName: string;
+  description: string;
+  price: number;
+  billingCycle: string;
+  customMonths: number;
+  isActive: boolean;
+}
+
+export interface SubModule {
+  subModuleId: number;
+  moduleId: number;
+  subModuleName: string;
+  description: string;
+  routePath: string;
+  orderNo: number;
+  isActive: boolean;
+  createdOn: string;
+  assignedRoleIds: number[];
+}
+
+export interface SubModuleCreateData {
+  subModuleId: number;
+  moduleId: number;
+  subModuleName: string;
+  description: string;
+  routePath: string;
+  orderNo: number;
+  isActive: boolean;
+  createdOn: string;
+  assignedRoleIds: number[];
+}
+
+export interface SubModuleUpdateData {
+  subModuleId: number;
+  moduleId: number;
+  subModuleName: string;
+  description: string;
+  routePath: string;
+  orderNo: number;
+  isActive: boolean;
+  createdOn: string;
+  assignedRoleIds: number[];
+}
+
 export interface PageableResponse<T> {
   content: T[];
   totalElements: number;
@@ -126,8 +178,19 @@ export const getModules = async (page = 0, size = 10, search?: string): Promise<
   });
   if (search) params.append('search', search);
 
-  const response = await apiClient.get<ApiResponse<PageableResponse<Module>>>(`/superadmin/modules?${params}`);
-  return response.data.data;
+  const response = await apiClient.get<ApiResponse<Module[]>>(`/superadmin/modules?${params}`);
+  const data = response.data.data;
+  
+  // API returns direct array, wrap in pageable format
+  return {
+    content: data,
+    totalElements: data.length,
+    totalPages: Math.ceil(data.length / size),
+    size: size,
+    number: page,
+    first: page === 0,
+    last: page >= Math.ceil(data.length / size) - 1,
+  };
 };
 
 export const getModuleById = async (moduleId: number): Promise<Module> => {
@@ -136,7 +199,7 @@ export const getModuleById = async (moduleId: number): Promise<Module> => {
 };
 
 export const createModule = async (moduleData: ModuleCreateData): Promise<Module> => {
-  const response = await apiClient.post<ApiResponse<Module>>('/SuperAdmin/modules', moduleData);
+  const response = await apiClient.post<ApiResponse<Module>>('/superadmin/modules', moduleData);
   return response.data.data;
 };
 
@@ -312,4 +375,86 @@ export const backupSystem = async (): Promise<{ backupId: string; downloadUrl: s
 
 export const restoreSystem = async (backupId: string): Promise<void> => {
   await apiClient.post(`/SuperAdmin/restore/${backupId}`);
+};
+
+// Subscription Plans APIs
+export const getSubscriptionPlans = async (page = 0, size = 10): Promise<PageableResponse<SubscriptionPlan>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+
+  const response = await apiClient.get<ApiResponse<SubscriptionPlan[]>>(`/superadmin/subscription/plans?${params}`);
+  const data = response.data.data;
+  
+  // API returns direct array, wrap in pageable format
+  return {
+    content: data,
+    totalElements: data.length,
+    totalPages: Math.ceil(data.length / size),
+    size: size,
+    number: page,
+    first: page === 0,
+    last: page >= Math.ceil(data.length / size) - 1,
+  };
+};
+
+// SubModule Management APIs
+export const getSubModules = async (page = 0, size = 10): Promise<PageableResponse<SubModule>> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    size: size.toString(),
+  });
+
+  const response = await apiClient.get<ApiResponse<SubModule[]>>(`/superadmin/modules/submodules?${params}`);
+  const data = response.data.data;
+  
+  // API returns direct array, wrap in pageable format
+  return {
+    content: data,
+    totalElements: data.length,
+    totalPages: Math.ceil(data.length / size),
+    size: size,
+    number: page,
+    first: page === 0,
+    last: page >= Math.ceil(data.length / size) - 1,
+  };
+};
+
+export const createSubModule = async (subModuleData: SubModuleCreateData): Promise<SubModule> => {
+  try {
+    console.log('API: Creating SubModule with data:', subModuleData);
+    const response = await apiClient.post<ApiResponse<SubModule>>('/superadmin/modules/submodules', subModuleData);
+    console.log('API: SubModule creation response:', response.data);
+    return response.data.data;
+  } catch (error: any) {
+    console.error('API: SubModule creation failed:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+};
+
+export const updateSubModule = async (subModuleId: number, subModuleData: SubModuleUpdateData): Promise<SubModule> => {
+  try {
+    console.log('API: Updating SubModule with data:', { subModuleId, subModuleData });
+    const response = await apiClient.put<ApiResponse<SubModule>>(`/superadmin/modules/submodules/${subModuleId}`, subModuleData);
+    console.log('API: SubModule update response:', response.data);
+    return response.data.data;
+  } catch (error: any) {
+    console.error('API: SubModule update failed:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+};
+
+export const deleteSubModule = async (subModuleId: number): Promise<void> => {
+  await apiClient.delete(`/superadmin/modules/submodules/${subModuleId}`);
 };

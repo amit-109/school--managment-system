@@ -19,8 +19,12 @@ import { AppDispatch, RootState } from '../../store';
 interface ModuleFormData {
   moduleName: string;
   description: string;
-  permissions: string[];
-  isEnabled: boolean;
+  icon?: string;
+  routePath?: string;
+  orderNo?: number;
+  isActive: boolean;
+  assignedRoleIds: number[];
+  createdOn?: string;
 }
 
 interface ModuleManagementProps {
@@ -46,16 +50,18 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   const [moduleForm, setModuleForm] = useState<ModuleFormData>({
     moduleName: '',
     description: '',
-    permissions: [],
-    isEnabled: true,
+    isActive: true,
+    assignedRoleIds: [],
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [permissionsInput, setPermissionsInput] = useState<string>('');
 
   useEffect(() => {
-    loadModules();
-  }, [currentPage, pageSize, searchTerm]);
+    if (!modulesLoading) {
+      dispatch(fetchModulesAsync({ page: currentPage, size: pageSize, search: searchTerm }));
+    }
+  }, [dispatch, currentPage, pageSize, searchTerm]);
 
   const loadModules = useCallback(() => {
     dispatch(fetchModulesAsync({ page: currentPage, size: pageSize, search: searchTerm }));
@@ -67,7 +73,11 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
       const moduleData: ModuleCreateData = {
         moduleName: moduleForm.moduleName,
         description: moduleForm.description,
-        permissions: moduleForm.permissions,
+        icon: moduleForm.icon || 'default',
+        routePath: moduleForm.routePath || '',
+        orderNo: moduleForm.orderNo || 0,
+        isActive: moduleForm.isActive,
+        assignedRoleIds: moduleForm.assignedRoleIds,
       };
       await dispatch(createModuleAsync(moduleData)).unwrap();
       toast.success('Module created successfully!');
@@ -87,8 +97,8 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
       const moduleData: ModuleUpdateData = {
         moduleName: moduleForm.moduleName,
         description: moduleForm.description,
-        isEnabled: moduleForm.isEnabled,
-        permissions: moduleForm.permissions,
+        isEnabled: true,
+        permissions: [],
       };
       await dispatch(updateModuleAsync({
         moduleId: selectedModule.moduleId,
@@ -127,11 +137,11 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
 
   const handleToggleModuleStatus = async (module: Module) => {
     try {
-      await dispatch(toggleModuleStatusAsync({ moduleId: module.moduleId, isEnabled: !module.isEnabled })).unwrap();
-      toast.success(`Module ${module.isEnabled ? 'disabled' : 'enabled'} successfully!`);
+      await dispatch(toggleModuleStatusAsync({ moduleId: module.moduleId, isEnabled: !module.isActive })).unwrap();
+      toast.success(`Module ${module.isActive ? 'disabled' : 'enabled'} successfully!`);
       loadModules();
     } catch (error: any) {
-      toast.error(`Failed to ${module.isEnabled ? 'disable' : 'enable'} module: ${error}`);
+      toast.error(`Failed to ${module.isActive ? 'disable' : 'enable'} module: ${error}`);
     }
   };
 
@@ -140,10 +150,9 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     setModuleForm({
       moduleName: module.moduleName,
       description: module.description,
-      permissions: module.permissions,
-      isEnabled: module.isEnabled,
+      isActive: module.isActive,
+      assignedRoleIds: module.assignedRoleIds,
     });
-    setPermissionsInput(module.permissions.join(', '));
     setShowEditModal(true);
   };
 
@@ -151,8 +160,8 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     setModuleForm({
       moduleName: '',
       description: '',
-      permissions: [],
-      isEnabled: true,
+      isActive: true,
+      assignedRoleIds: [],
     });
     setPermissionsInput('');
   };
@@ -166,8 +175,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   const handlePermissionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setPermissionsInput(value);
-    const permissions = value.split(',').map(p => p.trim()).filter(p => p !== '');
-    setModuleForm({...moduleForm, permissions});
+    // Note: permissions are handled separately, not stored in form state
   };
 
   const moduleColumns = [
@@ -215,7 +223,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     },
     {
       headerName: 'Status',
-      field: 'isEnabled',
+      field: 'isActive',
       sortable: true,
       cellRenderer: (params: any) => (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -223,13 +231,13 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
             : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
         }`}>
-          {params.value ? 'Enabled' : 'Disabled'}
+          {params.value ? 'Active' : 'Inactive'}
         </span>
       ),
     },
     {
       headerName: 'Created',
-      field: 'createdAt',
+      field: 'createdOn',
       valueFormatter: (params: any) => new Date(params.value).toLocaleDateString(),
       sortable: true,
     },
@@ -269,7 +277,10 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
         <AgGridBox
           title="System Modules"
           columnDefs={moduleColumns}
-          rowData={Array.isArray(modules) ? modules : []}
+          rowData={Array.isArray(modules) ? modules.map(module => ({
+            ...module,
+            permissions: module.assignedRoleIds || []
+          })) : []}
           onEdit={handleEditModule}
           onDelete={handleDeleteModule}
           toolbar={toolbarButtons}
@@ -389,12 +400,12 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
                   type="button"
                   onClick={() => selectedModule && handleToggleModuleStatus(selectedModule)}
                   className={`w-full py-2 px-4 rounded-lg text-sm font-medium ${
-                    selectedModule.isEnabled
+                    selectedModule.isActive
                       ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400'
                       : 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400'
                   }`}
                 >
-                  {selectedModule.isEnabled ? 'Disable Module' : 'Enable Module'}
+                  {selectedModule.isActive ? 'Disable Module' : 'Enable Module'}
                 </button>
               </div>
             </div>

@@ -125,7 +125,7 @@ export const getAllSubscriptions = async (page = 0, size = 10, status?: string):
   });
   if (status) params.append('status', status);
 
-  const response = await apiClient.get<ApiResponse<PageableResponse<SubscriptionDetails>>>(`/Admin/subscriptions?${params}`);
+  const response = await apiClient.get<ApiResponse<PageableResponse<SubscriptionDetails>>>(`/superadmin/subscription/plans?${params}`);
   return response.data.data;
 };
 
