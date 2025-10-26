@@ -179,19 +179,9 @@ const authSlice = createSlice({
               state.userRole = roles;
             }
           } else {
-            console.log('No roles found in response, setting default');
             state.userRole = 'Operator'; // Default role
             state.userRoles = ['Operator'];
           }
-
-          console.log('Login fulfilled - setting tokens, roles, and permissions:', {
-            accessToken: accessToken.substring(0, 20) + '...',
-            refreshToken: refreshToken.substring(0, 20) + '...',
-            userRole: state.userRole,
-            userRoles: state.userRoles,
-            hasPermissions: !!state.permissions,
-            isAuthenticated: true
-          });
         } else {
           console.log('Login fulfilled - no valid token data:', responseData);
         }

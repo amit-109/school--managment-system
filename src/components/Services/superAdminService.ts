@@ -117,6 +117,25 @@ export interface SubscriptionPlan {
   isActive: boolean;
 }
 
+export interface SubscriptionPlanCreateData {
+  planId?: number;
+  planName: string;
+  description: string;
+  price: number;
+  billingCycle: string;
+  customMonths?: number;
+  isActive?: boolean;
+}
+
+export interface SubscriptionPlanUpdateData {
+  planName?: string;
+  description?: string;
+  price?: number;
+  billingCycle?: string;
+  customMonths?: number;
+  isActive?: boolean;
+}
+
 export interface SubModule {
   subModuleId: number;
   moduleId: number;
@@ -386,7 +405,7 @@ export const getSubscriptionPlans = async (page = 0, size = 10): Promise<Pageabl
 
   const response = await apiClient.get<ApiResponse<SubscriptionPlan[]>>(`/superadmin/subscription/plans?${params}`);
   const data = response.data.data;
-  
+
   // API returns direct array, wrap in pageable format
   return {
     content: data,
@@ -397,6 +416,25 @@ export const getSubscriptionPlans = async (page = 0, size = 10): Promise<Pageabl
     first: page === 0,
     last: page >= Math.ceil(data.length / size) - 1,
   };
+};
+
+export const getSubscriptionPlanById = async (planId: number): Promise<SubscriptionPlan> => {
+  const response = await apiClient.get<ApiResponse<SubscriptionPlan>>(`/superadmin/subscription/plans/${planId}`);
+  return response.data.data;
+};
+
+export const createSubscriptionPlan = async (planData: SubscriptionPlanCreateData): Promise<SubscriptionPlan> => {
+  const response = await apiClient.post<ApiResponse<SubscriptionPlan>>('/superadmin/subscription/plans', planData);
+  return response.data.data;
+};
+
+export const updateSubscriptionPlan = async (planId: number, planData: SubscriptionPlanUpdateData): Promise<SubscriptionPlan> => {
+  const response = await apiClient.patch<ApiResponse<SubscriptionPlan>>(`/superadmin/subscription/plans/${planId}`, planData);
+  return response.data.data;
+};
+
+export const deleteSubscriptionPlan = async (planId: number): Promise<void> => {
+  await apiClient.delete(`/superadmin/subscription/plans/${planId}`);
 };
 
 // SubModule Management APIs

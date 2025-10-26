@@ -12,11 +12,15 @@ import ModuleManagement from './components/modules/ModuleManagement.tsx'
 import SubModuleManagement from './components/modules/SubModuleManagement.tsx'
 import RoleManagement from './components/modules/RoleManagement.tsx'
 import TenantManagement from './components/modules/TenantManagement.tsx'
+import RoleScope from './components/modules/RoleScope.tsx'
+import AuditLogs from './components/modules/AuditLogs.tsx'
+import SubscriptionPlans from './components/modules/SubscriptionPlans.tsx'
 import Employees from './components/modules/Employees.jsx'
 import Students from './components/modules/Students.jsx'
 import Fees from './components/modules/Fees.jsx'
 import Reports from './components/modules/Reports.jsx'
 import Classes from './components/modules/Classes.jsx'
+import Sections from './components/modules/Sections.jsx'
 import Sessions from './components/modules/Sessions.jsx'
 import Subjects from './components/modules/Subjects.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
@@ -310,16 +314,20 @@ export default function App() {
             {/* Show ALL components during development */}
             {tab === 'dashboard' && <Dashboard role={role} />}
             {tab === 'users' && <UserManagement />}
-            {tab === 'subscriptions' && <SubscriptionManagement />}
+            {tab === 'subscriptions' && (role === 'superadmin' ? <SubscriptionPlans /> : <SubscriptionManagement />)}
             {tab === 'modules' && <ModuleManagement />}
             {tab === 'submodules' && <SubModuleManagement />}
             {tab === 'roles' && <RoleManagement />}
             {tab === 'tenants' && <TenantManagement />}
+            {tab === 'role-scope' && <RoleScope />}
+            {tab === 'analytics' && <Reports />}
+            {tab === 'audit-logs' && <AuditLogs />}
             {tab === 'employees' && <Employees />}
             {tab === 'students' && <Students />}
             {tab === 'fees' && <Fees />}
             {tab === 'reports' && <Reports />}
             {tab === 'classes' && <Classes />}
+            {tab === 'sections' && <Sections />}
             {tab === 'sessions' && <Sessions />}
             {tab === 'subjects' && <Subjects />}
             {tab === 'fee-structures' && <FeeStructures />}

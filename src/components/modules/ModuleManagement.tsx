@@ -6,6 +6,7 @@ import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import {
   fetchModulesAsync,
+  fetchRolesAsync,
   createModuleAsync,
   updateModuleAsync,
   deleteModuleAsync,
@@ -13,7 +14,7 @@ import {
   setSelectedModule,
   setSearchTerm,
 } from '../Services/superAdminStore';
-import { Module, ModuleCreateData, ModuleUpdateData } from '../Services/superAdminService';
+import { Module, ModuleCreateData, ModuleUpdateData, Role } from '../Services/superAdminService';
 import { AppDispatch, RootState } from '../../store';
 
 interface ModuleFormData {
@@ -42,6 +43,8 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     deletingModule,
     searchTerm,
     selectedModule,
+    roles,
+    rolesLoading,
     error,
   } = useSelector((state: RootState) => state.superAdmin);
 
@@ -55,13 +58,16 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
-  const [permissionsInput, setPermissionsInput] = useState<string>('');
+
 
   useEffect(() => {
     if (!modulesLoading) {
       dispatch(fetchModulesAsync({ page: currentPage, size: pageSize, search: searchTerm }));
     }
-  }, [dispatch, currentPage, pageSize, searchTerm]);
+    if (!rolesLoading && (!roles || roles.length === 0)) {
+      dispatch(fetchRolesAsync({ page: 0, size: 100 }));
+    }
+  }, [dispatch, currentPage, pageSize, searchTerm, rolesLoading, roles]);
 
   const loadModules = useCallback(() => {
     dispatch(fetchModulesAsync({ page: currentPage, size: pageSize, search: searchTerm }));
@@ -163,7 +169,6 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
       isActive: true,
       assignedRoleIds: [],
     });
-    setPermissionsInput('');
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,11 +177,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     setCurrentPage(0);
   };
 
-  const handlePermissionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setPermissionsInput(value);
-    // Note: permissions are handled separately, not stored in form state
-  };
+
 
   const moduleColumns = [
     {
@@ -201,23 +202,13 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
       ),
     },
     {
-      headerName: 'Permissions',
-      field: 'permissions',
+      headerName: 'Assigned Roles',
+      field: 'assignedRoleIds',
+      valueFormatter: (params: any) => getRoleNames(params.value),
       sortable: true,
       cellRenderer: (params: any) => (
-        <div className="max-w-xs">
-          <div className="flex flex-wrap gap-1">
-            {params.value?.slice(0, 2)?.map((permission: string, index: number) => (
-              <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                {permission}
-              </span>
-            ))}
-            {params.value?.length > 2 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                +{params.value.length - 2} more
-              </span>
-            )}
-          </div>
+        <div className="max-w-xs truncate" title={getRoleNames(params.value)}>
+          {getRoleNames(params.value)}
         </div>
       ),
     },
@@ -266,8 +257,17 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     </div>
   );
 
+  const getRoleNames = (roleIds: number[]): string => {
+    if (!roleIds || roleIds.length === 0) return 'No roles assigned';
+    const roleNames = roleIds.map(id => {
+      const role = roles?.find((r: Role) => r.roleId === id);
+      return role ? role.roleName : `Role ${id}`;
+    });
+    return roleNames.join(', ');
+  };
+
   return (
-    <LoadingOverlay isLoading={modulesLoading || creatingModule || updatingModule || deletingModule}>
+    <LoadingOverlay isLoading={modulesLoading || rolesLoading || creatingModule || updatingModule || deletingModule}>
       <section className="space-y-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Module Management</h1>
@@ -277,10 +277,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
         <AgGridBox
           title="System Modules"
           columnDefs={moduleColumns}
-          rowData={Array.isArray(modules) ? modules.map(module => ({
-            ...module,
-            permissions: module.assignedRoleIds || []
-          })) : []}
+          rowData={Array.isArray(modules) ? modules : []}
           onEdit={handleEditModule}
           onDelete={handleDeleteModule}
           toolbar={toolbarButtons}
@@ -289,7 +286,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
         {/* Create Module Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">Create New Module</h3>
               <form onSubmit={handleCreateModule} className="space-y-4">
                 <div>
@@ -315,14 +312,34 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Permissions (comma-separated)</label>
-                  <textarea
-                    value={permissionsInput}
-                    onChange={handlePermissionsChange}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={2}
-                    placeholder="e.g., read:users, write:users, delete:users"
-                  />
+                  <label className="block text-sm font-medium mb-2">Assigned Roles</label>
+                  <div className="border border-slate-300 dark:border-slate-600 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2">
+                      {roles?.map((role: Role) => (
+                        <label key={role.roleId} className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={moduleForm.assignedRoleIds.includes(role.roleId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setModuleForm({
+                                  ...moduleForm,
+                                  assignedRoleIds: [...moduleForm.assignedRoleIds, role.roleId]
+                                });
+                              } else {
+                                setModuleForm({
+                                  ...moduleForm,
+                                  assignedRoleIds: moduleForm.assignedRoleIds.filter(id => id !== role.roleId)
+                                });
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm">{role.roleName}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button type="submit" className="btn-primary flex-1">
@@ -347,7 +364,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
         {/* Edit Module Modal */}
         {showEditModal && selectedModule && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">Edit Module</h3>
               <form onSubmit={handleUpdateModule} className="space-y-4">
                 <div>
@@ -371,13 +388,34 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Permissions (comma-separated)</label>
-                  <textarea
-                    value={permissionsInput}
-                    onChange={handlePermissionsChange}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={2}
-                  />
+                  <label className="block text-sm font-medium mb-2">Assigned Roles</label>
+                  <div className="border border-slate-300 dark:border-slate-600 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2">
+                      {roles?.map((role: Role) => (
+                        <label key={role.roleId} className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={moduleForm.assignedRoleIds.includes(role.roleId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setModuleForm({
+                                  ...moduleForm,
+                                  assignedRoleIds: [...moduleForm.assignedRoleIds, role.roleId]
+                                });
+                              } else {
+                                setModuleForm({
+                                  ...moduleForm,
+                                  assignedRoleIds: moduleForm.assignedRoleIds.filter(id => id !== role.roleId)
+                                });
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm">{role.roleName}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button type="submit" className="btn-primary flex-1">

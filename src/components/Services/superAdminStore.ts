@@ -6,6 +6,8 @@ import {
   AnalyticsData,
   SystemLog,
   SubscriptionPlan,
+  SubscriptionPlanCreateData,
+  SubscriptionPlanUpdateData,
   SubModule,
   SubModuleCreateData,
   SubModuleUpdateData,
@@ -47,6 +49,10 @@ import {
   backupSystem,
   restoreSystem,
   getSubscriptionPlans,
+  getSubscriptionPlanById,
+  createSubscriptionPlan,
+  updateSubscriptionPlan,
+  deleteSubscriptionPlan,
   getSubModules,
   createSubModule,
   updateSubModule,
@@ -587,6 +593,54 @@ export const fetchSubscriptionPlansAsync = createAsyncThunk(
   }
 );
 
+export const fetchSubscriptionPlanByIdAsync = createAsyncThunk(
+  'superAdmin/fetchSubscriptionPlanById',
+  async (planId: number, { rejectWithValue }) => {
+    try {
+      const plan = await getSubscriptionPlanById(planId);
+      return plan;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const createSubscriptionPlanAsync = createAsyncThunk(
+  'superAdmin/createSubscriptionPlan',
+  async (planData: SubscriptionPlanCreateData, { rejectWithValue }) => {
+    try {
+      const plan = await createSubscriptionPlan(planData);
+      return plan;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const updateSubscriptionPlanAsync = createAsyncThunk(
+  'superAdmin/updateSubscriptionPlan',
+  async ({ planId, planData }: { planId: number; planData: SubscriptionPlanUpdateData }, { rejectWithValue }) => {
+    try {
+      const plan = await updateSubscriptionPlan(planId, planData);
+      return plan;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const deleteSubscriptionPlanAsync = createAsyncThunk(
+  'superAdmin/deleteSubscriptionPlan',
+  async (planId: number, { rejectWithValue }) => {
+    try {
+      await deleteSubscriptionPlan(planId);
+      return planId;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 // Async thunks for SubModules
 export const fetchSubModulesAsync = createAsyncThunk(
   'superAdmin/fetchSubModules',
@@ -905,6 +959,45 @@ const superAdminSlice = createSlice({
       })
       .addCase(fetchSubscriptionPlansAsync.rejected, (state, action: PayloadAction<any>) => {
         state.subscriptionPlansLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(createSubscriptionPlanAsync.pending, (state) => {
+        state.creatingTenant = true; // Reuse tenant loading state
+        state.error = null;
+      })
+      .addCase(createSubscriptionPlanAsync.fulfilled, (state, action: PayloadAction<SubscriptionPlan>) => {
+        state.creatingTenant = false;
+        state.subscriptionPlans.push(action.payload);
+      })
+      .addCase(createSubscriptionPlanAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.creatingTenant = false;
+        state.error = action.payload;
+      })
+      .addCase(updateSubscriptionPlanAsync.pending, (state) => {
+        state.updatingTenant = true; // Reuse tenant loading state
+        state.error = null;
+      })
+      .addCase(updateSubscriptionPlanAsync.fulfilled, (state, action: PayloadAction<SubscriptionPlan>) => {
+        state.updatingTenant = false;
+        const index = state.subscriptionPlans.findIndex(plan => plan.planId === action.payload.planId);
+        if (index !== -1) {
+          state.subscriptionPlans[index] = action.payload;
+        }
+      })
+      .addCase(updateSubscriptionPlanAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.updatingTenant = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteSubscriptionPlanAsync.pending, (state) => {
+        state.deletingTenant = true; // Reuse tenant loading state
+        state.error = null;
+      })
+      .addCase(deleteSubscriptionPlanAsync.fulfilled, (state, action: PayloadAction<number>) => {
+        state.deletingTenant = false;
+        state.subscriptionPlans = state.subscriptionPlans.filter(plan => plan.planId !== action.payload);
+      })
+      .addCase(deleteSubscriptionPlanAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.deletingTenant = false;
         state.error = action.payload;
       })
       .addCase(fetchSubModulesAsync.pending, (state) => {
