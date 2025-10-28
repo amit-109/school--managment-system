@@ -117,7 +117,7 @@ export default function TeacherSubjects() {
     try {
       const assignmentData = {
         classId: parseInt(form.classId),
-        sectionId: parseInt(form.sectionId),
+        sectionId: form.sectionId ? parseInt(form.sectionId) : null,
         subjectId: parseInt(form.subjectId),
         isPrimary: form.isPrimary
       };
@@ -128,7 +128,19 @@ export default function TeacherSubjects() {
       resetForm();
       loadTeacherSubjects(selectedTeacherId);
     } catch (error) {
-      toast.error('Failed to assign subject to teacher');
+      console.log('Assignment error:', error);
+      console.log('Error response:', error.response);
+      console.log('Error response data:', error.response?.data);
+      
+      let errorMessage = 'Failed to assign subject to teacher';
+      
+      if (error.response?.data) {
+        errorMessage = error.response.data.message || error.response.data.error || errorMessage;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -173,18 +185,13 @@ export default function TeacherSubjects() {
       field: 'sectionName',
       sortable: true,
       valueGetter: (params) => {
-        const section = sections.find(s => s.sectionId === params.data.sectionId);
-        return section ? section.sectionName : 'N/A';
+        return params.data.sectionName || 'N/A';
       }
     },
     {
       headerName: 'Subject',
       field: 'subjectName',
-      sortable: true,
-      valueGetter: (params) => {
-        const subject = classSubjects.find(s => s.subjectId === params.data.subjectId);
-        return subject ? subject.subjectName : 'N/A';
-      }
+      sortable: true
     },
     {
       headerName: 'Primary',
@@ -290,15 +297,14 @@ export default function TeacherSubjects() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Section *</label>
+                  <label className="block text-sm font-medium mb-1">Section</label>
                   <select
-                    required
                     value={form.sectionId}
                     onChange={(e) => setForm({...form, sectionId: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     disabled={!form.classId}
                   >
-                    <option value="">Select a section</option>
+                    <option value="">All Sections (Optional)</option>
                     {sections.map(section => (
                       <option key={section.sectionId} value={section.sectionId}>
                         {section.sectionName}
