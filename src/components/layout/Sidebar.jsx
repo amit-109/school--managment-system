@@ -40,6 +40,8 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Sections': '📋',
     'Subjects': '📖',
     'Subject Assignments': '🔗',
+    'Class Subjects': '🎯',
+    'Teacher Subjects': '👨‍🏫',
     'Sessions': '📅',
     'Fee Structures': '💳',
     'Fee Collection': '💰',

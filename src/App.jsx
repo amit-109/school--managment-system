@@ -23,6 +23,8 @@ import Classes from './components/modules/Classes.jsx'
 import Sections from './components/modules/Sections.jsx'
 import Sessions from './components/modules/Sessions.jsx'
 import Subjects from './components/modules/Subjects.jsx'
+import ClassSubjects from './components/modules/ClassSubjects.jsx'
+import TeacherSubjects from './components/modules/TeacherSubjects.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
 import Login from './components/Auth/Login.jsx'
 import Register from './components/Auth/Register.jsx'
@@ -330,6 +332,8 @@ export default function App() {
             {tab === 'sections' && <Sections />}
             {tab === 'sessions' && <Sessions />}
             {tab === 'subjects' && <Subjects />}
+            {tab === 'class-subjects' && <ClassSubjects />}
+            {tab === 'teacher-subjects' && <TeacherSubjects />}
             {tab === 'fee-structures' && <FeeStructures />}
 
             {/* Show specific dashboard overrides temporarily commented out */}
