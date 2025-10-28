@@ -45,7 +45,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Sessions': '📅',
     'Fee Structures': '💳',
     'Fee Collection': '💰',
-    'Users': '👥',
+    'Users': '👤',
     'Students': '🎓',
     'Employees': '🧑',
     'Reports': '📈'
