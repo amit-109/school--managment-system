@@ -30,6 +30,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
         { id: 'tenants', label: 'Tenants', icon: '🏢' },
         { id: 'roles', label: 'Roles', icon: '🎭' },
         { id: 'modules', label: 'Modules', icon: '🧩' },
+        { id: 'submodules', label: 'SubModules', icon: '🔧' },
         { id: 'role-scope', label: 'Role Scope', icon: '🔒' },
         { id: 'analytics', label: 'Analytics', icon: '📈' },
         { id: 'audit-logs', label: 'Audit Logs', icon: '📋' },
@@ -150,12 +151,25 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
           {/* Primary Navigation */}
           {menuItems.filter(menu =>
             role === 'superadmin' ?
-              ['dashboard', 'tenants', 'subscriptions'].includes(menu.id) :
+              ['dashboard', 'tenants', 'subscriptions', 'roles', 'modules', 'submodules', 'role-scope', 'analytics', 'audit-logs'].includes(menu.id) :
             role === 'admin' ?
-              ['dashboard', 'users', 'employees', 'students', 'fees', 'reports'].includes(menu.id) :
+              ['dashboard', 'users', 'employees', 'students', 'class-management', 'fees', 'reports'].includes(menu.id) :
             ['dashboard', 'students', 'fees', 'reports'].includes(menu.id)
           ).map(menu => {
-            if (menu.id === 'subscriptions' && role === 'superadmin') {
+            if (menu.id === 'class-management' && role === 'admin') {
+              return (
+                <ManagementItem
+                  key={menu.id}
+                  id={menu.id}
+                  label={menu.label}
+                  icon={menu.icon}
+                  hasSubmodules={menu.hasSubmodules}
+                  submodules={menu.submodules}
+                  isExpanded={classManagementExpanded}
+                  onToggle={setClassManagementExpanded}
+                />
+              );
+            } else if (menu.id === 'subscriptions' && role === 'superadmin') {
               return (
                 <Item key={menu.id} id={menu.id} label="Subscriptions" icon={menu.icon} />
               );

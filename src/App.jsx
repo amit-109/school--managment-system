@@ -336,11 +336,7 @@ export default function App() {
             {/* {tab === 'dashboard' && role === 'superadmin' && <SuperAdminDashboard />} */}
             {/* {tab === 'dashboard' && role === 'admin' && <AdminDashboard />} */}
 
-            <section className="bg-white dark:bg-slate-800 border rounded-2xl p-4">
-              <h3 className="font-semibold mb-1">Policy Questions (to finalize)</h3>
-              <p className="text-sm text-slate-600">1) Allow one-time total fee payment?</p>
-              <p className="text-sm text-slate-600">2) Minimum months per payment (e.g., 2 or 3)?</p>
-            </section>
+
           </main>
         </div>
       </div>

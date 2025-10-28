@@ -57,6 +57,19 @@ import {
   createSubModule,
   updateSubModule,
   deleteSubModule,
+  getTenantAdmins,
+  getAdminRoleScope,
+  updateAdminRoleScope,
+  getRolePermissions,
+  assignPermissionToRole,
+  getAllPermissions,
+  getRolePermissionDetails,
+  TenantAdmin,
+  RoleScopeRole,
+  RolePermission,
+  PermissionAssignment,
+  Permission,
+  RolePermissionDetail,
 } from './superAdminService';
 
 // Define super admin state interface
@@ -66,6 +79,11 @@ interface SuperAdminState {
   tenants: Tenant[];
   subscriptionPlans: SubscriptionPlan[];
   subModules: SubModule[];
+  tenantAdmins: TenantAdmin[];
+  adminRoleScope: RoleScopeRole[];
+  rolePermissions: RolePermission[];
+  allPermissions: Permission[];
+  rolePermissionDetails: RolePermissionDetail[];
   currentModule: Module | null;
   currentRole: Role | null;
   currentTenant: Tenant | null;
@@ -79,6 +97,13 @@ interface SuperAdminState {
   creatingSubModule: boolean;
   updatingSubModule: boolean;
   deletingSubModule: boolean;
+  tenantAdminsLoading: boolean;
+  adminRoleScopeLoading: boolean;
+  updatingRoleScope: boolean;
+  rolePermissionsLoading: boolean;
+  assigningPermission: boolean;
+  allPermissionsLoading: boolean;
+  rolePermissionDetailsLoading: boolean;
 
   // Loading states
   loading: boolean;
@@ -147,6 +172,11 @@ const initialState: SuperAdminState = {
   tenants: [],
   subscriptionPlans: [],
   subModules: [],
+  tenantAdmins: [],
+  adminRoleScope: [],
+  rolePermissions: [],
+  allPermissions: [],
+  rolePermissionDetails: [],
   currentModule: null,
   currentRole: null,
   currentTenant: null,
@@ -160,6 +190,13 @@ const initialState: SuperAdminState = {
   creatingSubModule: false,
   updatingSubModule: false,
   deletingSubModule: false,
+  tenantAdminsLoading: false,
+  adminRoleScopeLoading: false,
+  updatingRoleScope: false,
+  rolePermissionsLoading: false,
+  assigningPermission: false,
+  allPermissionsLoading: false,
+  rolePermissionDetailsLoading: false,
 
   loading: false,
   modulesLoading: false,
@@ -644,9 +681,9 @@ export const deleteSubscriptionPlanAsync = createAsyncThunk(
 // Async thunks for SubModules
 export const fetchSubModulesAsync = createAsyncThunk(
   'superAdmin/fetchSubModules',
-  async ({ page = 0, size = 10 }: { page?: number; size?: number }, { rejectWithValue }) => {
+  async ({ page = 0, size = 10, moduleId }: { page?: number; size?: number; moduleId: number }, { rejectWithValue }) => {
     try {
-      const response = await getSubModules(page, size);
+      const response = await getSubModules(page, size, moduleId);
       return response;
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -690,6 +727,91 @@ export const deleteSubModuleAsync = createAsyncThunk(
     try {
       await deleteSubModule(subModuleId);
       return subModuleId;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Async thunks for Role Scope
+export const fetchTenantAdminsAsync = createAsyncThunk(
+  'superAdmin/fetchTenantAdmins',
+  async (_, { rejectWithValue }) => {
+    try {
+      const admins = await getTenantAdmins();
+      return admins;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchAdminRoleScopeAsync = createAsyncThunk(
+  'superAdmin/fetchAdminRoleScope',
+  async (adminUserId: number, { rejectWithValue }) => {
+    try {
+      const roleScope = await getAdminRoleScope(adminUserId);
+      return roleScope;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const updateAdminRoleScopeAsync = createAsyncThunk(
+  'superAdmin/updateAdminRoleScope',
+  async ({ adminUserId, roleIds }: { adminUserId: number; roleIds: number[] }, { rejectWithValue }) => {
+    try {
+      await updateAdminRoleScope(adminUserId, roleIds);
+      return { adminUserId, roleIds };
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchRolePermissionsAsync = createAsyncThunk(
+  'superAdmin/fetchRolePermissions',
+  async (roleId: number, { rejectWithValue }) => {
+    try {
+      const permissions = await getRolePermissions(roleId);
+      return permissions;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const assignPermissionToRoleAsync = createAsyncThunk(
+  'superAdmin/assignPermissionToRole',
+  async (permissionData: PermissionAssignment, { rejectWithValue }) => {
+    try {
+      await assignPermissionToRole(permissionData);
+      return permissionData;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchAllPermissionsAsync = createAsyncThunk(
+  'superAdmin/fetchAllPermissions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const permissions = await getAllPermissions();
+      return permissions;
+    } catch (error: any) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchRolePermissionDetailsAsync = createAsyncThunk(
+  'superAdmin/fetchRolePermissionDetails',
+  async (roleId: number, { rejectWithValue }) => {
+    try {
+      const details = await getRolePermissionDetails(roleId);
+      return details;
     } catch (error: any) {
       return rejectWithValue(error.message);
     }
@@ -778,9 +900,18 @@ const superAdminSlice = createSlice({
           state.selectedModule = action.payload;
         }
       })
+      .addCase(deleteModuleAsync.pending, (state) => {
+        state.deletingModule = true;
+        state.error = null;
+      })
       .addCase(deleteModuleAsync.fulfilled, (state, action: PayloadAction<number>) => {
+        state.deletingModule = false;
         state.modules = state.modules.filter(module => module.moduleId !== action.payload);
         state.modulesPagination.totalElements -= 1;
+      })
+      .addCase(deleteModuleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.deletingModule = false;
+        state.error = action.payload;
       })
       .addCase(toggleModuleStatusAsync.fulfilled, (state, action: PayloadAction<Module>) => {
         const index = state.modules.findIndex(module => module.moduleId === action.payload.moduleId);
@@ -819,7 +950,11 @@ const superAdminSlice = createSlice({
       })
       .addCase(createRoleAsync.fulfilled, (state, action: PayloadAction<Role>) => {
         state.creatingRole = false;
-        state.roles.push(action.payload);
+        if (Array.isArray(state.roles)) {
+          state.roles.push(action.payload);
+        } else {
+          state.roles = [action.payload];
+        }
         state.rolesPagination.totalElements += 1;
       })
       .addCase(createRoleAsync.rejected, (state, action: PayloadAction<any>) => {
@@ -838,9 +973,18 @@ const superAdminSlice = createSlice({
           state.selectedRole = action.payload;
         }
       })
+      .addCase(deleteRoleAsync.pending, (state) => {
+        state.deletingRole = true;
+        state.error = null;
+      })
       .addCase(deleteRoleAsync.fulfilled, (state, action: PayloadAction<number>) => {
+        state.deletingRole = false;
         state.roles = state.roles.filter(role => role.roleId !== action.payload);
         state.rolesPagination.totalElements -= 1;
+      })
+      .addCase(deleteRoleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.deletingRole = false;
+        state.error = action.payload;
       });
 
     // Tenants
@@ -1049,6 +1193,88 @@ const superAdminSlice = createSlice({
       })
       .addCase(deleteSubModuleAsync.rejected, (state, action: PayloadAction<any>) => {
         state.deletingSubModule = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchTenantAdminsAsync.pending, (state) => {
+        state.tenantAdminsLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchTenantAdminsAsync.fulfilled, (state, action: PayloadAction<TenantAdmin[]>) => {
+        state.tenantAdminsLoading = false;
+        state.tenantAdmins = action.payload;
+      })
+      .addCase(fetchTenantAdminsAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.tenantAdminsLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchAdminRoleScopeAsync.pending, (state) => {
+        state.adminRoleScopeLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAdminRoleScopeAsync.fulfilled, (state, action: PayloadAction<RoleScopeRole[]>) => {
+        state.adminRoleScopeLoading = false;
+        state.adminRoleScope = action.payload;
+      })
+      .addCase(fetchAdminRoleScopeAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.adminRoleScopeLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateAdminRoleScopeAsync.pending, (state) => {
+        state.updatingRoleScope = true;
+        state.error = null;
+      })
+      .addCase(updateAdminRoleScopeAsync.fulfilled, (state) => {
+        state.updatingRoleScope = false;
+      })
+      .addCase(updateAdminRoleScopeAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.updatingRoleScope = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchRolePermissionsAsync.pending, (state) => {
+        state.rolePermissionsLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchRolePermissionsAsync.fulfilled, (state, action: PayloadAction<RolePermission[]>) => {
+        state.rolePermissionsLoading = false;
+        state.rolePermissions = action.payload;
+      })
+      .addCase(fetchRolePermissionsAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.rolePermissionsLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(assignPermissionToRoleAsync.pending, (state) => {
+        state.assigningPermission = true;
+        state.error = null;
+      })
+      .addCase(assignPermissionToRoleAsync.fulfilled, (state) => {
+        state.assigningPermission = false;
+      })
+      .addCase(assignPermissionToRoleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.assigningPermission = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchAllPermissionsAsync.pending, (state) => {
+        state.allPermissionsLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllPermissionsAsync.fulfilled, (state, action: PayloadAction<Permission[]>) => {
+        state.allPermissionsLoading = false;
+        state.allPermissions = action.payload;
+      })
+      .addCase(fetchAllPermissionsAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.allPermissionsLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchRolePermissionDetailsAsync.pending, (state) => {
+        state.rolePermissionDetailsLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchRolePermissionDetailsAsync.fulfilled, (state, action: PayloadAction<RolePermissionDetail[]>) => {
+        state.rolePermissionDetailsLoading = false;
+        state.rolePermissionDetails = action.payload;
+      })
+      .addCase(fetchRolePermissionDetailsAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.rolePermissionDetailsLoading = false;
         state.error = action.payload;
       })
   },

@@ -44,7 +44,6 @@ const SubModuleManagement: FC = () => {
   const [selectedSubModule, setSelectedSubModule] = useState<SubModule | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
-  const [selectedModuleId, setSelectedModuleId] = useState<number>(0);
   const [subModuleForm, setSubModuleForm] = useState<SubModuleFormData>({
     moduleId: 0,
     subModuleName: '',
@@ -56,44 +55,26 @@ const SubModuleManagement: FC = () => {
   });
 
   useEffect(() => {
-    if (!modules || modules.length === 0) {
+    if (!subModulesLoading) {
+      dispatch(fetchSubModulesAsync({ page: currentPage, size: pageSize }));
+    }
+    if (!modulesLoading && (!modules || modules.length === 0)) {
       dispatch(fetchModulesAsync({ page: 0, size: 100 }));
     }
-    if (!roles || roles.length === 0) {
+    if (!rolesLoading && (!roles || roles.length === 0)) {
       dispatch(fetchRolesAsync({ page: 0, size: 100 }));
     }
-  }, [dispatch, modules, roles]);
-
-  // Load first module's submodules on initial load
-  useEffect(() => {
-    if (modules && modules.length > 0 && selectedModuleId === 0) {
-      const firstModule = modules[0];
-      setSelectedModuleId(firstModule.moduleId);
-    }
-  }, [modules, selectedModuleId]);
-
-  // Load submodules when module changes
-  useEffect(() => {
-    if (selectedModuleId > 0) {
-      dispatch(fetchSubModulesAsync({ page: currentPage, size: pageSize, moduleId: selectedModuleId }));
-    }
-  }, [dispatch, selectedModuleId, currentPage, pageSize]);
+  }, [dispatch, currentPage, pageSize]);
 
   const loadSubModules = useCallback(() => {
-    if (selectedModuleId > 0) {
-      dispatch(fetchSubModulesAsync({ page: currentPage, size: pageSize, moduleId: selectedModuleId }));
-    }
-  }, [dispatch, selectedModuleId, currentPage, pageSize]);
-
-  const handleModuleChange = (moduleId: number) => {
-    setSelectedModuleId(moduleId);
-    setCurrentPage(0);
-  };
+    dispatch(fetchSubModulesAsync({ page: currentPage, size: pageSize }));
+  }, [dispatch, currentPage, pageSize]);
 
   const handleCreateSubModule = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (selectedModuleId === 0) {
+    // Validation
+    if (subModuleForm.moduleId === 0) {
       toast.error('Please select a module');
       return;
     }
@@ -109,17 +90,13 @@ const SubModuleManagement: FC = () => {
     }
     
     try {
-      let routePath = subModuleForm.routePath.trim() || `/submodule/${subModuleForm.subModuleName.toLowerCase().replace(/\s+/g, '-')}`;
-      if (!routePath.startsWith('/')) {
-        routePath = '/' + routePath;
-      }
-      
       const subModuleData: SubModuleCreateData = {
-        moduleId: selectedModuleId,
+        moduleId: subModuleForm.moduleId,
         subModuleName: subModuleForm.subModuleName.trim(),
         description: subModuleForm.description.trim(),
-        routePath: routePath,
+        routePath: subModuleForm.routePath.trim() || `/submodule/${subModuleForm.subModuleName.toLowerCase().replace(/\s+/g, '-')}`,
         orderNo: subModuleForm.orderNo || 1,
+        isActive: subModuleForm.isActive,
         assignedRoleIds: subModuleForm.assignedRoleIds || [],
       };
       
@@ -139,7 +116,8 @@ const SubModuleManagement: FC = () => {
     e.preventDefault();
     if (!selectedSubModule) return;
     
-    if (selectedModuleId === 0) {
+    // Validation
+    if (subModuleForm.moduleId === 0) {
       toast.error('Please select a module');
       return;
     }
@@ -155,17 +133,12 @@ const SubModuleManagement: FC = () => {
     }
 
     try {
-      let routePath = subModuleForm.routePath.trim() || `/submodule/${subModuleForm.subModuleName.toLowerCase().replace(/\s+/g, '-')}`;
-      if (!routePath.startsWith('/')) {
-        routePath = '/' + routePath;
-      }
-      
       const subModuleData: SubModuleUpdateData = {
         subModuleId: selectedSubModule.subModuleId,
-        moduleId: selectedModuleId,
+        moduleId: subModuleForm.moduleId,
         subModuleName: subModuleForm.subModuleName.trim(),
         description: subModuleForm.description.trim(),
-        routePath: routePath,
+        routePath: subModuleForm.routePath.trim() || `/submodule/${subModuleForm.subModuleName.toLowerCase().replace(/\s+/g, '-')}`,
         orderNo: subModuleForm.orderNo || 1,
         isActive: subModuleForm.isActive,
         createdOn: selectedSubModule.createdOn,
@@ -212,7 +185,7 @@ const SubModuleManagement: FC = () => {
   const handleEditSubModule = (subModule: SubModule) => {
     setSelectedSubModule(subModule);
     setSubModuleForm({
-      moduleId: selectedModuleId,
+      moduleId: subModule.moduleId,
       subModuleName: subModule.subModuleName,
       description: subModule.description,
       routePath: subModule.routePath,
@@ -225,7 +198,7 @@ const SubModuleManagement: FC = () => {
 
   const resetForm = (): void => {
     setSubModuleForm({
-      moduleId: selectedModuleId,
+      moduleId: 0,
       subModuleName: '',
       description: '',
       routePath: '',
@@ -255,6 +228,12 @@ const SubModuleManagement: FC = () => {
       headerName: 'ID',
       field: 'subModuleId',
       width: 80,
+      sortable: true,
+    },
+    {
+      headerName: 'Module',
+      field: 'moduleId',
+      valueFormatter: (params: any) => getModuleName(params.value),
       sortable: true,
     },
     {
@@ -315,8 +294,7 @@ const SubModuleManagement: FC = () => {
     <div className="flex items-center gap-3">
       <button
         onClick={() => setShowCreateModal(true)}
-        disabled={selectedModuleId === 0}
-        className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-primary flex items-center gap-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -325,8 +303,7 @@ const SubModuleManagement: FC = () => {
       </button>
       <button
         onClick={() => loadSubModules()}
-        disabled={selectedModuleId === 0}
-        className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn-secondary flex items-center gap-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -336,20 +313,6 @@ const SubModuleManagement: FC = () => {
     </div>
   );
 
-  // Show loading while modules are being fetched initially
-  if (modulesLoading && (!modules || modules.length === 0)) {
-    return (
-      <LoadingOverlay isLoading={true}>
-        <section className="space-y-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">SubModule Management</h1>
-            <p className="text-sm text-slate-600">Loading modules...</p>
-          </div>
-        </section>
-      </LoadingOverlay>
-    );
-  }
-
   return (
     <LoadingOverlay isLoading={subModulesLoading || creatingSubModule || updatingSubModule || deletingSubModule}>
       <section className="space-y-6">
@@ -358,46 +321,14 @@ const SubModuleManagement: FC = () => {
           <p className="text-sm text-slate-600">Create, edit, and manage system submodules</p>
         </div>
 
-        {/* Module Selection */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium">Select Module:</label>
-            <select
-              value={selectedModuleId}
-              onChange={(e) => handleModuleChange(parseInt(e.target.value))}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-            >
-              <option value={0}>Select a Module</option>
-              {modules?.map((module: Module) => (
-                <option key={module.moduleId} value={module.moduleId}>
-                  {module.moduleName}
-                </option>
-              ))}
-            </select>
-            {selectedModuleId > 0 && (
-              <span className="text-sm text-slate-600">
-                Showing submodules for: <strong>{getModuleName(selectedModuleId)}</strong>
-              </span>
-            )}
-          </div>
-        </div>
-
-        {selectedModuleId > 0 && (
-          <AgGridBox
-            title={`SubModules - ${getModuleName(selectedModuleId)}`}
-            columnDefs={subModuleColumns}
-            rowData={Array.isArray(subModules) ? subModules : []}
-            onEdit={handleEditSubModule}
-            onDelete={handleDeleteSubModule}
-            toolbar={toolbarButtons}
-          />
-        )}
-
-        {selectedModuleId === 0 && !modulesLoading && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-8 text-center">
-            <p className="text-slate-600 dark:text-slate-400">Please select a module to view its submodules.</p>
-          </div>
-        )}
+        <AgGridBox
+          title="System SubModules"
+          columnDefs={subModuleColumns}
+          rowData={Array.isArray(subModules) ? subModules : []}
+          onEdit={handleEditSubModule}
+          onDelete={handleDeleteSubModule}
+          toolbar={toolbarButtons}
+        />
 
         {/* Create SubModule Modal */}
         {showCreateModal && (
@@ -408,12 +339,19 @@ const SubModuleManagement: FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Module</label>
-                    <input
-                      type="text"
-                      value={getModuleName(selectedModuleId)}
-                      disabled
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
-                    />
+                    <select
+                      required
+                      value={subModuleForm.moduleId}
+                      onChange={(e) => setSubModuleForm({...subModuleForm, moduleId: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value={0}>Select Module</option>
+                      {modules?.map((module: Module) => (
+                        <option key={module.moduleId} value={module.moduleId}>
+                          {module.moduleName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">SubModule Name</label>
@@ -446,7 +384,7 @@ const SubModuleManagement: FC = () => {
                       value={subModuleForm.routePath}
                       onChange={(e) => setSubModuleForm({...subModuleForm, routePath: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="e.g., /users/list (must start with /)"
+                      placeholder="e.g., /users/list (auto-generated if empty)"
                     />
                   </div>
                   <div>
@@ -529,12 +467,19 @@ const SubModuleManagement: FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Module</label>
-                    <input
-                      type="text"
-                      value={getModuleName(selectedModuleId)}
-                      disabled
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
-                    />
+                    <select
+                      required
+                      value={subModuleForm.moduleId}
+                      onChange={(e) => setSubModuleForm({...subModuleForm, moduleId: parseInt(e.target.value)})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value={0}>Select Module</option>
+                      {modules?.map((module: Module) => (
+                        <option key={module.moduleId} value={module.moduleId}>
+                          {module.moduleName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">SubModule Name</label>
@@ -565,7 +510,7 @@ const SubModuleManagement: FC = () => {
                       value={subModuleForm.routePath}
                       onChange={(e) => setSubModuleForm({...subModuleForm, routePath: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="e.g., /users/list (must start with /)"
+                      placeholder="e.g., /users/list (auto-generated if empty)"
                     />
                   </div>
                   <div>

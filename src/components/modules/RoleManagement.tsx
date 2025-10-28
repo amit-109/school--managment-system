@@ -11,14 +11,15 @@ import {
   deleteRoleAsync,
   setSelectedRole,
   setSearchTerm,
+  fetchAllPermissionsAsync,
+  fetchRolePermissionDetailsAsync,
+  assignPermissionToRoleAsync,
 } from '../Services/superAdminStore';
-import { Role, RoleCreateData, RoleUpdateData } from '../Services/superAdminService';
+import { Role, RoleCreateData, RoleUpdateData, Permission, RolePermissionDetail, PermissionAssignment } from '../Services/superAdminService';
 import { AppDispatch, RootState } from '../../store';
 
 interface RoleFormData {
   roleName: string;
-  description: string;
-  permissions: string[];
 }
 
 interface RoleManagementProps {
@@ -36,19 +37,23 @@ const RoleManagement: FC<RoleManagementProps> = () => {
     deletingRole,
     searchTerm,
     selectedRole,
+    allPermissions,
+    rolePermissionDetails,
+    allPermissionsLoading,
+    rolePermissionDetailsLoading,
+    assigningPermission,
     error,
   } = useSelector((state: RootState) => state.superAdmin);
 
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState<boolean>(false);
   const [roleForm, setRoleForm] = useState<RoleFormData>({
     roleName: '',
-    description: '',
-    permissions: [],
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
-  const [permissionsInput, setPermissionsInput] = useState<string>('');
+
 
   useEffect(() => {
     loadRoles();
@@ -62,9 +67,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
     e.preventDefault();
     try {
       const roleData: RoleCreateData = {
-        roleName: roleForm.roleName,
-        description: roleForm.description,
-        permissions: roleForm.permissions,
+        roleName: roleForm.roleName.trim(),
       };
       await dispatch(createRoleAsync(roleData)).unwrap();
       toast.success('Role created successfully!');
@@ -82,9 +85,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
 
     try {
       const roleData: RoleUpdateData = {
-        roleName: roleForm.roleName,
-        description: roleForm.description,
-        permissions: roleForm.permissions,
+        roleName: roleForm.roleName.trim(),
       };
       await dispatch(updateRoleAsync({
         roleId: selectedRole.roleId,
@@ -125,20 +126,14 @@ const RoleManagement: FC<RoleManagementProps> = () => {
     dispatch(setSelectedRole(role));
     setRoleForm({
       roleName: role.roleName,
-      description: role.description,
-      permissions: role?.permissions ?? [],
     });
-    setPermissionsInput((role?.permissions ?? []).join(', '));
     setShowEditModal(true);
   };
 
   const resetForm = (): void => {
     setRoleForm({
       roleName: '',
-      description: '',
-      permissions: [],
     });
-    setPermissionsInput('');
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,11 +142,13 @@ const RoleManagement: FC<RoleManagementProps> = () => {
     setCurrentPage(0);
   };
 
-  const handlePermissionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setPermissionsInput(value);
-    const permissions = value.split(',').map(p => p.trim()).filter(p => p !== '');
-    setRoleForm({...roleForm, permissions});
+
+
+  const handleManagePermissions = (role: Role) => {
+    dispatch(setSelectedRole(role));
+    setShowPermissionsModal(true);
+    dispatch(fetchAllPermissionsAsync());
+    dispatch(fetchRolePermissionDetailsAsync(role.roleId));
   };
 
   const roleColumns = [
@@ -167,55 +164,44 @@ const RoleManagement: FC<RoleManagementProps> = () => {
       sortable: true,
     },
     {
-      headerName: 'Description',
-      field: 'description',
-      sortable: true,
+      headerName: 'Actions',
+      field: 'actions',
+      width: 150,
       cellRenderer: (params: any) => (
-        <div className="max-w-xs truncate" title={params.value}>
-          {params.value}
-        </div>
-      ),
-    },
-    {
-      headerName: 'Permissions',
-      field: 'permissions',
-      sortable: true,
-      cellRenderer: (params: any) => (
-        <div className="max-w-xs">
-          <div className="flex flex-wrap gap-1">
-            {params.value?.slice(0, 2)?.map((permission: string, index: number) => (
-              <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                {permission}
-              </span>
-            ))}
-            {params.value?.length > 2 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                +{params.value.length - 2} more
-              </span>
-            )}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleEditRole(params.data)}
+            className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+            title="Edit Role"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleDeleteRole(params.data)}
+            className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
+            title="Delete Role"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+          <div className="relative group">
+            <button
+              onClick={() => handleManagePermissions(params.data)}
+              className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </button>
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Permissions
+            </div>
           </div>
         </div>
       ),
-    },
-    {
-      headerName: 'System Role',
-      field: 'isSystemRole',
-      sortable: true,
-      cellRenderer: (params: any) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          params.value
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-        }`}>
-          {params.value ? 'System' : 'Custom'}
-        </span>
-      ),
-    },
-    {
-      headerName: 'Created',
-      field: 'createdAt',
-      valueFormatter: (params: any) => new Date(params.value).toLocaleDateString(),
-      sortable: true,
     },
   ];
 
@@ -251,30 +237,14 @@ const RoleManagement: FC<RoleManagementProps> = () => {
         </div>
 
         {/* Role Statistics */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
             <h3 className="text-lg font-semibold text-blue-600 mb-2">Total Roles</h3>
             <div className="text-2xl font-bold">{Array.isArray(roles) ? roles.length : 0}</div>
           </div>
           <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-purple-600 mb-2">System Roles</h3>
-            <div className="text-2xl font-bold">
-              {Array.isArray(roles) ? roles.filter((role: Role) => role?.isSystemRole ?? false).length : 0}
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-green-600 mb-2">Custom Roles</h3>
-            <div className="text-2xl font-bold">
-              {Array.isArray(roles) ? roles.filter((role: Role) => !(role?.isSystemRole ?? false)).length : 0}
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-orange-600 mb-2">Avg Permissions</h3>
-            <div className="text-2xl font-bold">
-              {Array.isArray(roles) && roles.length > 0
-                ? Math.round(roles.reduce((sum, role: Role) => sum + (role.permissions?.length || 0), 0) / roles.length)
-                : 0}
-            </div>
+            <h3 className="text-lg font-semibold text-green-600 mb-2">Active Roles</h3>
+            <div className="text-2xl font-bold">{Array.isArray(roles) ? roles.length : 0}</div>
           </div>
         </div>
 
@@ -282,9 +252,8 @@ const RoleManagement: FC<RoleManagementProps> = () => {
           title="System Roles"
           columnDefs={roleColumns}
           rowData={Array.isArray(roles) ? roles : []}
-          onEdit={handleEditRole}
-          onDelete={handleDeleteRole}
           toolbar={toolbarButtons}
+          showActions={false}
         />
 
         {/* Create Role Modal */}
@@ -304,27 +273,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
                     placeholder="e.g., Admin, Manager, Operator"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea
-                    required
-                    value={roleForm.description}
-                    onChange={(e) => setRoleForm({...roleForm, description: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
-                    placeholder="Describe the role's responsibilities"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Permissions (comma-separated)</label>
-                  <textarea
-                    value={permissionsInput}
-                    onChange={handlePermissionsChange}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
-                    placeholder="e.g., users:read, users:write, users:delete, reports:view"
-                  />
-                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button type="submit" className="btn-primary flex-1">
                     Create Role
@@ -359,31 +308,9 @@ const RoleManagement: FC<RoleManagementProps> = () => {
                     value={roleForm.roleName}
                     onChange={(e) => setRoleForm({...roleForm, roleName: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  disabled={selectedRole?.isSystemRole ?? false}
-                  />
-                  {selectedRole.isSystemRole && (
-                    <p className="text-xs text-orange-600 mt-1">System roles cannot be renamed</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description</label>
-                  <textarea
-                    required
-                    value={roleForm.description}
-                    onChange={(e) => setRoleForm({...roleForm, description: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Permissions (comma-separated)</label>
-                  <textarea
-                    value={permissionsInput}
-                    onChange={handlePermissionsChange}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
-                  />
-                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button type="submit" className="btn-primary flex-1">
                     Update Role
@@ -401,33 +328,90 @@ const RoleManagement: FC<RoleManagementProps> = () => {
                 </div>
               </form>
 
-              {/* System Role Warning */}
-              {selectedRole.isSystemRole && (
-                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                      This is a system role and some modifications may be restricted.
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {/* Delete Button */}
               <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
                 <button
                   type="button"
                   onClick={() => selectedRole && handleDeleteRole(selectedRole)}
-                  disabled={selectedRole.isSystemRole}
-                  className={`w-full py-2 px-4 rounded-lg text-sm font-medium ${
-                    selectedRole.isSystemRole
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                      : 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400'
-                  }`}
+                  className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
                 >
-                  {selectedRole.isSystemRole ? 'Cannot Delete System Role' : 'Delete Role'}
+                  Delete Role
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Permissions Management Modal */}
+        {showPermissionsModal && selectedRole && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-semibold mb-4">Manage Permissions - {selectedRole.roleName}</h3>
+              
+              {allPermissionsLoading || rolePermissionDetailsLoading ? (
+                <div className="text-center py-8">Loading permissions...</div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(
+                    allPermissions?.reduce((acc: any, permission: Permission) => {
+                      if (!acc[permission.moduleName]) acc[permission.moduleName] = [];
+                      acc[permission.moduleName].push(permission);
+                      return acc;
+                    }, {}) || {}
+                  ).map(([moduleName, permissions]: [string, any]) => (
+                    <div key={moduleName} className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">{moduleName}</h4>
+                      <div className="space-y-2">
+                        {permissions.map((permission: Permission) => {
+                          const rolePermission = rolePermissionDetails?.find(
+                            (rp: RolePermissionDetail) => rp.permissionId === permission.permissionId
+                          );
+                          return (
+                            <div key={permission.permissionId} className="grid grid-cols-6 gap-2 items-center py-2 border-b">
+                              <div className="col-span-2">
+                                <span className="text-sm font-medium">{permission.permissionName}</span>
+                              </div>
+                              {['canView', 'canCreate', 'canEdit', 'canDelete'].map((action) => (
+                                <label key={action} className="flex items-center space-x-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={rolePermission?.[action as keyof RolePermissionDetail] || false}
+                                    onChange={async (e) => {
+                                      const permissionData: PermissionAssignment = {
+                                        roleId: selectedRole.roleId,
+                                        permissionId: permission.permissionId,
+                                        canView: action === 'canView' ? e.target.checked : (rolePermission?.canView || false),
+                                        canCreate: action === 'canCreate' ? e.target.checked : (rolePermission?.canCreate || false),
+                                        canEdit: action === 'canEdit' ? e.target.checked : (rolePermission?.canEdit || false),
+                                        canDelete: action === 'canDelete' ? e.target.checked : (rolePermission?.canDelete || false),
+                                      };
+                                      try {
+                                        await dispatch(assignPermissionToRoleAsync(permissionData)).unwrap();
+                                        dispatch(fetchRolePermissionDetailsAsync(selectedRole.roleId));
+                                      } catch (error: any) {
+                                        toast.error(`Failed to update permission: ${error}`);
+                                      }
+                                    }}
+                                    className="rounded"
+                                  />
+                                  <span className="text-xs">{action.replace('can', '')}</span>
+                                </label>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4 mt-6 border-t">
+                <button
+                  onClick={() => setShowPermissionsModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Close
                 </button>
               </div>
             </div>

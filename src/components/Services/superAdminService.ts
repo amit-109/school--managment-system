@@ -16,11 +16,11 @@ export interface Module {
 export interface Role {
   roleId: number;
   roleName: string;
-  description: string;
-  permissions: string[];
-  isSystemRole: boolean;
-  createdAt: string;
-  updatedAt: string;
+  description?: string;
+  permissions?: string[];
+  isSystemRole?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Tenant {
@@ -63,30 +63,65 @@ export interface SystemLog {
 export interface ModuleCreateData {
   moduleName: string;
   description: string;
-  icon?: string;
-  routePath?: string;
-  orderNo?: number;
-  isActive?: boolean;
-  assignedRoleIds?: number[];
+  icon: string;
+  routePath: string;
+  orderNo: number;
+  assignedRoleIds: number[];
 }
 
 export interface ModuleUpdateData {
-  moduleName?: string;
-  description?: string;
-  isEnabled?: boolean;
-  permissions?: string[];
+  moduleName: string;
+  description: string;
+  icon: string;
+  routePath: string;
+  orderNo: number;
+  isActive: boolean;
+  assignedRoleIds: number[];
 }
 
 export interface RoleCreateData {
   roleName: string;
-  description: string;
-  permissions: string[];
 }
 
 export interface RoleUpdateData {
   roleName?: string;
   description?: string;
   permissions?: string[];
+}
+
+export interface RolePermission {
+  roleId: number;
+  roleName: string;
+}
+
+export interface Permission {
+  permissionId: number;
+  permissionKey: string;
+  permissionName: string;
+  moduleId: number;
+  subModuleId: number | null;
+  moduleName: string;
+  description: string;
+  isActive: boolean;
+  createdOn: string;
+}
+
+export interface RolePermissionDetail {
+  permissionId: number;
+  permissionName: string;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+export interface PermissionAssignment {
+  roleId: number;
+  permissionId: number;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 export interface TenantCreateData {
@@ -149,14 +184,11 @@ export interface SubModule {
 }
 
 export interface SubModuleCreateData {
-  subModuleId: number;
   moduleId: number;
   subModuleName: string;
   description: string;
   routePath: string;
   orderNo: number;
-  isActive: boolean;
-  createdOn: string;
   assignedRoleIds: number[];
 }
 
@@ -437,14 +469,19 @@ export const deleteSubscriptionPlan = async (planId: number): Promise<void> => {
   await apiClient.delete(`/superadmin/subscription/plans/${planId}`);
 };
 
+// Export role scope types
+export type { TenantAdmin, RoleScopeRole, RolePermission, PermissionAssignment, Permission, RolePermissionDetail };
+
 // SubModule Management APIs
-export const getSubModules = async (page = 0, size = 10): Promise<PageableResponse<SubModule>> => {
+export const getSubModules = async (page = 0, size = 10, moduleId: number): Promise<PageableResponse<SubModule>> => {
   const params = new URLSearchParams({
     page: page.toString(),
     size: size.toString(),
   });
 
-  const response = await apiClient.get<ApiResponse<SubModule[]>>(`/superadmin/modules/submodules?${params}`);
+  const endpoint = `/superadmin/modules/${moduleId}/submodules?${params}`;
+    
+  const response = await apiClient.get<ApiResponse<SubModule[]>>(endpoint);
   const data = response.data.data;
   
   // API returns direct array, wrap in pageable format
@@ -461,8 +498,24 @@ export const getSubModules = async (page = 0, size = 10): Promise<PageableRespon
 
 export const createSubModule = async (subModuleData: SubModuleCreateData): Promise<SubModule> => {
   try {
-    console.log('API: Creating SubModule with data:', subModuleData);
-    const response = await apiClient.post<ApiResponse<SubModule>>('/superadmin/modules/submodules', subModuleData);
+    // Ensure proper data format for API
+    // Ensure route path starts with /
+    let routePath = subModuleData.routePath;
+    if (routePath && !routePath.startsWith('/')) {
+      routePath = '/' + routePath;
+    }
+    
+    const payload = {
+      moduleId: subModuleData.moduleId,
+      subModuleName: subModuleData.subModuleName,
+      description: subModuleData.description,
+      routePath: routePath,
+      orderNo: subModuleData.orderNo,
+      assignedRoleIds: subModuleData.assignedRoleIds || []
+    };
+    
+    console.log('API: Creating SubModule with payload:', payload);
+    const response = await apiClient.post<ApiResponse<SubModule>>('/superadmin/modules/submodules', payload);
     console.log('API: SubModule creation response:', response.data);
     return response.data.data;
   } catch (error: any) {
@@ -478,8 +531,26 @@ export const createSubModule = async (subModuleData: SubModuleCreateData): Promi
 
 export const updateSubModule = async (subModuleId: number, subModuleData: SubModuleUpdateData): Promise<SubModule> => {
   try {
-    console.log('API: Updating SubModule with data:', { subModuleId, subModuleData });
-    const response = await apiClient.put<ApiResponse<SubModule>>(`/superadmin/modules/submodules/${subModuleId}`, subModuleData);
+    // Ensure route path starts with /
+    let routePath = subModuleData.routePath;
+    if (routePath && !routePath.startsWith('/')) {
+      routePath = '/' + routePath;
+    }
+    
+    const payload = {
+      subModuleId: subModuleId,
+      moduleId: subModuleData.moduleId,
+      subModuleName: subModuleData.subModuleName,
+      description: subModuleData.description,
+      routePath: routePath,
+      orderNo: subModuleData.orderNo,
+      isActive: subModuleData.isActive,
+      createdOn: subModuleData.createdOn,
+      assignedRoleIds: subModuleData.assignedRoleIds || []
+    };
+    
+    console.log('API: Updating SubModule with payload:', { subModuleId, payload });
+    const response = await apiClient.put<ApiResponse<SubModule>>(`/superadmin/modules/submodules/${subModuleId}`, payload);
     console.log('API: SubModule update response:', response.data);
     return response.data.data;
   } catch (error: any) {
@@ -495,4 +566,52 @@ export const updateSubModule = async (subModuleId: number, subModuleData: SubMod
 
 export const deleteSubModule = async (subModuleId: number): Promise<void> => {
   await apiClient.delete(`/superadmin/modules/submodules/${subModuleId}`);
+};
+
+// Role Scope Management APIs
+export interface TenantAdmin {
+  adminUserId: number;
+  adminName: string;
+  organizationName: string;
+  roleName: string;
+  email: string;
+  username: string;
+}
+
+export interface RoleScopeRole {
+  roleId: number;
+  roleName: string;
+}
+
+export const getTenantAdmins = async (): Promise<TenantAdmin[]> => {
+  const response = await apiClient.get<ApiResponse<TenantAdmin[]>>('/superadmin/role-scope/tenant-admins');
+  return response.data.data;
+};
+
+export const getAdminRoleScope = async (adminUserId: number): Promise<RoleScopeRole[]> => {
+  const response = await apiClient.get<ApiResponse<RoleScopeRole[]>>(`/superadmin/role-scope/${adminUserId}`);
+  return response.data.data;
+};
+
+export const updateAdminRoleScope = async (adminUserId: number, roleIds: number[]): Promise<void> => {
+  await apiClient.post(`/superadmin/role-scope/${adminUserId}`, roleIds);
+};
+
+export const getRolePermissions = async (roleId: number): Promise<RolePermission[]> => {
+  const response = await apiClient.get<ApiResponse<RolePermission[]>>(`/superadmin/roles/${roleId}/permissions`);
+  return response.data.data;
+};
+
+export const getAllPermissions = async (): Promise<Permission[]> => {
+  const response = await apiClient.get<ApiResponse<Permission[]>>('/superadmin/roles/GetAllPermissions');
+  return response.data.data;
+};
+
+export const getRolePermissionDetails = async (roleId: number): Promise<RolePermissionDetail[]> => {
+  const response = await apiClient.get<ApiResponse<RolePermissionDetail[]>>(`/superadmin/roles/${roleId}/permissions`);
+  return response.data.data;
+};
+
+export const assignPermissionToRole = async (permissionData: PermissionAssignment): Promise<void> => {
+  await apiClient.post('/superadmin/roles/assign-permission', permissionData);
 };

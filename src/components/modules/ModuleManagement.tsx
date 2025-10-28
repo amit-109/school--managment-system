@@ -20,12 +20,10 @@ import { AppDispatch, RootState } from '../../store';
 interface ModuleFormData {
   moduleName: string;
   description: string;
-  icon?: string;
-  routePath?: string;
-  orderNo?: number;
-  isActive: boolean;
+  icon: string;
+  routePath: string;
+  orderNo: number;
   assignedRoleIds: number[];
-  createdOn?: string;
 }
 
 interface ModuleManagementProps {
@@ -53,7 +51,9 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   const [moduleForm, setModuleForm] = useState<ModuleFormData>({
     moduleName: '',
     description: '',
-    isActive: true,
+    icon: '',
+    routePath: '',
+    orderNo: 1,
     assignedRoleIds: [],
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
@@ -77,12 +77,11 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     e.preventDefault();
     try {
       const moduleData: ModuleCreateData = {
-        moduleName: moduleForm.moduleName,
-        description: moduleForm.description,
-        icon: moduleForm.icon || 'default',
-        routePath: moduleForm.routePath || '',
-        orderNo: moduleForm.orderNo || 0,
-        isActive: moduleForm.isActive,
+        moduleName: moduleForm.moduleName.trim(),
+        description: moduleForm.description.trim(),
+        icon: moduleForm.icon.trim() || '🧩',
+        routePath: moduleForm.routePath.trim() || `/${moduleForm.moduleName.toLowerCase().replace(/\s+/g, '-')}`,
+        orderNo: moduleForm.orderNo || 1,
         assignedRoleIds: moduleForm.assignedRoleIds,
       };
       await dispatch(createModuleAsync(moduleData)).unwrap();
@@ -101,10 +100,13 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
 
     try {
       const moduleData: ModuleUpdateData = {
-        moduleName: moduleForm.moduleName,
-        description: moduleForm.description,
-        isEnabled: true,
-        permissions: [],
+        moduleName: moduleForm.moduleName.trim(),
+        description: moduleForm.description.trim(),
+        icon: moduleForm.icon.trim() || '🧩',
+        routePath: moduleForm.routePath.trim() || `/${moduleForm.moduleName.toLowerCase().replace(/\s+/g, '-')}`,
+        orderNo: moduleForm.orderNo || 1,
+        isActive: selectedModule.isActive,
+        assignedRoleIds: moduleForm.assignedRoleIds,
       };
       await dispatch(updateModuleAsync({
         moduleId: selectedModule.moduleId,
@@ -156,8 +158,10 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     setModuleForm({
       moduleName: module.moduleName,
       description: module.description,
-      isActive: module.isActive,
-      assignedRoleIds: module.assignedRoleIds,
+      icon: module.icon || '',
+      routePath: module.routePath || '',
+      orderNo: module.orderNo || 1,
+      assignedRoleIds: module.assignedRoleIds || [],
     });
     setShowEditModal(true);
   };
@@ -166,7 +170,9 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     setModuleForm({
       moduleName: '',
       description: '',
-      isActive: true,
+      icon: '',
+      routePath: '',
+      orderNo: 1,
       assignedRoleIds: [],
     });
   };
@@ -200,6 +206,19 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
           {params.value}
         </div>
       ),
+    },
+    {
+      headerName: 'Icon',
+      field: 'icon',
+      width: 80,
+      cellRenderer: (params: any) => (
+        <div className="text-lg">{params.value || '🧩'}</div>
+      ),
+    },
+    {
+      headerName: 'Route Path',
+      field: 'routePath',
+      sortable: true,
     },
     {
       headerName: 'Assigned Roles',
@@ -307,8 +326,40 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
                     value={moduleForm.description}
                     onChange={(e) => setModuleForm({...moduleForm, description: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
+                    rows={2}
                     placeholder="Describe the module's purpose"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Icon</label>
+                    <input
+                      type="text"
+                      value={moduleForm.icon}
+                      onChange={(e) => setModuleForm({...moduleForm, icon: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="🧩 (emoji or icon)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Order Number</label>
+                    <input
+                      type="number"
+                      value={moduleForm.orderNo}
+                      onChange={(e) => setModuleForm({...moduleForm, orderNo: parseInt(e.target.value) || 1})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      min="1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Route Path</label>
+                  <input
+                    type="text"
+                    value={moduleForm.routePath}
+                    onChange={(e) => setModuleForm({...moduleForm, routePath: e.target.value})}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    placeholder="/module-path (auto-generated if empty)"
                   />
                 </div>
                 <div>
@@ -384,7 +435,39 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
                     value={moduleForm.description}
                     onChange={(e) => setModuleForm({...moduleForm, description: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={3}
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Icon</label>
+                    <input
+                      type="text"
+                      value={moduleForm.icon}
+                      onChange={(e) => setModuleForm({...moduleForm, icon: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="🧩 (emoji or icon)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Order Number</label>
+                    <input
+                      type="number"
+                      value={moduleForm.orderNo}
+                      onChange={(e) => setModuleForm({...moduleForm, orderNo: parseInt(e.target.value) || 1})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      min="1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Route Path</label>
+                  <input
+                    type="text"
+                    value={moduleForm.routePath}
+                    onChange={(e) => setModuleForm({...moduleForm, routePath: e.target.value})}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    placeholder="/module-path (auto-generated if empty)"
                   />
                 </div>
                 <div>

@@ -78,18 +78,24 @@ export const loginUserAsync = createAsyncThunk(
 // Async thunk for logging out user
 export const logoutUserAsync = createAsyncThunk(
   'auth/logoutUser',
-  async (_, { rejectWithValue, getState }) => {
+  async (refreshToken?: string, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState;
-      const refreshToken = state.auth.refreshToken || TokenManager.getInstance().getRefreshToken();
+      const token = refreshToken || state.auth.refreshToken || TokenManager.getInstance().getRefreshToken();
 
-      if (refreshToken) {
-        const result = await logoutUser(refreshToken);
+      if (token) {
+        const result = await logoutUser(token);
+        // Clear TokenManager after successful API call
+        TokenManager.getInstance().clearTokens();
         return result;
       } else {
-        throw new Error('No refresh token available');
+        // No token available, just clear local state
+        TokenManager.getInstance().clearTokens();
+        return { message: 'Logged out locally' };
       }
     } catch (error: any) {
+      // Even if API fails, clear local tokens
+      TokenManager.getInstance().clearTokens();
       return rejectWithValue(error.message);
     }
   }
@@ -199,9 +205,20 @@ const authSlice = createSlice({
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
+        state.userRole = null;
+        state.userRoles = [];
+        state.permissions = null;
+        state.error = null;
       })
       .addCase(logoutUserAsync.rejected, (state, action: PayloadAction<any>) => {
         state.loggingOut = false;
+        // Clear auth state even on rejection since tokens are cleared
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.isAuthenticated = false;
+        state.userRole = null;
+        state.userRoles = [];
+        state.permissions = null;
         state.error = action.payload;
       });
   },

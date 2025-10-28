@@ -96,19 +96,22 @@ export default function TopBar({
     }
   };
 
-  const handleLogoutClick = () => {
+  const handleLogoutClick = async () => {
     handleProfileMenuClose();
 
-    // Simple, synchronous logout without any async calls or state management
-    // Just clear everything and let the app handle the state change naturally
-
-    // Clear local storage tokens first
-    TokenManager.getInstance().clearTokens();
-
-    // Dispatch Redux action to clear state (this is synchronous)
-    dispatch(logoutUserAsync());
-
-    toast.success('Logged out successfully!');
+    try {
+      // Get refresh token before clearing
+      const refreshToken = TokenManager.getInstance().getRefreshToken();
+      
+      // Call logout API with refresh token
+      await dispatch(logoutUserAsync(refreshToken)).unwrap();
+      
+      toast.success('Logged out successfully!');
+    } catch (error) {
+      // Even if API call fails, tokens are cleared in the thunk
+      console.warn('Logout API call failed, but local logout completed:', error);
+      toast.success('Logged out successfully!');
+    }
   };
 
   return (
