@@ -88,6 +88,8 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
         {current===id && (
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-purple-600 rounded-r"></div>
         )}
+        
+        
       </button>
       {hasSubmodules && modulesExpanded && (
         <div className="ml-6 mt-1 space-y-1">
