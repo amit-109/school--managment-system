@@ -296,3 +296,24 @@ export const deleteFeeStructure = async (feeStructureId) => {
   const response = await apiClient.delete(`/admin/fee-structures/${feeStructureId}`);
   return response.data;
 };
+
+// Permission Management APIs - Exactly as per specification
+export const getAdminEffectivePermissions = async (adminId) => {
+  const response = await apiClient.get(`/admin/permissions/user/${adminId}/effective`);
+  return response.data;
+};
+
+export const getUserPermissionsForAssignment = async (userId) => {
+  const response = await apiClient.get(`/admin/permissions/user/${userId}`);
+  return response.data;
+};
+
+export const updateUserPermissionsForAssignment = async (userId, permissions) => {
+  const response = await apiClient.post(`/admin/permissions/user/${userId}`, permissions);
+  return response.data;
+};
+
+export const getUserLoginPermissions = async (userId) => {
+  const response = await apiClient.get(`/admin/permissions/user/${userId}/login`);
+  return response.data;
+};

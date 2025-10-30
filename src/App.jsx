@@ -26,6 +26,8 @@ import Subjects from './components/modules/Subjects.jsx'
 import ClassSubjects from './components/modules/ClassSubjects.jsx'
 import TeacherSubjects from './components/modules/TeacherSubjects.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
+import PermissionAssignment from './components/modules/PermissionAssignment.jsx'
+import PermissionManagement from './components/modules/PermissionManagement.jsx'
 import Login from './components/Auth/Login.jsx'
 import Register from './components/Auth/Register.jsx'
 import LandingPage from './components/LandingPage.jsx'
@@ -51,8 +53,22 @@ export default function App() {
   const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en')
   const { isLoading, setIsLoading } = useLoading()
 
-  const handleNavigate = (tab) => {
-    setTab(tab)
+  const handleNavigate = (tab, fromComponent = false) => {
+    console.log('App: handleNavigate called with tab:', tab, 'fromComponent:', fromComponent);
+    
+    // Only redirect permission-assignment from sidebar to permission-management (user list)
+    // Allow direct navigation when coming from PermissionManagement component
+    if (tab === 'permission-assignment' && !fromComponent) {
+      // Force clear any leftover data and go to user list
+      localStorage.removeItem('selectedUserForPermissions');
+      setTab('permission-management');
+    } else if (tab === 'permission-management') {
+      localStorage.removeItem('selectedUserForPermissions');
+      setTab(tab);
+    } else {
+      setTab(tab);
+    }
+    
     setSidebarOpen(false) // Close sidebar on mobile when navigating
   }
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -335,6 +351,8 @@ export default function App() {
             {tab === 'class-subjects' && <ClassSubjects />}
             {tab === 'teacher-subjects' && <TeacherSubjects />}
             {tab === 'fee-structures' && <FeeStructures />}
+            {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
+            {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 
             {/* Show specific dashboard overrides temporarily commented out */}
             {/* {tab === 'dashboard' && role === 'superadmin' && <SuperAdminDashboard />} */}
