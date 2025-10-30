@@ -1,7 +1,9 @@
 import axios from 'axios';
 import TokenManager from './tokenManager';
 
-const API_BASE_URL = '/api';
+// const API_BASE_URL = '/api';
+const API_BASE_URL = 'https://schoolmgmt-api-vvfv.onrender.com/api';
+
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
