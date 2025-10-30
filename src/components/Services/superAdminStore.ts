@@ -888,7 +888,12 @@ const superAdminSlice = createSlice({
         state.creatingModule = false;
         state.error = action.payload;
       })
+      .addCase(updateModuleAsync.pending, (state) => {
+        state.updatingModule = true;
+        state.error = null;
+      })
       .addCase(updateModuleAsync.fulfilled, (state, action: PayloadAction<Module>) => {
+        state.updatingModule = false;
         const index = state.modules.findIndex(module => module.moduleId === action.payload.moduleId);
         if (index !== -1) {
           state.modules[index] = action.payload;
@@ -899,6 +904,10 @@ const superAdminSlice = createSlice({
         if (state.selectedModule?.moduleId === action.payload.moduleId) {
           state.selectedModule = action.payload;
         }
+      })
+      .addCase(updateModuleAsync.rejected, (state, action: PayloadAction<any>) => {
+        state.updatingModule = false;
+        state.error = action.payload;
       })
       .addCase(deleteModuleAsync.pending, (state) => {
         state.deletingModule = true;

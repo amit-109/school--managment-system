@@ -124,6 +124,20 @@ export interface PermissionAssignment {
   canDelete: boolean;
 }
 
+export interface TenantAdmin {
+  adminUserId: number;
+  adminName: string;
+  organizationName: string;
+  roleName: string;
+  email: string;
+  username: string;
+}
+
+export interface RoleScopeRole {
+  roleId: number;
+  roleName: string;
+}
+
 export interface TenantCreateData {
   tenantName: string;
   domain: string;
@@ -255,8 +269,13 @@ export const createModule = async (moduleData: ModuleCreateData): Promise<Module
 };
 
 export const updateModule = async (moduleId: number, moduleData: ModuleUpdateData): Promise<Module> => {
-  const response = await apiClient.put<ApiResponse<Module>>(`/SuperAdmin/modules/${moduleId}`, moduleData);
-  return response.data.data;
+  const response = await apiClient.put(`/superadmin/modules/${moduleId}`, moduleData);
+  // API returns success message only, so return the updated data we sent
+  return {
+    moduleId,
+    ...moduleData,
+    createdOn: new Date().toISOString() // placeholder since API doesn't return it
+  } as Module;
 };
 
 export const deleteModule = async (moduleId: number): Promise<void> => {
@@ -469,8 +488,7 @@ export const deleteSubscriptionPlan = async (planId: number): Promise<void> => {
   await apiClient.delete(`/superadmin/subscription/plans/${planId}`);
 };
 
-// Export role scope types
-export type { TenantAdmin, RoleScopeRole, RolePermission, PermissionAssignment, Permission, RolePermissionDetail };
+
 
 // SubModule Management APIs
 export const getSubModules = async (page = 0, size = 10, moduleId: number): Promise<PageableResponse<SubModule>> => {
@@ -531,7 +549,6 @@ export const createSubModule = async (subModuleData: SubModuleCreateData): Promi
 
 export const updateSubModule = async (subModuleId: number, subModuleData: SubModuleUpdateData): Promise<SubModule> => {
   try {
-    // Ensure route path starts with /
     let routePath = subModuleData.routePath;
     if (routePath && !routePath.startsWith('/')) {
       routePath = '/' + routePath;
@@ -549,17 +566,15 @@ export const updateSubModule = async (subModuleId: number, subModuleData: SubMod
       assignedRoleIds: subModuleData.assignedRoleIds || []
     };
     
-    console.log('API: Updating SubModule with payload:', { subModuleId, payload });
-    const response = await apiClient.put<ApiResponse<SubModule>>(`/superadmin/modules/submodules/${subModuleId}`, payload);
-    console.log('API: SubModule update response:', response.data);
-    return response.data.data;
+    const response = await apiClient.put(`/superadmin/modules/submodules/${subModuleId}`, payload);
+    return {
+      subModuleId,
+      ...subModuleData,
+      routePath,
+      assignedRoleIds: subModuleData.assignedRoleIds || []
+    } as SubModule;
   } catch (error: any) {
-    console.error('API: SubModule update failed:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
+    console.error('API: SubModule update failed:', error);
     throw error;
   }
 };
@@ -569,19 +584,6 @@ export const deleteSubModule = async (subModuleId: number): Promise<void> => {
 };
 
 // Role Scope Management APIs
-export interface TenantAdmin {
-  adminUserId: number;
-  adminName: string;
-  organizationName: string;
-  roleName: string;
-  email: string;
-  username: string;
-}
-
-export interface RoleScopeRole {
-  roleId: number;
-  roleName: string;
-}
 
 export const getTenantAdmins = async (): Promise<TenantAdmin[]> => {
   const response = await apiClient.get<ApiResponse<TenantAdmin[]>>('/superadmin/role-scope/tenant-admins');

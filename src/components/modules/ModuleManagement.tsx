@@ -161,7 +161,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
       icon: module.icon || '',
       routePath: module.routePath || '',
       orderNo: module.orderNo || 1,
-      assignedRoleIds: module.assignedRoleIds || [],
+      assignedRoleIds: Array.isArray(module.assignedRoleIds) ? module.assignedRoleIds : [],
     });
     setShowEditModal(true);
   };
