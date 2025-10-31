@@ -64,11 +64,20 @@ const PermissionAssignment = ({ onNavigate }) => {
       console.log('Admin effective permissions:', adminData);
       console.log('User current permissions:', userData);
 
-      setAdminPerms(adminData?.data || []);
-      setUserPerms(userData?.data || []);
+      // Extract arrays from nested response structure
+      const adminPermissions = Array.isArray(adminData?.data) ? adminData.data : 
+                              Array.isArray(adminData) ? adminData : [];
+      const userPermissions = Array.isArray(userData?.data) ? userData.data : 
+                             Array.isArray(userData) ? userData : [];
+      
+      console.log('Extracted admin permissions:', adminPermissions);
+      console.log('Extracted user permissions:', userPermissions);
+      
+      setAdminPerms(adminPermissions);
+      setUserPerms(userPermissions);
 
       // Create permission matrix by merging both responses
-      createPermissionMatrix(adminData?.data || [], userData?.data || []);
+      createPermissionMatrix(adminPermissions, userPermissions);
     } catch (error) {
       console.error('Error loading permissions:', error);
       toast.error('Failed to load permissions');
@@ -80,65 +89,108 @@ const PermissionAssignment = ({ onNavigate }) => {
   const createPermissionMatrix = (adminPermissions, userPermissions) => {
     const matrix = {};
     
-    // Group by moduleName as per specification
+    // Ensure we have arrays to work with
+    if (!Array.isArray(adminPermissions) || !Array.isArray(userPermissions)) {
+      console.error('Invalid permission data structure:', { adminPermissions, userPermissions });
+      setPermissionMatrix({});
+      return;
+    }
+    
+    // Group by moduleName and subModuleName
     adminPermissions.forEach(adminPerm => {
       const moduleKey = adminPerm.moduleName;
+      const subModuleKey = adminPerm.subModuleName || 'General';
+      const permissionType = adminPerm.permissionKey.split('.').pop(); // Get View/Create/Edit/Delete
+      
       if (!matrix[moduleKey]) {
-        matrix[moduleKey] = [];
+        matrix[moduleKey] = {};
+      }
+      if (!matrix[moduleKey][subModuleKey]) {
+        matrix[moduleKey][subModuleKey] = {
+          permissions: {},
+          adminCan: { View: false, Create: false, Edit: false, Delete: false },
+          userCan: { View: false, Create: false, Edit: false, Delete: false }
+        };
       }
 
-      // Find corresponding user permission by permissionId
+      // Find corresponding user permission
       const userPerm = userPermissions.find(up => up.permissionId === adminPerm.permissionId) || {
-        permissionId: adminPerm.permissionId,
-        canView: false,
-        canCreate: false,
-        canEdit: false,
-        canDelete: false
+        canView: false, canCreate: false, canEdit: false, canDelete: false
       };
 
-      // Merge admin and user permissions for UI binding
-      matrix[moduleKey].push({
+      // Store permission details
+      matrix[moduleKey][subModuleKey].permissions[permissionType] = {
         permissionId: adminPerm.permissionId,
         permissionKey: adminPerm.permissionKey,
-        permissionName: adminPerm.permissionName,
-        moduleName: adminPerm.moduleName,
-        subModuleName: adminPerm.subModuleName || '',
-        // Admin's capabilities (what admin can assign)
-        adminCanView: adminPerm.canView,
-        adminCanCreate: adminPerm.canCreate,
-        adminCanEdit: adminPerm.canEdit,
-        adminCanDelete: adminPerm.canDelete,
-        // User's current permissions
-        userCanView: userPerm.canView,
-        userCanCreate: userPerm.canCreate,
-        userCanEdit: userPerm.canEdit,
-        userCanDelete: userPerm.canDelete
-      });
+        permissionName: adminPerm.permissionName
+      };
+
+      // Set admin capabilities
+      matrix[moduleKey][subModuleKey].adminCan[permissionType] = adminPerm.canView || adminPerm.canCreate || adminPerm.canEdit || adminPerm.canDelete;
+      
+      // Set user current permissions
+      matrix[moduleKey][subModuleKey].userCan[permissionType] = userPerm.canView || userPerm.canCreate || userPerm.canEdit || userPerm.canDelete;
     });
 
     console.log('Permission matrix created:', matrix);
     setPermissionMatrix(matrix);
   };
 
-  // Handle checkbox changes
-  const handlePermissionChange = (permissionId, action, value) => {
+  // Handle permission toggle changes
+  const handlePermissionToggle = (moduleKey, subModuleKey, permissionType, value) => {
     setPermissionMatrix(prev => {
-      const newMatrix = { ...prev };
-      
-      Object.keys(newMatrix).forEach(moduleKey => {
-        newMatrix[moduleKey] = newMatrix[moduleKey].map(perm => {
-          if (perm.permissionId === permissionId) {
-            return {
-              ...perm,
-              [`user${action.charAt(0).toUpperCase() + action.slice(1)}`]: value
-            };
-          }
-          return perm;
-        });
-      });
-      
+      const newMatrix = JSON.parse(JSON.stringify(prev));
+      newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
       return newMatrix;
     });
+  };
+
+  // Handle module-level toggle (master toggle)
+  const handleModuleToggle = (moduleKey, value) => {
+    setPermissionMatrix(prev => {
+      const newMatrix = JSON.parse(JSON.stringify(prev));
+      Object.keys(newMatrix[moduleKey]).forEach(subModuleKey => {
+        ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+          if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
+            newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+          }
+        });
+      });
+      return newMatrix;
+    });
+  };
+
+  // Handle submodule-level toggle
+  const handleSubModuleToggle = (moduleKey, subModuleKey, value) => {
+    setPermissionMatrix(prev => {
+      const newMatrix = JSON.parse(JSON.stringify(prev));
+      ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+        if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
+          newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+        }
+      });
+      return newMatrix;
+    });
+  };
+
+  // Check if module is fully enabled
+  const isModuleEnabled = (moduleKey) => {
+    const module = permissionMatrix[moduleKey];
+    if (!module) return false;
+    return Object.values(module).every(subModule => 
+      ['View', 'Create', 'Edit', 'Delete'].every(type => 
+        !subModule.adminCan[type] || subModule.userCan[type]
+      )
+    );
+  };
+
+  // Check if submodule is fully enabled
+  const isSubModuleEnabled = (moduleKey, subModuleKey) => {
+    const subModule = permissionMatrix[moduleKey]?.[subModuleKey];
+    if (!subModule) return false;
+    return ['View', 'Create', 'Edit', 'Delete'].every(type => 
+      !subModule.adminCan[type] || subModule.userCan[type]
+    );
   };
 
   // Save permissions - collect all rows and POST to backend
@@ -148,19 +200,27 @@ const PermissionAssignment = ({ onNavigate }) => {
       
       // Collect all permissions with full payload structure
       const permissions = [];
-      Object.values(permissionMatrix).flat().forEach(perm => {
-        permissions.push({
-          userId: selectedUser.userId,
-          permissionId: perm.permissionId,
-          permissionKey: perm.permissionKey,
-          permissionName: perm.permissionName,
-          moduleName: perm.moduleName,
-          subModuleName: perm.subModuleName || '',
-          isAssigned: perm.userCanView || perm.userCanCreate || perm.userCanEdit || perm.userCanDelete,
-          canView: perm.userCanView,
-          canCreate: perm.userCanCreate,
-          canEdit: perm.userCanEdit,
-          canDelete: perm.userCanDelete
+      Object.entries(permissionMatrix).forEach(([moduleKey, subModules]) => {
+        Object.entries(subModules).forEach(([subModuleKey, subModuleData]) => {
+          ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+            const permissionInfo = subModuleData.permissions[permissionType];
+            if (permissionInfo) {
+              const isEnabled = subModuleData.userCan[permissionType];
+              permissions.push({
+                userId: selectedUser.userId,
+                permissionId: permissionInfo.permissionId,
+                permissionKey: permissionInfo.permissionKey,
+                permissionName: permissionInfo.permissionName,
+                moduleName: moduleKey,
+                subModuleName: subModuleKey === 'General' ? '' : subModuleKey,
+                isAssigned: isEnabled,
+                canView: permissionType === 'View' ? isEnabled : false,
+                canCreate: permissionType === 'Create' ? isEnabled : false,
+                canEdit: permissionType === 'Edit' ? isEnabled : false,
+                canDelete: permissionType === 'Delete' ? isEnabled : false
+              });
+            }
+          });
         });
       });
 
@@ -221,89 +281,95 @@ const PermissionAssignment = ({ onNavigate }) => {
       <div className="bg-white rounded-lg shadow">
         <div className="p-6">
           <div className="space-y-6">
-            {/* Group by moduleName - Use collapsible panels as suggested */}
-            {Object.entries(permissionMatrix).map(([moduleName, permissions]) => (
+            {/* Enhanced Permission Matrix with Module and SubModule toggles */}
+            {Object.entries(permissionMatrix).map(([moduleName, subModules]) => (
               <div key={moduleName} className="border rounded-lg">
-                <div className="bg-slate-50 px-4 py-3 border-b">
-                  <h3 className="font-medium text-slate-900">{moduleName}</h3>
+                {/* Module Header with Master Toggle */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-900 text-lg">{moduleName}</h3>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm font-medium text-slate-700">Enable All</span>
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={isModuleEnabled(moduleName)}
+                        onChange={(e) => handleModuleToggle(moduleName, e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div className={`w-11 h-6 rounded-full transition-colors ${
+                        isModuleEnabled(moduleName) ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}>
+                        <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                          isModuleEnabled(moduleName) ? 'translate-x-5' : 'translate-x-0.5'
+                        } mt-0.5`}></div>
+                      </div>
+                    </div>
+                  </label>
                 </div>
-                <div className="p-4">
-                  <div className="overflow-x-auto">
-                    {/* Permission table - checkbox matrix for View/Create/Edit/Delete */}
-                    <table className="min-w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 px-3 font-medium text-slate-700">Permission</th>
-                          <th className="text-center py-2 px-3 font-medium text-slate-700">View</th>
-                          <th className="text-center py-2 px-3 font-medium text-slate-700">Create</th>
-                          <th className="text-center py-2 px-3 font-medium text-slate-700">Edit</th>
-                          <th className="text-center py-2 px-3 font-medium text-slate-700">Delete</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {permissions.map((permission) => (
-                          <tr key={permission.permissionId} className="border-b">
-                            <td className="py-2 px-3 text-slate-900">
-                              {permission.permissionName}
-                            </td>
-                            {/* Checkbox binding logic: checkbox.disabled = !adminPermission.canView; checkbox.checked = userPermission.canView; */}
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={permission.userCanView}
-                                disabled={!permission.adminCanView}
-                                onChange={(e) => handlePermissionChange(
-                                  permission.permissionId, 
-                                  'canView', 
-                                  e.target.checked
-                                )}
-                                className="rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={permission.userCanCreate}
-                                disabled={!permission.adminCanCreate}
-                                onChange={(e) => handlePermissionChange(
-                                  permission.permissionId, 
-                                  'canCreate', 
-                                  e.target.checked
-                                )}
-                                className="rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={permission.userCanEdit}
-                                disabled={!permission.adminCanEdit}
-                                onChange={(e) => handlePermissionChange(
-                                  permission.permissionId, 
-                                  'canEdit', 
-                                  e.target.checked
-                                )}
-                                className="rounded"
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={permission.userCanDelete}
-                                disabled={!permission.adminCanDelete}
-                                onChange={(e) => handlePermissionChange(
-                                  permission.permissionId, 
-                                  'canDelete', 
-                                  e.target.checked
-                                )}
-                                className="rounded"
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                
+                {/* SubModules */}
+                <div className="p-4 space-y-4">
+                  {Object.entries(subModules).map(([subModuleName, subModuleData]) => (
+                    <div key={subModuleName} className="bg-slate-50 rounded-lg p-4">
+                      {/* SubModule Header with Toggle */}
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-slate-800">{subModuleName}</h4>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <span className="text-sm text-slate-600">Enable</span>
+                          <div className="relative">
+                            <input
+                              type="checkbox"
+                              checked={isSubModuleEnabled(moduleName, subModuleName)}
+                              onChange={(e) => handleSubModuleToggle(moduleName, subModuleName, e.target.checked)}
+                              className="sr-only"
+                            />
+                            <div className={`w-10 h-5 rounded-full transition-colors ${
+                              isSubModuleEnabled(moduleName, subModuleName) ? 'bg-green-500' : 'bg-gray-300'
+                            }`}>
+                              <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform ${
+                                isSubModuleEnabled(moduleName, subModuleName) ? 'translate-x-5' : 'translate-x-0.5'
+                              } mt-0.5`}></div>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                      
+                      {/* Permission Type Toggles */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {['View', 'Create', 'Edit', 'Delete'].map(permissionType => {
+                          const canAssign = subModuleData.adminCan[permissionType];
+                          const isEnabled = subModuleData.userCan[permissionType];
+                          const colors = {
+                            View: 'blue', Create: 'green', Edit: 'yellow', Delete: 'red'
+                          };
+                          const color = colors[permissionType];
+                          
+                          return (
+                            <div key={permissionType} className={`p-3 rounded-lg border-2 transition-all ${
+                              !canAssign ? 'bg-gray-100 border-gray-200 opacity-50' : 
+                              isEnabled ? `bg-${color}-50 border-${color}-200` : 'bg-white border-gray-200 hover:border-gray-300'
+                            }`}>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isEnabled}
+                                  disabled={!canAssign}
+                                  onChange={(e) => handlePermissionToggle(moduleName, subModuleName, permissionType, e.target.checked)}
+                                  className={`rounded ${!canAssign ? 'opacity-50' : ''}`}
+                                />
+                                <span className={`text-sm font-medium ${
+                                  !canAssign ? 'text-gray-400' : 
+                                  isEnabled ? `text-${color}-700` : 'text-gray-600'
+                                }`}>
+                                  {permissionType}
+                                </span>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
