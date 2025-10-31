@@ -194,13 +194,9 @@ const PermissionAssignment = ({ onNavigate }) => {
 
   // Handle submodule-level toggle
   const handleSubModuleToggle = (moduleKey, subModuleKey, value) => {
-    console.log('SubModule toggle:', { moduleKey, subModuleKey, value });
-    
     // Check if trying to enable submodule when module doesn't have permissions
     if (value && subModuleKey !== 'General') {
-      // Find the General/module-level permissions
       const generalSubModule = permissionMatrix[moduleKey]['General'];
-      console.log('General submodule found:', generalSubModule);
       
       if (!generalSubModule) {
         toast.error(`Cannot enable ${subModuleKey} permissions. Module structure not found.`);
@@ -210,8 +206,6 @@ const PermissionAssignment = ({ onNavigate }) => {
       const modulePermissions = generalSubModule.userCan;
       const hasAnyModulePermission = modulePermissions && 
         (modulePermissions.View || modulePermissions.Create || modulePermissions.Edit || modulePermissions.Delete);
-      
-      console.log('Module permissions check:', { modulePermissions, hasAnyModulePermission });
       
       if (!hasAnyModulePermission) {
         toast.error(`Cannot enable ${subModuleKey} permissions. Please enable at least one permission for ${moduleKey} module first.`);
