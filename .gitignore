@@ -145,7 +145,6 @@ vite.config.ts.timestamp-*
 # yarn.lock
 
 # Local development
-.env
 
 # Private keys and certs
 *.pem

@@ -38,11 +38,9 @@ export default function Login({ onLogin, onSwitch }) {
         <div className="w-full max-w-md bg-white dark:bg-slate-800/90 rounded-3xl shadow-2xl border border-white/30 dark:border-slate-700 p-8 space-y-6 backdrop-blur-md">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              UpNext School Suite
+             Login
             </h1>
-            <p className="text-slate-500 dark:text-slate-400">
-              Sign in to continue your journey
-            </p>
+            
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
