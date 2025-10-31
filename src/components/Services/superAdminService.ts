@@ -614,6 +614,6 @@ export const getRolePermissionDetails = async (roleId: number): Promise<RolePerm
   return response.data.data;
 };
 
-export const assignPermissionToRole = async (permissionData: PermissionAssignment): Promise<void> => {
-  await apiClient.post('/superadmin/roles/assign-permission', permissionData);
+export const assignPermissionToRole = async (permissionData: PermissionAssignment[]): Promise<void> => {
+  await apiClient.post('/superadmin/roles/assign-permissions', permissionData);
 };

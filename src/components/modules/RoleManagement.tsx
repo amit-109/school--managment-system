@@ -4,6 +4,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import RolePermissionAssignment from './RolePermissionAssignment';
 import {
   fetchRolesAsync,
   createRoleAsync,
@@ -48,6 +49,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState<boolean>(false);
+  const [showEnhancedPermissions, setShowEnhancedPermissions] = useState<boolean>(false);
   const [roleForm, setRoleForm] = useState<RoleFormData>({
     roleName: '',
   });
@@ -145,6 +147,11 @@ const RoleManagement: FC<RoleManagementProps> = () => {
 
 
   const handleManagePermissions = (role: Role) => {
+    dispatch(setSelectedRole(role));
+    setShowEnhancedPermissions(true);
+  };
+
+  const handleManagePermissionsLegacy = (role: Role) => {
     dispatch(setSelectedRole(role));
     setShowPermissionsModal(true);
     dispatch(fetchAllPermissionsAsync());
@@ -342,11 +349,35 @@ const RoleManagement: FC<RoleManagementProps> = () => {
           </div>
         )}
 
-        {/* Permissions Management Modal */}
+        {/* Enhanced Permissions Management Modal */}
+        {showEnhancedPermissions && selectedRole && (
+          <RolePermissionAssignment
+            selectedRole={selectedRole}
+            onClose={() => {
+              setShowEnhancedPermissions(false);
+              dispatch(setSelectedRole(null));
+            }}
+          />
+        )}
+
+        {/* Legacy Permissions Management Modal */}
         {showPermissionsModal && selectedRole && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Manage Permissions - {selectedRole.roleName}</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Manage Permissions - {selectedRole.roleName}</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowPermissionsModal(false);
+                      setShowEnhancedPermissions(true);
+                    }}
+                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    Enhanced View
+                  </button>
+                </div>
+              </div>
               
               {allPermissionsLoading || rolePermissionDetailsLoading ? (
                 <div className="text-center py-8">Loading permissions...</div>
