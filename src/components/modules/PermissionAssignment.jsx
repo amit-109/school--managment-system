@@ -139,9 +139,28 @@ const PermissionAssignment = ({ onNavigate }) => {
 
   // Handle permission toggle changes
   const handlePermissionToggle = (moduleKey, subModuleKey, permissionType, value) => {
+    // Check if trying to enable submodule permission when module doesn't have it
+    if (value && subModuleKey !== 'General') {
+      const moduleHasPermission = permissionMatrix[moduleKey]['General']?.userCan[permissionType];
+      if (!moduleHasPermission) {
+        toast.error(`Cannot enable ${permissionType} permission for ${subModuleKey}. Please enable ${permissionType} permission for ${moduleKey} module first.`);
+        return;
+      }
+    }
+    
     setPermissionMatrix(prev => {
       const newMatrix = JSON.parse(JSON.stringify(prev));
       newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+      
+      // If disabling a module permission, clear the same permission from all submodules
+      if (!value && subModuleKey === 'General') {
+        Object.keys(newMatrix[moduleKey]).forEach(subKey => {
+          if (subKey !== 'General') {
+            newMatrix[moduleKey][subKey].userCan[permissionType] = false;
+          }
+        });
+      }
+      
       return newMatrix;
     });
   };
@@ -157,17 +176,62 @@ const PermissionAssignment = ({ onNavigate }) => {
           }
         });
       });
+      
+      // If disabling module, clear all submodule permissions
+      if (!value) {
+        Object.keys(newMatrix[moduleKey]).forEach(subModuleKey => {
+          if (subModuleKey !== 'General') {
+            ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+              newMatrix[moduleKey][subModuleKey].userCan[permissionType] = false;
+            });
+          }
+        });
+      }
+      
       return newMatrix;
     });
   };
 
   // Handle submodule-level toggle
   const handleSubModuleToggle = (moduleKey, subModuleKey, value) => {
+    console.log('SubModule toggle:', { moduleKey, subModuleKey, value });
+    
+    // Check if trying to enable submodule when module doesn't have permissions
+    if (value && subModuleKey !== 'General') {
+      // Find the General/module-level permissions
+      const generalSubModule = permissionMatrix[moduleKey]['General'];
+      console.log('General submodule found:', generalSubModule);
+      
+      if (!generalSubModule) {
+        toast.error(`Cannot enable ${subModuleKey} permissions. Module structure not found.`);
+        return;
+      }
+      
+      const modulePermissions = generalSubModule.userCan;
+      const hasAnyModulePermission = modulePermissions && 
+        (modulePermissions.View || modulePermissions.Create || modulePermissions.Edit || modulePermissions.Delete);
+      
+      console.log('Module permissions check:', { modulePermissions, hasAnyModulePermission });
+      
+      if (!hasAnyModulePermission) {
+        toast.error(`Cannot enable ${subModuleKey} permissions. Please enable at least one permission for ${moduleKey} module first.`);
+        return;
+      }
+    }
+    
     setPermissionMatrix(prev => {
       const newMatrix = JSON.parse(JSON.stringify(prev));
       ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
         if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
-          newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+          // Additional check for individual permission types
+          if (value && subModuleKey !== 'General') {
+            const moduleHasPermission = newMatrix[moduleKey]['General']?.userCan[permissionType];
+            if (moduleHasPermission) {
+              newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+            }
+          } else {
+            newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+          }
         }
       });
       return newMatrix;
