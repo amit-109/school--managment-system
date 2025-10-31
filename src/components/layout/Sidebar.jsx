@@ -87,19 +87,29 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     // Process permissions to create module structure
     if (permissions && Array.isArray(permissions)) {
       permissions.forEach(module => {
-        const moduleItem = {
-          id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
-          label: module.moduleName,
-          icon: moduleIcons[module.moduleName] || '📁',
-          hasSubmodules: true,
-          submodules: module.subModules.map(subModule => ({
-            id: subModule.subModuleName.toLowerCase().replace(/\s+/g, '-'),
-            label: subModule.subModuleName,
-            icon: subModuleIcons[subModule.subModuleName] || '📄',
-            permissions: subModule.permissions
-          }))
-        };
-        menuItems.push(moduleItem);
+        // Filter submodules that have at least one permission granted
+        const accessibleSubmodules = module.subModules.filter(subModule => {
+          return subModule.permissions.some(permission => 
+            permission.canView || permission.canCreate || permission.canEdit || permission.canDelete
+          );
+        }).map(subModule => ({
+          id: subModule.subModuleName.toLowerCase().replace(/\s+/g, '-'),
+          label: subModule.subModuleName,
+          icon: subModuleIcons[subModule.subModuleName] || '📄',
+          permissions: subModule.permissions
+        }));
+
+        // Only add module if it has accessible submodules
+        if (accessibleSubmodules.length > 0) {
+          const moduleItem = {
+            id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
+            label: module.moduleName,
+            icon: moduleIcons[module.moduleName] || '📁',
+            hasSubmodules: true,
+            submodules: accessibleSubmodules
+          };
+          menuItems.push(moduleItem);
+        }
       });
     }
 
