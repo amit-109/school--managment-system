@@ -317,6 +317,7 @@ export default function App() {
         ) : (
           <Login onLogin={handleLogin} onSwitch={() => setShowPricing(true)} />
         )}
+        <Toaster position="top-right" />
       </LoadingOverlay>
     );
   }
@@ -363,6 +364,7 @@ export default function App() {
         </div>
       </div>
       </div>
+      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

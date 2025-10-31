@@ -169,6 +169,8 @@ const PermissionAssignment = ({ onNavigate }) => {
   const handleModuleToggle = (moduleKey, value) => {
     setPermissionMatrix(prev => {
       const newMatrix = JSON.parse(JSON.stringify(prev));
+      
+      // Apply to all submodules including General
       Object.keys(newMatrix[moduleKey]).forEach(subModuleKey => {
         ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
           if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
@@ -176,17 +178,6 @@ const PermissionAssignment = ({ onNavigate }) => {
           }
         });
       });
-      
-      // If disabling module, clear all submodule permissions
-      if (!value) {
-        Object.keys(newMatrix[moduleKey]).forEach(subModuleKey => {
-          if (subModuleKey !== 'General') {
-            ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
-              newMatrix[moduleKey][subModuleKey].userCan[permissionType] = false;
-            });
-          }
-        });
-      }
       
       return newMatrix;
     });
@@ -215,19 +206,42 @@ const PermissionAssignment = ({ onNavigate }) => {
     
     setPermissionMatrix(prev => {
       const newMatrix = JSON.parse(JSON.stringify(prev));
-      ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
-        if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
-          // Additional check for individual permission types
-          if (value && subModuleKey !== 'General') {
-            const moduleHasPermission = newMatrix[moduleKey]['General']?.userCan[permissionType];
-            if (moduleHasPermission) {
-              newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
-            }
-          } else {
+      
+      // Handle General submodule toggle
+      if (subModuleKey === 'General') {
+        // Toggle General permissions
+        ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+          if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
             newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
           }
+        });
+        
+        // If disabling General, also disable all other submodules
+        if (!value) {
+          Object.keys(newMatrix[moduleKey]).forEach(subKey => {
+            if (subKey !== 'General') {
+              ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+                newMatrix[moduleKey][subKey].userCan[permissionType] = false;
+              });
+            }
+          });
         }
-      });
+      } else {
+        // Handle other submodule toggles
+        ['View', 'Create', 'Edit', 'Delete'].forEach(permissionType => {
+          if (newMatrix[moduleKey][subModuleKey].adminCan[permissionType]) {
+            if (value) {
+              const moduleHasPermission = newMatrix[moduleKey]['General']?.userCan[permissionType];
+              if (moduleHasPermission) {
+                newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+              }
+            } else {
+              newMatrix[moduleKey][subModuleKey].userCan[permissionType] = value;
+            }
+          }
+        });
+      }
+      
       return newMatrix;
     });
   };
