@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
+import LoadingOverlay from '../shared/LoadingOverlay';
 import { 
   getAdminEffectivePermissions, 
   getUserPermissionsForAssignment, 
@@ -241,16 +242,9 @@ const PermissionAssignment = ({ onNavigate }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
+    <LoadingOverlay isLoading={loading}>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Assign Permissions</h1>
@@ -281,8 +275,31 @@ const PermissionAssignment = ({ onNavigate }) => {
       <div className="bg-white rounded-lg shadow">
         <div className="p-6">
           <div className="space-y-6">
+            {/* Show skeleton while loading */}
+            {loading && (
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="border rounded-lg">
+                    <div className="bg-slate-50 px-4 py-3 border-b">
+                      <div className="h-6 bg-slate-200 rounded animate-pulse w-48"></div>
+                    </div>
+                    <div className="p-4">
+                      <div className="bg-slate-100 rounded-lg p-4">
+                        <div className="h-4 bg-slate-200 rounded animate-pulse w-32 mb-3"></div>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[1, 2, 3, 4].map(j => (
+                            <div key={j} className="h-12 bg-slate-200 rounded animate-pulse"></div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             {/* Enhanced Permission Matrix with Module and SubModule toggles */}
-            {Object.entries(permissionMatrix).map(([moduleName, subModules]) => (
+            {!loading && Object.entries(permissionMatrix).map(([moduleName, subModules]) => (
               <div key={moduleName} className="border rounded-lg">
                 {/* Module Header with Master Toggle */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b flex items-center justify-between">
@@ -374,7 +391,7 @@ const PermissionAssignment = ({ onNavigate }) => {
               </div>
             ))}
             
-            {Object.keys(permissionMatrix).length === 0 && (
+            {!loading && Object.keys(permissionMatrix).length === 0 && (
               <div className="text-center py-8 text-slate-500">
                 <p>No permissions available to assign.</p>
                 <p className="text-sm mt-2">Please ensure the backend APIs are implemented and return permission data.</p>
@@ -383,7 +400,8 @@ const PermissionAssignment = ({ onNavigate }) => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </LoadingOverlay>
   );
 };
 
