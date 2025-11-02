@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="480" viewBox="0 0 800 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="480" rx="12" fill="#0f172a"/>
+  <rect x="40" y="40" width="720" height="160" rx="8" fill="#22c55e" fill-opacity="0.12"/>
+  <text x="56" y="96" fill="white" font-size="32" font-family="Arial">Fees & Payments</text>
+  <text x="56" y="136" fill="#94a3b8" font-size="18" font-family="Arial">Flexible fee structures, payment records and reports.</text>
+</svg>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="480" viewBox="0 0 800 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="480" rx="12" fill="#1e293b"/>
+  <rect x="32" y="32" width="736" height="240" rx="8" fill="#0ea5e9" fill-opacity="0.12"/>
+  <rect x="32" y="288" width="736" height="160" rx="8" fill="#0ea5e9" fill-opacity="0.06"/>
+  <text x="48" y="96" fill="white" font-size="32" font-family="Arial">Dashboard Preview — Class Overview</text>
+  <text x="48" y="136" fill="#cbd5e1" font-size="18" font-family="Arial">Attendance, recent announcements, quick links and analytics snapshot.</text>
+</svg>
