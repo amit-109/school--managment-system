@@ -101,7 +101,7 @@ export default function TopBar({
 
     try {
       // Get refresh token before clearing
-      const refreshToken = TokenManager.getInstance().getRefreshToken();
+      const refreshToken = TokenManager.getInstance().getRefreshToken() || '';
       
       // Call logout API with refresh token
       await dispatch(logoutUserAsync(refreshToken)).unwrap();

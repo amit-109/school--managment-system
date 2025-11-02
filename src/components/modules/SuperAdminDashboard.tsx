@@ -48,7 +48,7 @@ const SuperAdminDashboard: FC<SuperAdminDashboardProps> = () => {
 
   const activeTenants = Array.isArray(tenants) ? tenants.filter((tenant: Tenant) => tenant.subscriptionStatus === 'active').length : 0;
   const totalTenants = Array.isArray(tenants) ? tenants.length : 0;
-  const enabledModules = Array.isArray(modules) ? modules.filter((module: Module) => module.isEnabled).length : 0;
+  const enabledModules = Array.isArray(modules) ? modules.filter((module: Module) => (module as any).isEnabled).length : 0;
   const totalModules = Array.isArray(modules) ? modules.length : 0;
 
   const totalRevenue = analyticsData?.revenueData?.totalRevenue || 0;
