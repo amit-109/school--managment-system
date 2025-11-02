@@ -54,8 +54,6 @@ export default function App() {
   const { isLoading, setIsLoading } = useLoading()
 
   const handleNavigate = (tab, fromComponent = false) => {
-    console.log('App: handleNavigate called with tab:', tab, 'fromComponent:', fromComponent);
-    
     // Only redirect permission-assignment from sidebar to permission-management (user list)
     // Allow direct navigation when coming from PermissionManagement component
     if (tab === 'permission-assignment' && !fromComponent) {
@@ -80,7 +78,6 @@ export default function App() {
         await logoutUser(refreshToken)
       }
     } catch (error) {
-      console.error('Logout API failed:', error)
       // Proceed with logout anyway
     } finally {
       TokenManager.getInstance().clearTokens()
@@ -95,13 +92,11 @@ export default function App() {
 
   // Check authentication on app startup using Redux state
   useEffect(() => {
-    console.log('App: Checking for existing authentication...');
     // Initialize Redux state with token if exists
     const token = TokenManager.getInstance().getAccessToken();
     const refreshToken = TokenManager.getInstance().getRefreshToken();
 
     if (token && refreshToken) {
-      console.log('App: Found existing tokens, setting authentication');
       dispatch(setTokens({
         accessToken: token,
         refreshToken: refreshToken,
@@ -114,14 +109,11 @@ export default function App() {
       setAuthenticated(true);
       setShowLanding(false);
       setTab('dashboard'); // Set to dashboard on reload
-    } else {
-      console.log('App: No existing tokens found');
     }
   }, [dispatch])
 
   // Sync authentication state and role
   useEffect(() => {
-    console.log('App: Sync effect triggered - isAuthenticated:', isAuthenticated, 'userRole:', userRole);
     setAuthenticated(isAuthenticated);
     if (isAuthenticated && userRole) {
       // Update local role state based on userRole from Redux
@@ -138,9 +130,7 @@ export default function App() {
       const username = localStorage.getItem('lastUser') || 'User';
       setUser({ username });
       setShowLanding(false);
-      console.log('App: User authenticated with role:', userRole, 'local role:', role);
     } else {
-      console.log('App: User not authenticated or no userRole');
       setUser(null);
       setAuthenticated(false);
       setShowLanding(true);
@@ -211,7 +201,6 @@ export default function App() {
         setShowPricing(false)
       })
       .catch((error) => {
-        console.error('Logout failed:', error)
         // Still clear tokens and redirect even if API fails
         TokenManager.getInstance().clearTokens()
         setAuthenticated(false)
@@ -254,17 +243,11 @@ export default function App() {
 
   const handleLogin = async ({ username, password }) => {
     try {
-      console.log('App: Attempting login...');
       const response = await dispatch(loginUserAsync({ username, password })).unwrap();
-      console.log('App: Login response:', response);
 
       // Wait for Redux state to be updated and then set tokens
       setTimeout(() => {
         const authState = store.getState().auth;
-        console.log('App: Setting tokens after Redux update:', {
-          accessToken: authState.accessToken?.substring(0, 20) + '...',
-          refreshToken: authState.refreshToken?.substring(0, 20) + '...',
-        });
 
         if (authState.accessToken && authState.refreshToken) {
           TokenManager.getInstance().setTokens({
@@ -283,11 +266,9 @@ export default function App() {
       setAuthenticated(true);
       setShowLanding(false);
       localStorage.setItem('lastUser', username);
-      console.log('App: Login successful, setting tab to dashboard');
       setTab('dashboard'); // Ensure we start on dashboard
       toast.success('Login successful!');
     } catch (error) {
-      console.error('App: Login failed:', error);
       toast.error(`Login Failed: ${error}`);
     }
   }

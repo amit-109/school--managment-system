@@ -18,10 +18,7 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = TokenManager.getInstance().getAccessToken();
     if (token) {
-      console.log('API Client: Adding Bearer token to request:', config.method?.toUpperCase(), config.url);
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.log('API Client: No token available for request:', config.method?.toUpperCase(), config.url);
     }
     return config;
   },
@@ -34,7 +31,6 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Unauthorized, clear tokens and redirect
-      console.log('API Client: 401 error detected, clearing tokens');
       TokenManager.getInstance().clearTokens();
       // Don't auto-redirect during development - let Redux handle state
       // window.location.href = '/'; // redirect to landing

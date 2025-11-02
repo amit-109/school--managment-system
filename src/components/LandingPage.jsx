@@ -99,7 +99,6 @@ export default function LandingPage({ onSignIn, onRegister }) {
     })
     .catch(error => {
       setSending(false);
-      console.error('Email error:', error);
       toast.error('Failed to send message. Please try again.');
     });
   };
@@ -107,7 +106,7 @@ export default function LandingPage({ onSignIn, onRegister }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       
-      <style jsx>{`
+      <style>{`
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-20px); }
