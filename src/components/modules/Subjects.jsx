@@ -28,6 +28,8 @@ export default function Subjects() {
   })
   const [errors, setErrors] = useState({})
   const [viewData, setViewData] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
 
   useEffect(() => {
     dispatch(fetchSubjectsAsync({ page: 0, size: 10 }))
@@ -38,14 +40,27 @@ export default function Subjects() {
     setIsLoading(creatingSubject || updatingSubject || deletingSubject)
   }, [creatingSubject, updatingSubject, deletingSubject, setIsLoading])
 
-  const filteredRows = (rows || []).map((row, index) => ({
-    sno: index + 1,
-    id: row.subjectId,
-    name: row.subjectName,
-    code: row.subjectCode,
-    description: row.description,
-    isActive: row.isActive
-  }))
+  const filteredRows = useMemo(() => {
+    return (rows || []).filter(row => {
+      const matchesSearch = searchTerm === '' ||
+        row.subjectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.subjectCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        row.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesStatus = statusFilter === 'All' ||
+        (statusFilter === 'Active' && row.isActive) ||
+        (statusFilter === 'Inactive' && !row.isActive)
+      
+      return matchesSearch && matchesStatus
+    }).map((row, index) => ({
+      sno: index + 1,
+      id: row.subjectId,
+      name: row.subjectName,
+      code: row.subjectCode,
+      description: row.description,
+      isActive: row.isActive
+    }))
+  }, [rows, searchTerm, statusFilter])
 
   const cols = useMemo(() => [
     { field: 'sno', headerName: 'S.No', maxWidth: 80 },
@@ -165,13 +180,67 @@ export default function Subjects() {
     }
   }
 
+  const handleExport = () => {
+    const csvData = filteredRows.map(subject => ({
+      'S.No': subject.sno,
+      'Subject Code': subject.code,
+      'Subject Name': subject.name,
+      'Description': subject.description || 'N/A',
+      'Status': subject.isActive ? 'Active' : 'Inactive'
+    }))
+
+    const csvContent = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `subjects_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
   const toolbar = (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search subjects..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        />
+        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        >
+          <option value="All">All</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+      
       <button
         onClick={() => { resetForm(); setShow(true) }}
-        className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg"
+        className="btn-primary flex items-center gap-2"
       >
-        + Add Subject
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Add Subject
       </button>
     </div>
   )
@@ -179,15 +248,34 @@ export default function Subjects() {
   return (
     <>
       <LoadingOverlay isLoading={subjectsLoading}>
-        <AgGridBox
-          title="Subjects"
-          columnDefs={cols}
-          rowData={filteredRows}
-          toolbar={toolbar}
-          onEdit={handleEdit}
-          onView={handleView}
-          onDelete={handleDelete}
-        />
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Subject Management</h1>
+              <p className="text-sm text-slate-600">Manage academic subjects and their details</p>
+            </div>
+            <button
+              onClick={handleExport}
+              className="btn-secondary flex items-center gap-2"
+              disabled={filteredRows.length === 0}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export CSV
+            </button>
+          </div>
+          
+          <AgGridBox
+            title={`Subjects (${filteredRows.length})`}
+            columnDefs={cols}
+            rowData={filteredRows}
+            toolbar={toolbar}
+            onEdit={handleEdit}
+            onView={handleView}
+            onDelete={handleDelete}
+          />
+        </div>
       </LoadingOverlay>
 
       {/* Add/Edit Modal */}

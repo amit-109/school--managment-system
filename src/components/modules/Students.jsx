@@ -1,69 +1,178 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
-import { demoStudents } from '../../data/students.js'
-import { usePermissions } from '../Auth/usePermissions'
+import LoadingOverlay from '../shared/LoadingOverlay'
+import { getUsers, createUser, updateUser, deleteUser, getParents, getClasses } from '../Services/adminService'
 
 export default function Students() {
-  const { canCreate, canUpdate, canDelete, canRead } = usePermissions()
-  const [rows, setRows] = useState(demoStudents)
+  const { permissions } = useSelector((state) => state.auth)
+  const [rows, setRows] = useState([])
+  const [parents, setParents] = useState([])
+  const [classes, setClasses] = useState([])
+  const [loading, setLoading] = useState(false)
   const [show, setShow] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  const [form, setForm] = useState({ id: '', name: '', cls: '', stream: '', guardian: '', phone: '' })
+  const [form, setForm] = useState({
+    userId: 0,
+    roleName: 'Student',
+    firstName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    password: '',
+    phoneNumber: '',
+    address: '',
+    admissionNo: '',
+    parentName: '',
+    classId: 0
+  })
   const [errors, setErrors] = useState({})
   const [classFilter, setClassFilter] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('')
   const [streamFilter, setStreamFilter] = useState('')
   const [viewData, setViewData] = useState(null)
 
-  const filteredRows = rows.filter(row =>
-    (classFilter === '' || row.cls.includes(classFilter)) &&
-    (streamFilter === '' || row.stream.includes(streamFilter))
-  )
+  useEffect(() => {
+    loadStudents()
+    loadClasses()
+  }, [])
+
+  const loadStudents = async () => {
+    setLoading(true)
+    try {
+      const response = await getUsers()
+      if (response.success) {
+        const students = response.data?.users?.filter(user => user.roleName === 'Student') || []
+        setRows(students)
+      }
+    } catch (error) {
+      toast.error('Failed to load students')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+
+  const loadClasses = async () => {
+    try {
+      const response = await getClasses()
+      if (response.success) {
+        setClasses(response.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error)
+    }
+  }
+
+  const filteredRows = rows.filter(row => {
+    const className = classes.find(c => c.classId === row.classId)?.className || ''
+    return (
+      (classFilter === '' || className.includes(classFilter)) &&
+      (sectionFilter === '' || className.includes(sectionFilter))
+    )
+  })
 
   const cols = useMemo(() => [
-    { field: 'id', headerName: 'ID', maxWidth: 120 },
-    { field: 'name', headerName: 'Name' },
-    { field: 'cls', headerName: 'Class', maxWidth: 140 },
-    { field: 'stream', headerName: 'Stream', maxWidth: 140 },
-    { field: 'guardian', headerName: 'Guardian' },
+    { field: 'admissionNo', headerName: 'Admission No', maxWidth: 140 },
+    { field: 'fullName', headerName: 'Name' },
+    { field: 'username', headerName: 'Username', maxWidth: 140 },
+    { field: 'email', headerName: 'Email' },
     { field: 'phone', headerName: 'Phone', maxWidth: 160 },
-  ], [])
+    { 
+      field: 'className', 
+      headerName: 'Class', 
+      maxWidth: 140,
+      valueGetter: (params) => {
+        const cls = classes.find(c => c.classId === params.data.classId)
+        return cls?.className || 'N/A'
+      }
+    },
+    {
+      field: 'parentName',
+      headerName: 'Parent'
+    }
+  ], [classes, parents])
 
   const validate = () => {
     const newErrors = {}
-    if (!form.id.trim()) newErrors.id = "ID is required"
-    if (!editMode && rows.some(student => student.id === form.id.trim())) newErrors.id = "ID already exists"
-    if (!form.name.trim()) newErrors.name = "Name is required"
-    if (!form.cls.trim()) newErrors.cls = "Class is required"
-    if (!form.guardian.trim()) newErrors.guardian = "Guardian is required"
-    if (!form.phone.trim()) newErrors.phone = "Phone is required"
-    if (form.phone.trim() && !/^\d{10}$/.test(form.phone.trim())) newErrors.phone = "Phone must be 10 digits"
+    if (!form.firstName.trim()) newErrors.firstName = "First name is required"
+    if (!form.lastName.trim()) newErrors.lastName = "Last name is required"
+    if (!form.username.trim()) newErrors.username = "Username is required"
+    if (!form.email.trim()) newErrors.email = "Email is required"
+    if (!editMode && !form.password.trim()) newErrors.password = "Password is required"
+    if (!form.admissionNo.trim()) newErrors.admissionNo = "Admission number is required"
+    if (!form.parentName.trim()) newErrors.parentName = "Parent name is required"
+    if (!form.classId) newErrors.classId = "Class is required"
     return newErrors
   }
 
   const resetForm = () => {
-    setForm({ id: '', name: '', cls: '', stream: '', guardian: '', phone: '' })
+    setForm({
+      userId: 0,
+      roleName: 'Student',
+      firstName: '',
+      lastName: '',
+      username: '',
+      email: '',
+      password: '',
+      phoneNumber: '',
+      address: '',
+      admissionNo: '',
+      parentName: '',
+      classId: 0
+    })
     setErrors({})
     setEditMode(false)
   }
 
-  const addStudent = () => {
+  const addStudent = async () => {
     const newErrors = validate()
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
-    if (editMode) {
-      setRows(prev => prev.map(student =>
-        student.id === form.originalId ? {...form, id: form.id.trim(), name: form.name.trim(), guardian: form.guardian.trim(), phone: form.phone.trim(), cls: form.cls.trim(), stream: form.stream.trim()} : student
-      ))
-    } else {
-      setRows(prev => [{...form, id: form.id.trim(), name: form.name.trim(), guardian: form.guardian.trim(), phone: form.phone.trim(), cls: form.cls.trim(), stream: form.stream.trim()}, ...prev])
+    setLoading(true)
+    try {
+      const userData = {
+        ...form,
+        roleName: 'Student'
+      }
+
+      if (editMode) {
+        await updateUser(userData)
+        toast.success('Student updated successfully')
+      } else {
+        await createUser(userData)
+        toast.success('Student created successfully')
+      }
+      
+      setShow(false)
+      resetForm()
+      loadStudents()
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save student'
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
     }
-    setShow(false)
-    resetForm()
   }
 
   const handleEdit = (data) => {
-    setForm({...data, originalId: data.id})
+    setForm({
+      userId: data.userId,
+      roleName: 'Student',
+      firstName: data.firstName,
+      lastName: data.lastName,
+      username: data.username,
+      email: data.email,
+      password: '',
+      phoneNumber: data.phoneNumber || data.phone,
+      address: data.address,
+      admissionNo: data.admissionNo,
+      parentName: data.parentName || '',
+      classId: data.classId || 0
+    })
     setEditMode(true)
     setShow(true)
   }
@@ -72,9 +181,18 @@ export default function Students() {
     setViewData(data)
   }
 
-  const handleDelete = (data) => {
-    if (window.confirm(`Are you sure you want to delete student ${data.name}?`)) {
-      setRows(prev => prev.filter(student => student.id !== data.id))
+  const handleDelete = async (data) => {
+    if (window.confirm(`Are you sure you want to delete student ${data.fullName}?`)) {
+      setLoading(true)
+      try {
+        await deleteUser(data.userId)
+        toast.success('Student deleted successfully')
+        loadStudents()
+      } catch (error) {
+        toast.error('Failed to delete student')
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
@@ -90,25 +208,46 @@ export default function Students() {
         Add Student
       </button>
       <div className="flex gap-3">
-        <input
-          type="text"
-          placeholder="Filter by Class"
+        <select
           value={classFilter}
           onChange={(e) => setClassFilter(e.target.value)}
-          className="input-primary text-sm min-w-[140px]"
-        />
-        <input
-          type="text"
-          placeholder="Filter by Stream"
+          className="input-primary text-sm min-w-[120px]"
+        >
+          <option value="">All Classes</option>
+          <option value="1">Class 1</option>
+          <option value="2">Class 2</option>
+          <option value="9">Class 9</option>
+          <option value="10">Class 10</option>
+          <option value="11">Class 11</option>
+          <option value="12">Class 12</option>
+        </select>
+        <select
+          value={sectionFilter}
+          onChange={(e) => setSectionFilter(e.target.value)}
+          className="input-primary text-sm min-w-[120px]"
+        >
+          <option value="">All Sections</option>
+          <option value="A">Section A</option>
+          <option value="B">Section B</option>
+          <option value="C">Section C</option>
+        </select>
+        <select
           value={streamFilter}
           onChange={(e) => setStreamFilter(e.target.value)}
-          className="input-primary text-sm min-w-[140px]"
-        />
+          className="input-primary text-sm min-w-[120px]"
+        >
+          <option value="">All Streams</option>
+          <option value="Science">Science</option>
+          <option value="Arts">Arts</option>
+          <option value="Commerce">Commerce</option>
+        </select>
       </div>
     </div>
   )
 
-  return <>
+  return (
+    <LoadingOverlay isLoading={loading}>
+      <>
     <AgGridBox
       title="Students"
       columnDefs={cols}
@@ -139,53 +278,117 @@ export default function Students() {
             <form onSubmit={(e) => { e.preventDefault(); addStudent(); }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Student ID *</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">First Name *</label>
                   <input
                     type="text"
-                    className={`input-primary ${errors.id ? 'border-red-500 focus:ring-red-500' : ''}`}
-                    placeholder="e.g., S001"
-                    value={form.id}
-                    onChange={(e) => setForm(f => ({...f, id: e.target.value}))}
-                    disabled={editMode}
+                    className={`input-primary ${errors.firstName ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter first name"
+                    value={form.firstName}
+                    onChange={(e) => setForm(f => ({...f, firstName: e.target.value}))}
                   />
-                  {errors.id && <p className="text-red-500 text-xs flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.id}
-                  </p>}
+                  {errors.firstName && <p className="text-red-500 text-xs">{errors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Full Name *</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Last Name *</label>
                   <input
                     type="text"
-                    className={`input-primary ${errors.name ? 'border-red-500 focus:ring-red-500' : ''}`}
-                    placeholder="e.g., John Doe"
-                    value={form.name}
-                    onChange={(e) => setForm(f => ({...f, name: e.target.value}))}
+                    className={`input-primary ${errors.lastName ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter last name"
+                    value={form.lastName}
+                    onChange={(e) => setForm(f => ({...f, lastName: e.target.value}))}
                   />
-                  {errors.name && <p className="text-red-500 text-xs flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.name}
-                  </p>}
+                  {errors.lastName && <p className="text-red-500 text-xs">{errors.lastName}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Username *</label>
+                  <input
+                    type="text"
+                    className={`input-primary ${errors.username ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter username"
+                    value={form.username}
+                    onChange={(e) => setForm(f => ({...f, username: e.target.value}))}
+                  />
+                  {errors.username && <p className="text-red-500 text-xs">{errors.username}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Email *</label>
+                  <input
+                    type="email"
+                    className={`input-primary ${errors.email ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter email address"
+                    value={form.email}
+                    onChange={(e) => setForm(f => ({...f, email: e.target.value}))}
+                  />
+                  {errors.email && <p className="text-red-500 text-xs">{errors.email}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Password {!editMode && '*'}</label>
+                  <input
+                    type="password"
+                    className={`input-primary ${errors.password ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder={editMode ? "Leave blank to keep current" : "Enter password"}
+                    value={form.password}
+                    onChange={(e) => setForm(f => ({...f, password: e.target.value}))}
+                  />
+                  {errors.password && <p className="text-red-500 text-xs">{errors.password}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Phone Number</label>
+                  <input
+                    type="tel"
+                    className="input-primary"
+                    placeholder="Enter phone number"
+                    value={form.phoneNumber}
+                    onChange={(e) => setForm(f => ({...f, phoneNumber: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Address</label>
+                  <textarea
+                    className="input-primary"
+                    placeholder="Enter address"
+                    rows={2}
+                    value={form.address}
+                    onChange={(e) => setForm(f => ({...f, address: e.target.value}))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Admission Number *</label>
+                  <input
+                    type="text"
+                    className={`input-primary ${errors.admissionNo ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter admission number"
+                    value={form.admissionNo}
+                    onChange={(e) => setForm(f => ({...f, admissionNo: e.target.value}))}
+                  />
+                  {errors.admissionNo && <p className="text-red-500 text-xs">{errors.admissionNo}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Parent Name *</label>
+                  <input
+                    type="text"
+                    className={`input-primary ${errors.parentName ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="Enter parent name"
+                    value={form.parentName}
+                    onChange={(e) => setForm(f => ({...f, parentName: e.target.value}))}
+                  />
+                  {errors.parentName && <p className="text-red-500 text-xs">{errors.parentName}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Class *</label>
-                  <input
-                    type="text"
-                    className={`input-primary ${errors.cls ? 'border-red-500 focus:ring-red-500' : ''}`}
-                    placeholder="e.g., 10-A"
-                    value={form.cls}
-                    onChange={(e) => setForm(f => ({...f, cls: e.target.value}))}
-                  />
-                  {errors.cls && <p className="text-red-500 text-xs flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.cls}
-                  </p>}
+                  <select
+                    className={`input-primary ${errors.classId ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    value={form.classId}
+                    onChange={(e) => setForm(f => ({...f, classId: parseInt(e.target.value) || 0}))}
+                  >
+                    <option value="">Select Class</option>
+                    {classes.map(cls => (
+                      <option key={cls.classId} value={cls.classId}>
+                        {cls.className}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.classId && <p className="text-red-500 text-xs">{errors.classId}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Stream</label>
@@ -321,5 +524,7 @@ export default function Students() {
         </div>
       </div>
     )}
-  </>
+      </>
+    </LoadingOverlay>
+  )
 }

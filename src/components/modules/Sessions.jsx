@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import CircularIndeterminate from '../Auth/CircularIndeterminate'
+import TokenManager from '../Auth/tokenManager'
 import { fetchSessionsAsync, createSessionAsync, updateSessionAsync, deleteSessionAsync } from '../Services/adminStore'
 
 export default function Sessions() {
@@ -13,16 +15,13 @@ export default function Sessions() {
     updatingSession,
     deletingSession
   } = useSelector(state => state.admin)
+  const { accessToken, organizationId } = useSelector(state => state.auth)
 
   const [show, setShow] = useState(false)
   const [form, setForm] = useState({
-    sessionId: 0,
     sessionName: '',
-    academicYear: '',
     startDate: '',
     endDate: '',
-    status: 'Active',
-    description: '',
     isActive: true
   })
   const [errors, setErrors] = useState({})
@@ -58,12 +57,9 @@ export default function Sessions() {
 
   const validate = () => {
     const newErrors = {}
-    if (!form.sessionId) newErrors.sessionId = "ID is required"
-    if (!form.sessionName.trim()) newErrors.sessionName = "Name is required"
-    if (!form.academicYear.trim()) newErrors.academicYear = "Academic year is required"
+    if (!form.sessionName.trim()) newErrors.sessionName = "Session name is required"
     if (!form.startDate) newErrors.startDate = "Start date is required"
     if (!form.endDate) newErrors.endDate = "End date is required"
-    if (!form.description.trim()) newErrors.description = "Description is required"
     if (form.startDate && form.endDate && new Date(form.startDate) >= new Date(form.endDate)) {
       newErrors.endDate = "End date must be after start date"
     }
@@ -72,13 +68,9 @@ export default function Sessions() {
 
   const resetForm = () => {
     setForm({
-      sessionId: 0,
       sessionName: '',
-      academicYear: '',
       startDate: '',
       endDate: '',
-      status: 'Active',
-      description: '',
       isActive: true
     })
     setErrors({})
@@ -90,22 +82,66 @@ export default function Sessions() {
     if (Object.keys(newErrors).length > 0) return
 
     try {
-      const sessionData = {
-        sessionId: form.sessionId,
+      const token = accessToken || TokenManager.getInstance().getAccessToken()
+      
+      console.log('=== SESSION API DEBUG ===')
+      console.log('Access Token from Redux:', !!accessToken)
+      console.log('Access Token from TokenManager:', !!TokenManager.getInstance().getAccessToken())
+      console.log('Final token being used:', !!token)
+      const payload = {
+        sessionId: 0,
+        organizationId: organizationId || 19,
         sessionName: form.sessionName.trim(),
-        academicYear: form.academicYear.trim(),
-        startDate: form.startDate,
-        endDate: form.endDate,
-        status: form.status,
-        description: form.description.trim(),
-        isActive: form.isActive
+        startDate: new Date(form.startDate).toISOString(),
+        endDate: new Date(form.endDate).toISOString(),
+        isActive: form.isActive,
+        isDeleted: false,
+        createdOn: new Date().toISOString()
       }
 
-      await dispatch(createSessionAsync(sessionData)).unwrap()
-      setShow(false)
-      resetForm()
+      console.log('=== SESSION API DEBUG ===')
+      console.log('Payload being sent:', JSON.stringify(payload, null, 2))
+      console.log('Organization ID from Redux:', organizationId)
+      console.log('Access Token available:', !!token)
+      console.log('API Endpoint:', 'https://sfms-api.abhiworld.in/api/admin/feemasters/session')
+
+      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/feemasters/session', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'accept': '*/*'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      console.log('Response status:', response.status)
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Success response:', result)
+        if (result.success) {
+          toast.success('Session created successfully')
+          setShow(false)
+          resetForm()
+          dispatch(fetchSessionsAsync())
+        } else {
+          console.error('API returned success=false:', result)
+          toast.error(result.message || 'Failed to save session')
+        }
+      } else {
+        const errorText = await response.text()
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        })
+        toast.error(`Failed to save session: ${response.status} ${response.statusText}`)
+      }
     } catch (error) {
-      console.error('Error creating session:', error)
+      console.error('Network/Parse Error:', error)
+      toast.error(`Network error: ${error.message}`)
     }
   }
 
@@ -135,36 +171,15 @@ export default function Sessions() {
         <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-4 space-y-3 max-h-[90vh] overflow-y-auto">
           <div className="text-lg font-semibold mb-4">Add New Session</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Session ID *</label>
-              <input
-                type="number"
-                className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.sessionId ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                placeholder="e.g., 2024"
-                value={form.sessionId}
-                onChange={(e) => setForm(f => ({...f, sessionId: parseInt(e.target.value) || 0}))}
-              />
-              {errors.sessionId && <p className="text-red-500 text-xs">{errors.sessionId}</p>}
-            </div>
             <div className="space-y-1 sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Session Name *</label>
               <input
                 className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.sessionName ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                placeholder="e.g., Academic Year 2024-25"
+                placeholder="e.g., 2024-25"
                 value={form.sessionName}
                 onChange={(e) => setForm(f => ({...f, sessionName: e.target.value}))}
               />
               {errors.sessionName && <p className="text-red-500 text-xs">{errors.sessionName}</p>}
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Academic Year *</label>
-              <input
-                className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.academicYear ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                placeholder="e.g., 2024-25"
-                value={form.academicYear}
-                onChange={(e) => setForm(f => ({...f, academicYear: e.target.value}))}
-              />
-              {errors.academicYear && <p className="text-red-500 text-xs">{errors.academicYear}</p>}
             </div>
             <div className="space-y-1">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Start Date *</label>
@@ -186,27 +201,17 @@ export default function Sessions() {
               />
               {errors.endDate && <p className="text-red-500 text-xs">{errors.endDate}</p>}
             </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm(f => ({...f, status: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600"
-              >
-                <option value="Active">Active</option>
-                <option value="Closed">Closed</option>
-                <option value="Upcoming">Upcoming</option>
-              </select>
-            </div>
             <div className="space-y-1 sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description *</label>
-              <input
-                className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.description ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                placeholder="Session description"
-                value={form.description}
-                onChange={(e) => setForm(f => ({...f, description: e.target.value}))}
-              />
-              {errors.description && <p className="text-red-500 text-xs">{errors.description}</p>}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  checked={form.isActive}
+                  onChange={(e) => setForm(f => ({...f, isActive: e.target.checked}))}
+                />
+                <label htmlFor="isActive" className="text-sm font-medium">Active Session</label>
+              </div>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -227,5 +232,6 @@ export default function Sessions() {
         </div>
       </div>
     )}
+    <Toaster position="top-right" />
   </>
 }

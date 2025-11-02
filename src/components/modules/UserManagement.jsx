@@ -16,6 +16,10 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedRole, setSelectedRole] = useState('');
+  const [roleFilter, setRoleFilter] = useState('All');
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewUser, setViewUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: '',
@@ -201,6 +205,44 @@ export default function UserManagement() {
     setEditMode(false);
   };
 
+  const handleView = (userData) => {
+    setViewUser(userData);
+    setShowViewModal(true);
+  };
+
+  const handleExport = () => {
+    const csvData = filteredUsers.map(user => ({
+      'Full Name': user.fullName,
+      'Username': user.username,
+      'Role': user.roleName,
+      'Email': user.email,
+      'Phone': user.phone || '',
+      'Status': user.status,
+      'Admission No': user.admissionNo || '',
+      'Qualification': user.qualification || '',
+      'Designation': user.designation || '',
+      'Salary': user.salary || '',
+      'Occupation': user.occupation || '',
+      'Address': user.address || ''
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `users_${roleFilter !== 'All' ? roleFilter.toLowerCase() + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success('Users exported successfully!');
+  };
+
   const getFieldsForRole = (role) => {
     const commonFields = ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber', 'address'];
     
@@ -224,6 +266,29 @@ export default function UserManagement() {
     };
     return requiredFields[role]?.includes(field) || false;
   };
+
+  // Filter users based on role filter and search term
+  const filteredUsers = useMemo(() => {
+    let filtered = users;
+    
+    // Filter by role
+    if (roleFilter !== 'All') {
+      filtered = filtered.filter(user => user.roleName === roleFilter);
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(user => 
+        user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.roleName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    return filtered;
+  }, [users, roleFilter, searchTerm]);
 
   const columns = useMemo(() => [
     {
@@ -266,7 +331,37 @@ export default function UserManagement() {
   ], []);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      {/* Search Bar */}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        />
+        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      
+      {/* Role Filter */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role:</label>
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        >
+          <option value="All">All</option>
+          <option value="Admin">Admin</option>
+          <option value="Student">Student</option>
+          <option value="Parent">Parent</option>
+          <option value="Teacher">Teacher</option>
+        </select>
+      </div>
+      
       <PermissionButton
         moduleName="User Management"
         subModuleName="Users"
@@ -392,15 +487,28 @@ export default function UserManagement() {
   return (
     <LoadingOverlay isLoading={loading}>
       <section className="space-y-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">User Management</h1>
-          <p className="text-sm text-slate-600">Manage teachers, students, and parents</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">User Management</h1>
+            <p className="text-sm text-slate-600">Manage teachers, students, and parents</p>
+          </div>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2"
+            disabled={filteredUsers.length === 0}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export CSV
+          </button>
         </div>
 
         <AgGridBox
-          title="Users"
+          title={`Users ${roleFilter !== 'All' ? `(${roleFilter})` : ''}`}
           columnDefs={columns}
-          rowData={users}
+          rowData={filteredUsers}
+          onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
@@ -495,6 +603,69 @@ export default function UserManagement() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* View Modal */}
+        {showViewModal && viewUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">User Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Full Name</label>
+                    <p className="text-slate-900 dark:text-slate-100 font-medium">{viewUser.fullName}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Username</label>
+                    <p className="text-slate-900 dark:text-slate-100">{viewUser.username}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Role</label>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                      {viewUser.roleName}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Email</label>
+                    <p className="text-slate-900 dark:text-slate-100">{viewUser.email}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Phone</label>
+                    <p className="text-slate-900 dark:text-slate-100">{viewUser.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">Status</label>
+                    <span className={`inline-block px-2 py-1 rounded-full text-sm ${
+                      viewUser.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {viewUser.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end pt-4 mt-6 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="btn-secondary"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

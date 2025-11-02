@@ -6,6 +6,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   const { userRole, permissions } = useSelector((state) => state.auth);
   const [role, setRole] = useState('operator');
   const [expandedModules, setExpandedModules] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Update local role state when Redux userRole changes
   useEffect(() => {
@@ -30,8 +31,10 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Fee Management': '💰',
     'User Management': '👥',
     'Student Management': '🎓',
+    'Student': '🎓',
     'Employee Management': '🧑',
-    'Report Management': '📈'
+    'Report Management': '📈',
+    'Reports': '📈'
   };
 
   // SubModule icons mapping
@@ -43,8 +46,12 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Class Subjects': '🎯',
     'Teacher Subjects': '👨‍🏫',
     'Sessions': '📅',
+    'Terms': '📋',
+    'Term': '📋',
+    'Feetype': '💎',
     'Fee Structures': '💳',
     'Fee Collection': '💰',
+    'Fee Management': '💼',
     'Users': '👤',
     'Students': '🎓',
     'Employees': '🧑',
@@ -75,14 +82,14 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     ];
 
     // Add static items that don't come from permissions
-    const staticItems = [
-      { id: 'users', label: 'Users', icon: '👥' },
-      { id: 'employees', label: 'Employees', icon: '🧑' },
-      { id: 'students', label: 'Students', icon: '🎓' },
-      { id: 'reports', label: 'Reports', icon: '📈' }
-    ];
+    // const staticItems = [
+    //   { id: 'users', label: 'Users', icon: '👥' },
+    //   { id: 'employees', label: 'Employees', icon: '🧑' },
+    //   { id: 'students', label: 'Students', icon: '🎓' },
+    //   { id: 'reports', label: 'Reports', icon: '📈' }
+    // ];
 
-    menuItems.push(...staticItems);
+    // menuItems.push(...staticItems);
 
     // Process permissions to create module structure
     if (permissions && Array.isArray(permissions)) {
@@ -99,7 +106,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
           permissions: subModule.permissions
         }));
 
-        // Only add module if it has accessible submodules
+        // Add module if it has accessible submodules OR if it has no submodules (direct module)
         if (accessibleSubmodules.length > 0) {
           const moduleItem = {
             id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
@@ -109,12 +116,52 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
             submodules: accessibleSubmodules
           };
           menuItems.push(moduleItem);
+        } else if (module.subModules.length === 0) {
+          // Module with no submodules - add as direct menu item
+          const moduleItem = {
+            id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
+            label: module.moduleName,
+            icon: moduleIcons[module.moduleName] || '📁',
+            hasSubmodules: false
+          };
+          menuItems.push(moduleItem);
         }
       });
     }
 
     return menuItems;
   }, [role, permissions]);
+
+  // Filter menu items based on search term
+  const filteredMenuItems = useMemo(() => {
+    const items = role === 'superadmin' ? superAdminMenuItems : dynamicMenuItems;
+    
+    if (!searchTerm) return items;
+    
+    return items.filter(item => {
+      // Check if main item matches
+      const mainMatch = item.label.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Check if any submodule matches
+      const subMatch = item.submodules?.some(sub => 
+        sub.label.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      
+      return mainMatch || subMatch;
+    }).map(item => {
+      // If item has submodules, filter them too
+      if (item.submodules) {
+        return {
+          ...item,
+          submodules: item.submodules.filter(sub => 
+            sub.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.label.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        };
+      }
+      return item;
+    });
+  }, [role, superAdminMenuItems, dynamicMenuItems, searchTerm]);
 
   const toggleModule = (moduleId) => {
     setExpandedModules(prev => ({
@@ -188,33 +235,47 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static` }
       >
 
-        <nav className="px-2 space-y-2 mt-4">
-          { role === 'superadmin' ? (
-            // SuperAdmin static menu
-            superAdminMenuItems.map(menu => (
-              <Item key={ menu.id } id={ menu.id } label={ menu.label } icon={ menu.icon } />
-            ))
-          ) : (
-            // Dynamic menu for other roles
-            dynamicMenuItems.map(menu => {
-              if (menu.hasSubmodules) {
-                return (
-                  <ModuleItem
-                    key={ menu.id }
-                    id={ menu.id }
-                    label={ menu.label }
-                    icon={ menu.icon }
-                    hasSubmodules={ menu.hasSubmodules }
-                    submodules={ menu.submodules }
-                  />
-                );
-              } else {
-                return (
-                  <Item key={ menu.id } id={ menu.id } label={ menu.label } icon={ menu.icon } />
-                );
-              }
-            })
-          ) }
+        {/* Search Box */}
+        <div className="px-2 mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search modules..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 pl-9 text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+            <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+
+        <nav className="px-2 space-y-2">
+          {filteredMenuItems.map(menu => {
+            if (menu.hasSubmodules) {
+              return (
+                <ModuleItem
+                  key={menu.id}
+                  id={menu.id}
+                  label={menu.label}
+                  icon={menu.icon}
+                  hasSubmodules={menu.hasSubmodules}
+                  submodules={menu.submodules}
+                />
+              );
+            } else {
+              return (
+                <Item key={menu.id} id={menu.id} label={menu.label} icon={menu.icon} />
+              );
+            }
+          })}
+          
+          {filteredMenuItems.length === 0 && searchTerm && (
+            <div className="px-3 py-4 text-center text-slate-500 dark:text-slate-400 text-sm">
+              No modules found for "{searchTerm}"
+            </div>
+          )}
         </nav>
       </aside>
     </>

@@ -13,6 +13,8 @@ export default function Classes() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [form, setForm] = useState({
     classId: 0,
     className: '',
@@ -137,6 +139,48 @@ export default function Classes() {
     setEditMode(false);
   };
 
+  const handleExport = () => {
+    const csvData = filteredClasses.map(cls => ({
+      'Class ID': cls.classId,
+      'Class Name': cls.className,
+      'Description': cls.description,
+      'Class Teacher': cls.classTeacherName,
+      'Academic Year': cls.academicYear,
+      'Order': cls.orderNo,
+      'Status': cls.isActive ? 'Active' : 'Inactive'
+    }))
+
+    const csvContent = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `classes_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  };
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter(cls => {
+      const matchesSearch = searchTerm === '' ||
+        cls.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.classTeacherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.academicYear?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesStatus = statusFilter === 'All' ||
+        (statusFilter === 'Active' && cls.isActive) ||
+        (statusFilter === 'Inactive' && !cls.isActive)
+      
+      return matchesSearch && matchesStatus
+    })
+  }, [classes, searchTerm, statusFilter]);
+
   const columns = useMemo(() => [
     {
       headerName: 'ID',
@@ -174,7 +218,33 @@ export default function Classes() {
   ], []);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search classes..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        />
+        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        >
+          <option value="All">All</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+      
       <PermissionButton
         moduleName="Class Management"
         subModuleName="Classes"
@@ -196,15 +266,27 @@ export default function Classes() {
   return (
     <LoadingOverlay isLoading={loading}>
       <section className="space-y-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Classes Management</h1>
-          <p className="text-sm text-slate-600">Manage school classes and their details</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Classes Management</h1>
+            <p className="text-sm text-slate-600">Manage school classes and their details</p>
+          </div>
+          <button
+            onClick={handleExport}
+            className="btn-secondary flex items-center gap-2"
+            disabled={filteredClasses.length === 0}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export CSV
+          </button>
         </div>
 
         <AgGridBox
-          title="Classes"
+          title={`Classes (${filteredClasses.length})`}
           columnDefs={columns}
-          rowData={classes}
+          rowData={filteredClasses}
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
