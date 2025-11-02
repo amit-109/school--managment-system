@@ -130,12 +130,15 @@ export default function TopBar({
           </IconButton>
 
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h6" noWrap component="div" sx={{ mr: 2 }}>
-              EduManage Pro
-            </Typography>
-            <Typography variant="caption" sx={{ px: 1, py: 0.5, bgcolor: 'secondary.main', color: 'secondary.contrastText', borderRadius: 1 }}>
-              v2.0
-            </Typography>
+            <img 
+              src="/src/assets/logo.svg" 
+              alt="School Management System" 
+              style={{ 
+                height: '42px',
+                opacity: '0.95',
+                marginLeft: '8px'
+              }} 
+            />
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
