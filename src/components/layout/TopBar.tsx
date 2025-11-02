@@ -109,7 +109,6 @@ export default function TopBar({
       toast.success('Logged out successfully!');
     } catch (error) {
       // Even if API call fails, tokens are cleared in the thunk
-      console.warn('Logout API call failed, but local logout completed:', error);
       toast.success('Logged out successfully!');
     }
   };

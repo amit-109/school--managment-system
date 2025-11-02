@@ -298,11 +298,9 @@ export const getRoles = async (page = 0, size = 10, search?: string): Promise<Pa
   const response = await apiClient.get<ApiResponse<any>>(`/superadmin/roles?${params}`);
   // Handle both paginated and direct array responses
   const data = response.data.data;
-  console.log('getRoles API response:', data);
 
   if (Array.isArray(data)) {
     // Direct array response - wrap in pageable format
-    console.log('Converting array response to pageable:', data);
     return {
       content: data,
       totalElements: data.length,
@@ -314,7 +312,6 @@ export const getRoles = async (page = 0, size = 10, search?: string): Promise<Pa
     };
   } else {
     // Already paginated response
-    console.log('Using paginated response:', data);
     return data;
   }
 };
@@ -532,17 +529,9 @@ export const createSubModule = async (subModuleData: SubModuleCreateData): Promi
       assignedRoleIds: subModuleData.assignedRoleIds || []
     };
     
-    console.log('API: Creating SubModule with payload:', payload);
     const response = await apiClient.post<ApiResponse<SubModule>>('/superadmin/modules/submodules', payload);
-    console.log('API: SubModule creation response:', response.data);
     return response.data.data;
   } catch (error: any) {
-    console.error('API: SubModule creation failed:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
     throw error;
   }
 };
@@ -574,7 +563,6 @@ export const updateSubModule = async (subModuleId: number, subModuleData: SubMod
       assignedRoleIds: subModuleData.assignedRoleIds || []
     } as SubModule;
   } catch (error: any) {
-    console.error('API: SubModule update failed:', error);
     throw error;
   }
 };
