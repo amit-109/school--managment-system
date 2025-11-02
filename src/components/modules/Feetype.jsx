@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
-import TokenManager from '../Auth/tokenManager'
+import apiClient from '../Auth/base'
 
 export default function Feetype() {
   const { accessToken, organizationId } = useSelector((state) => state.auth)
@@ -26,12 +26,13 @@ export default function Feetype() {
   const loadFeetypes = async () => {
     setLoading(true)
     try {
-      const token = accessToken || TokenManager.getInstance().getAccessToken()
-      // Add API call here when available
-      // For now using empty array
-      setFeetypes([])
+      const response = await apiClient.get('/admin/feemasters/feetype')
+      if (response.data.success) {
+        setFeetypes(response.data.data || [])
+      }
     } catch (error) {
       console.error('Failed to load fee types:', error)
+      toast.error('Failed to load fee types')
     } finally {
       setLoading(false)
     }
@@ -77,59 +78,27 @@ export default function Feetype() {
 
     setLoading(true)
     try {
-      const token = accessToken || TokenManager.getInstance().getAccessToken()
       const payload = {
-        feeTypeId: 0,
-        organizationId: organizationId || 19,
-        feeTypeName: form.feeTypeName,
-        description: form.description,
+        feeTypeId: editMode ? form.feeTypeId : 0,
+        organizationId: organizationId,
+        feeTypeName: form.feeTypeName.trim(),
+        description: form.description.trim(),
         isActive: form.isActive,
         isDeleted: false,
         createdOn: new Date().toISOString()
       }
 
-      console.log('=== FEETYPE API DEBUG ===')
-      console.log('Payload being sent:', JSON.stringify(payload, null, 2))
-      console.log('Organization ID from Redux:', organizationId)
-      console.log('Access Token available:', !!token)
-      console.log('API Endpoint:', 'https://sfms-api.abhiworld.in/api/admin/feemasters/feetype')
+      const response = await apiClient.post('/admin/feemasters/feetype', payload)
 
-      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/feemasters/feetype', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      console.log('Response status:', response.status)
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Success response:', result)
-        if (result.success) {
-          toast.success(editMode ? 'Fee type updated successfully' : 'Fee type created successfully')
-          setShowModal(false)
-          resetForm()
-          loadFeetypes()
-        } else {
-          console.error('API returned success=false:', result)
-          toast.error(result.message || 'Failed to save fee type')
-        }
+      if (response.data.success) {
+        toast.success(editMode ? 'Fee type updated successfully' : 'Fee type created successfully')
+        setShowModal(false)
+        resetForm()
+        loadFeetypes()
       } else {
-        const errorText = await response.text()
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        })
-        toast.error(`Failed to save fee type: ${response.status} ${response.statusText}`)
+        toast.error(response.data.message || 'Failed to save fee type')
       }
     } catch (error) {
-      console.error('Network/Parse Error:', error)
       toast.error(`Network error: ${error.message}`)
     } finally {
       setLoading(false)
@@ -149,8 +118,21 @@ export default function Feetype() {
 
   const handleDelete = async (data) => {
     if (window.confirm(`Are you sure you want to delete fee type "${data.feeTypeName}"?`)) {
-      toast.success('Fee type deleted successfully')
-      loadFeetypes()
+      setLoading(true)
+      try {
+        const response = await apiClient.delete(`/admin/feemasters/feetype/${data.feeTypeId}`)
+
+        if (response.data.success) {
+          toast.success('Fee type deleted successfully')
+          loadFeetypes()
+        } else {
+          toast.error(response.data.message || 'Failed to delete fee type')
+        }
+      } catch (error) {
+        toast.error(`Network error: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 

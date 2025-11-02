@@ -14,6 +14,7 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  organizationId: number | null;
   userRole: string | null;
   userRoles: string[];
   permissions: PermissionsData | null;
@@ -31,6 +32,7 @@ const initialState: AuthState = {
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
+  organizationId: null,
   userRole: null,
   userRoles: [],
   permissions: null,
@@ -118,6 +120,7 @@ const authSlice = createSlice({
       state.accessToken = null;
       state.refreshToken = null;
       state.isAuthenticated = false;
+      state.organizationId = null;
       state.error = null;
     },
   },
@@ -159,11 +162,13 @@ const authSlice = createSlice({
         // Check for both old format (accessToken) and new format (access_token)
         const accessToken = responseData?.accessToken || responseData?.access_token;
         const refreshToken = responseData?.refreshToken || responseData?.refresh_token;
+        const organizationId = responseData?.organizationId;
 
         if (accessToken && refreshToken) {
           state.accessToken = accessToken;
           state.refreshToken = refreshToken;
           state.isAuthenticated = true;
+          state.organizationId = organizationId;
 
           // Extract permissions from response
           const permissions = responseData?.permissions;
@@ -205,6 +210,7 @@ const authSlice = createSlice({
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
+        state.organizationId = null;
         state.userRole = null;
         state.userRoles = [];
         state.permissions = null;
@@ -216,6 +222,7 @@ const authSlice = createSlice({
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
+        state.organizationId = null;
         state.userRole = null;
         state.userRoles = [];
         state.permissions = null;

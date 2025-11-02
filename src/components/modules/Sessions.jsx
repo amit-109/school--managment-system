@@ -2,23 +2,19 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
-import CircularIndeterminate from '../Auth/CircularIndeterminate'
-import TokenManager from '../Auth/tokenManager'
-import { fetchSessionsAsync, createSessionAsync, updateSessionAsync, deleteSessionAsync } from '../Services/adminStore'
+import LoadingOverlay from '../shared/LoadingOverlay'
+import apiClient from '../Auth/base'
 
 export default function Sessions() {
   const dispatch = useDispatch()
-  const {
-    sessions: rows,
-    sessionsLoading,
-    creatingSession,
-    updatingSession,
-    deletingSession
-  } = useSelector(state => state.admin)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(false)
   const { accessToken, organizationId } = useSelector(state => state.auth)
 
   const [show, setShow] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState({
+    sessionId: 0,
     sessionName: '',
     startDate: '',
     endDate: '',
@@ -28,31 +24,51 @@ export default function Sessions() {
   const [statusFilter, setStatusFilter] = useState('')
 
   useEffect(() => {
-    dispatch(fetchSessionsAsync())
-  }, [dispatch])
+    loadSessions()
+  }, [])
+
+  const loadSessions = async () => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get('/admin/feemasters/session')
+      if (response.data.success) {
+        setRows(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error)
+      toast.error('Failed to load sessions')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredRows = rows.filter(row => {
-    const searchableData = `${row.sessionId} ${row.sessionName} ${row.academicYear}`.toLowerCase()
-    const classMatch = statusFilter === '' || row.status === statusFilter
-    return classMatch
+    const statusMatch = statusFilter === '' || (statusFilter === 'Active' ? row.isActive : !row.isActive)
+    return statusMatch
   }).map(row => ({
-    id: row.sessionId,
-    name: row.sessionName,
+    ...row,
     startDate: new Date(row.startDate).toLocaleDateString(),
     endDate: new Date(row.endDate).toLocaleDateString(),
-    status: row.status,
-    academicYear: row.academicYear,
-    description: row.description,
-    isActive: row.isActive
+    status: row.isActive ? 'Active' : 'Inactive'
   }))
 
   const cols = useMemo(() => [
-    { field: 'id', headerName: 'ID', maxWidth: 100 },
-    { field: 'name', headerName: 'Session Name' },
-    { field: 'academicYear', headerName: 'Academic Year', maxWidth: 120 },
+    { field: 'sessionId', headerName: 'ID', maxWidth: 100 },
+    { field: 'sessionName', headerName: 'Session Name' },
     { field: 'startDate', headerName: 'Start Date', maxWidth: 120 },
     { field: 'endDate', headerName: 'End Date', maxWidth: 120 },
-    { field: 'status', headerName: 'Status', maxWidth: 100 },
+    { 
+      field: 'status', 
+      headerName: 'Status',
+      maxWidth: 100,
+      cellRenderer: (params) => (
+        <span className={`px-2 py-1 rounded-full text-xs ${
+          params.value === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`}>
+          {params.value}
+        </span>
+      )
+    },
   ], [])
 
   const validate = () => {
@@ -68,29 +84,31 @@ export default function Sessions() {
 
   const resetForm = () => {
     setForm({
+      sessionId: 0,
       sessionName: '',
       startDate: '',
       endDate: '',
       isActive: true
     })
     setErrors({})
+    setEditMode(false)
   }
 
-  const addSession = async () => {
+  const handleSubmit = async () => {
     const newErrors = validate()
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
+    if (!organizationId) {
+      toast.error('Organization ID is required. Please login again.')
+      return
+    }
+
+    setLoading(true)
     try {
-      const token = accessToken || TokenManager.getInstance().getAccessToken()
-      
-      console.log('=== SESSION API DEBUG ===')
-      console.log('Access Token from Redux:', !!accessToken)
-      console.log('Access Token from TokenManager:', !!TokenManager.getInstance().getAccessToken())
-      console.log('Final token being used:', !!token)
       const payload = {
-        sessionId: 0,
-        organizationId: organizationId || 19,
+        sessionId: editMode ? form.sessionId : 0,
+        organizationId: organizationId,
         sessionName: form.sessionName.trim(),
         startDate: new Date(form.startDate).toISOString(),
         endDate: new Date(form.endDate).toISOString(),
@@ -99,55 +117,28 @@ export default function Sessions() {
         createdOn: new Date().toISOString()
       }
 
-      console.log('=== SESSION API DEBUG ===')
-      console.log('Payload being sent:', JSON.stringify(payload, null, 2))
-      console.log('Organization ID from Redux:', organizationId)
-      console.log('Access Token available:', !!token)
-      console.log('API Endpoint:', 'https://sfms-api.abhiworld.in/api/admin/feemasters/session')
+      console.log('Session payload:', payload)
 
-      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/feemasters/session', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify(payload)
-      })
+      const response = await apiClient.post('/admin/feemasters/session', payload)
 
-      console.log('Response status:', response.status)
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Success response:', result)
-        if (result.success) {
-          toast.success('Session created successfully')
-          setShow(false)
-          resetForm()
-          dispatch(fetchSessionsAsync())
-        } else {
-          console.error('API returned success=false:', result)
-          toast.error(result.message || 'Failed to save session')
-        }
+      if (response.data.success) {
+        toast.success(editMode ? 'Session updated successfully' : 'Session created successfully')
+        setShow(false)
+        resetForm()
+        loadSessions()
       } else {
-        const errorText = await response.text()
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        })
-        toast.error(`Failed to save session: ${response.status} ${response.statusText}`)
+        toast.error(response.data.message || 'Failed to save session')
       }
     } catch (error) {
-      console.error('Network/Parse Error:', error)
       toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
   const toolbar = (
     <div className="flex items-center gap-2 flex-wrap">
-      <button onClick={()=>setShow(true)} className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg">+ Add Session</button>
+      <button onClick={() => { resetForm(); setShow(true) }} className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg">+ Add Session</button>
       <select
         value={statusFilter}
         onChange={(e) => setStatusFilter(e.target.value)}
@@ -160,16 +151,56 @@ export default function Sessions() {
     </div>
   )
 
-  if (sessionsLoading) {
-    return <CircularIndeterminate />
+  const handleEdit = (data) => {
+    // Find original data from rows (not filteredRows) to get original date format
+    const originalData = rows.find(row => row.sessionId === data.sessionId) || data
+    
+    setForm({
+      sessionId: originalData.sessionId,
+      sessionName: originalData.sessionName,
+      startDate: new Date(originalData.startDate).toISOString().split('T')[0],
+      endDate: new Date(originalData.endDate).toISOString().split('T')[0],
+      isActive: originalData.isActive
+    })
+    setEditMode(true)
+    setShow(true)
+  }
+
+  const handleDelete = async (data) => {
+    if (window.confirm(`Are you sure you want to delete session "${data.sessionName}"?`)) {
+      setLoading(true)
+      try {
+        const response = await apiClient.delete(`/admin/feemasters/session/${data.sessionId}`)
+
+        if (response.data.success) {
+          toast.success('Session deleted successfully')
+          loadSessions()
+        } else {
+          toast.error(response.data.message || 'Failed to delete session')
+        }
+      } catch (error) {
+        toast.error(`Network error: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
+    }
   }
 
   return <>
-    <AgGridBox title="Academic Sessions" columnDefs={cols} rowData={filteredRows} toolbar={toolbar} />
+    <LoadingOverlay isLoading={loading}>
+      <AgGridBox 
+        title="Academic Sessions" 
+        columnDefs={cols} 
+        rowData={filteredRows} 
+        toolbar={toolbar}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+    </LoadingOverlay>
     {show && (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-          <div className="text-lg font-semibold mb-4">Add New Session</div>
+          <div className="text-lg font-semibold mb-4">{editMode ? 'Edit Session' : 'Add New Session'}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1 sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Session Name *</label>
@@ -223,10 +254,10 @@ export default function Sessions() {
             </button>
             <button
               className="px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-              onClick={addSession}
-              disabled={creatingSession}
+              onClick={handleSubmit}
+              disabled={loading}
             >
-              {creatingSession ? 'Saving...' : 'Save'}
+              {loading ? 'Saving...' : (editMode ? 'Update' : 'Create')}
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
-import TokenManager from '../Auth/tokenManager'
+import apiClient from '../Auth/base'
 
 export default function Terms() {
   const { accessToken, organizationId } = useSelector((state) => state.auth)
@@ -42,19 +42,9 @@ export default function Terms() {
   const loadTerms = async () => {
     setLoading(true)
     try {
-      const token = accessToken || TokenManager.getInstance().getAccessToken()
-      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/feemasters/term', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
-        }
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          setTerms(result.data || [])
-        }
+      const response = await apiClient.get('/admin/feemasters/term')
+      if (response.data.success) {
+        setTerms(response.data.data || [])
       }
     } catch (error) {
       console.error('Failed to load terms:', error)
@@ -114,10 +104,9 @@ export default function Terms() {
 
     setLoading(true)
     try {
-      const token = accessToken || TokenManager.getInstance().getAccessToken()
       const payload = {
-        termId: form.termId,
-        organizationId: organizationId || 19,
+        termId: editMode ? form.termId : 0,
+        organizationId: organizationId,
         termName: form.termName.trim(),
         startMonth: form.startMonth,
         endMonth: form.endMonth,
@@ -126,38 +115,17 @@ export default function Terms() {
         createdOn: new Date().toISOString()
       }
 
-      console.log('Sending payload:', payload)
-
-      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/feemasters/term', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      console.log('Response status:', response.status)
+      const response = await apiClient.post('/admin/feemasters/term', payload)
       
-      if (response.ok) {
-        const result = await response.json()
-        console.log('Response result:', result)
-        if (result.success) {
-          toast.success(editMode ? 'Term updated successfully' : 'Term created successfully')
-          setShowModal(false)
-          resetForm()
-          loadTerms()
-        } else {
-          toast.error(result.message || 'Failed to save term')
-        }
+      if (response.data.success) {
+        toast.success(editMode ? 'Term updated successfully' : 'Term created successfully')
+        setShowModal(false)
+        resetForm()
+        loadTerms()
       } else {
-        const errorText = await response.text()
-        console.error('API Error:', response.status, errorText)
-        toast.error(`Failed to save term: ${response.status}`)
+        toast.error(response.data.message || 'Failed to save term')
       }
     } catch (error) {
-      console.error('Network Error:', error)
       toast.error(`Network error: ${error.message}`)
     } finally {
       setLoading(false)
@@ -178,9 +146,21 @@ export default function Terms() {
 
   const handleDelete = async (data) => {
     if (window.confirm(`Are you sure you want to delete term "${data.termName}"?`)) {
-      // Add delete API call here when available
-      toast.success('Term deleted successfully')
-      loadTerms()
+      setLoading(true)
+      try {
+        const response = await apiClient.delete(`/admin/feemasters/term/${data.termId}`)
+
+        if (response.data.success) {
+          toast.success('Term deleted successfully')
+          loadTerms()
+        } else {
+          toast.error(response.data.message || 'Failed to delete term')
+        }
+      } catch (error) {
+        toast.error(`Network error: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
