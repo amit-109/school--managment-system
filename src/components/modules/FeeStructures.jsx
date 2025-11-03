@@ -1,344 +1,402 @@
-import React, { useMemo, useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useSelector } from 'react-redux'
+import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
-import CircularIndeterminate from '../Auth/CircularIndeterminate'
-import {
-  fetchClassesAsync,
-  fetchSessionsAsync,
-  fetchFeeStructuresAsync,
-  createFeeStructureAsync,
-  updateFeeStructureAsync,
-  deleteFeeStructureAsync
-} from '../Services/adminStore'
+import LoadingOverlay from '../shared/LoadingOverlay'
+import apiClient from '../Auth/base'
 
 export default function FeeStructures() {
-  const dispatch = useDispatch()
-  const {
-    classes,
-    sessions,
-    feeStructures: rows,
-    classesLoading,
-    sessionsLoading,
-    feeStructuresLoading,
-    creatingFeeStructure
-  } = useSelector(state => state.admin)
-
-  const [show, setShow] = useState(false)
-  const [sessionFilter, setSessionFilter] = useState('')
+  const { organizationId } = useSelector((state) => state.auth)
+  const [feeStructures, setFeeStructures] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  
+  // Dropdown data
+  const [classes, setClasses] = useState([])
+  const [feeTypes, setFeeTypes] = useState([])
+  const [terms, setTerms] = useState([])
+  const [sessions, setSessions] = useState([])
+  
   const [form, setForm] = useState({
-    feeStructureId: 0,
+    feeId: 0,
     classId: 0,
-    sessionId: 0,
-    stream: 'All',
-    feeComponents: [{ name: '', amount: 0, frequency: 'Monthly', description: '' }],
-    description: '',
-    isActive: true
+    feeType: '',
+    amount: 0,
+    dueDate: '',
+    term: '',
+    session: '',
+    status: 'Pending'
   })
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    dispatch(fetchClassesAsync())
-    dispatch(fetchSessionsAsync())
-    dispatch(fetchFeeStructuresAsync())
-  }, [dispatch])
+    loadFeeStructures()
+    loadDropdownData()
+    loadClasses()
+  }, [])
 
-  const calculateTotal = (feeComponents) => {
-    return feeComponents.reduce((total, fee) => {
-      switch (fee.frequency) {
-        case 'Annual':
-          return total + fee.amount
-        case 'Half-Yearly':
-          return total + (fee.amount * 2)
-        case 'Quarterly':
-          return total + (fee.amount * 4)
-        case 'Monthly':
-          return total + (fee.amount * 12)
-        default:
-          return total
+  const loadFeeStructures = async () => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get('/admin/fees')
+      if (response.data.success) {
+        setFeeStructures(response.data.data || [])
       }
-    }, 0)
+    } catch (error) {
+      console.error('Failed to load fee structures:', error)
+      toast.error('Failed to load fee structures')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const filteredRows = rows.map(row => ({
-    id: row.feeStructureId,
-    className: row.className,
-    sessionName: row.sessionName,
-    stream: row.stream,
-    feeComponents: row.feeComponents,
-    displayFees: row.feeComponents && row.feeComponents.length > 0 ? row.feeComponents.map(f => `${f.name}: ₹${f.amount}/${f.frequency}`).join(', ') : 'No fees',
-    totalAnnual: row.totalAnnualAmount,
-    description: row.description,
-    isActive: row.isActive
-  })).filter(row =>
-    sessionFilter === '' || (row.sessionName && row.sessionName.includes(sessionFilter)) || row.id.toString().includes(sessionFilter)
-  )
+  const loadDropdownData = async () => {
+    try {
+      const response = await apiClient.get('/admin/feemasters/dropdowns')
+      if (response.data.success) {
+        const data = response.data.data
+        setFeeTypes(data.feeTypes || [])
+        setTerms(data.terms || [])
+        setSessions(data.sessions || [])
+      }
+    } catch (error) {
+      console.error('Failed to load dropdown data:', error)
+    }
+  }
+
+  const loadClasses = async () => {
+    try {
+      const response = await apiClient.get('/admin/classes')
+      if (response.data.success) {
+        setClasses(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error)
+    }
+  }
 
   const cols = useMemo(() => [
-    { field: 'id', headerName: 'ID', maxWidth: 100 },
     { field: 'className', headerName: 'Class' },
-    { field: 'sessionName', headerName: 'Session' },
-    { field: 'stream', headerName: 'Stream', maxWidth: 100 },
-    { field: 'displayFees', headerName: 'Fee Components' },
-    { field: 'totalAnnual', headerName: 'Total Annual (₹)', maxWidth: 150 },
+    { field: 'feeType', headerName: 'Fee Type' },
+    { field: 'amount', headerName: 'Amount', valueFormatter: (params) => `₹ ${params.value}` },
+    { field: 'dueDate', headerName: 'Due Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
+    { field: 'term', headerName: 'Term' },
+    { field: 'session', headerName: 'Session' },
+    { 
+      field: 'status', 
+      headerName: 'Status',
+      cellRenderer: (params) => {
+        const statusColors = {
+          'Pending': 'bg-yellow-100 text-yellow-800',
+          'Paid': 'bg-green-100 text-green-800',
+          'Overdue': 'bg-red-100 text-red-800'
+        }
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs ${statusColors[params.value] || 'bg-gray-100 text-gray-800'}`}>
+            {params.value}
+          </span>
+        )
+      }
+    }
   ], [])
 
   const validate = () => {
     const newErrors = {}
-    if (!form.feeStructureId) newErrors.feeStructureId = "ID is required"
-    if (!form.classId) newErrors.classId = "Class is required"
-    if (!form.sessionId) newErrors.sessionId = "Session is required"
-    if (!form.feeComponents || form.feeComponents.length === 0) {
-      newErrors.feeComponents = "At least one fee is required"
-    } else {
-      form.feeComponents.forEach((fee, index) => {
-        if (!fee.name.trim()) newErrors[`fee${index}name`] = "Fee name is required"
-        if (!fee.amount || fee.amount <= 0) newErrors[`fee${index}amount`] = "Valid amount is required"
-      })
-    }
-    if (!form.description.trim()) newErrors.description = "Description is required"
+    if (!form.classId) newErrors.classId = 'Class is required'
+    if (!form.feeType.trim()) newErrors.feeType = 'Fee type is required'
+    if (!form.amount || form.amount <= 0) newErrors.amount = 'Valid amount is required'
+    if (!form.dueDate) newErrors.dueDate = 'Due date is required'
+    if (!form.term.trim()) newErrors.term = 'Term is required'
+    if (!form.session.trim()) newErrors.session = 'Session is required'
     return newErrors
   }
 
   const resetForm = () => {
     setForm({
-      feeStructureId: 0,
+      feeId: 0,
       classId: 0,
-      sessionId: 0,
-      stream: 'All',
-      feeComponents: [{ name: '', amount: 0, frequency: 'Monthly', description: '' }],
-      description: '',
-      isActive: true
+      feeType: '',
+      amount: 0,
+      dueDate: '',
+      term: '',
+      session: '',
+      status: 'Pending'
     })
     setErrors({})
+    setEditMode(false)
   }
 
-  const addFee = () => {
-    setForm(prev => ({
-      ...prev,
-      feeComponents: [...prev.feeComponents, { name: '', amount: 0, frequency: 'Monthly', description: '' }]
-    }))
-  }
-
-  const removeFee = (index) => {
-    setForm(prev => ({
-      ...prev,
-      feeComponents: prev.feeComponents.filter((_, i) => i !== index)
-    }))
-  }
-
-  const updateFee = (index, field, value) => {
-    setForm(prev => ({
-      ...prev,
-      feeComponents: prev.feeComponents.map((fee, i) =>
-        i === index ? { ...fee, [field]: value } : fee
-      )
-    }))
-  }
-
-  const addFeeStructure = async () => {
+  const handleSubmit = async () => {
     const newErrors = validate()
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
+    if (!organizationId) {
+      toast.error('Organization ID is required. Please login again.')
+      return
+    }
+
+    setLoading(true)
     try {
-      const feeStructureData = {
-        feeStructureId: form.feeStructureId,
+      const payload = {
+        feeId: editMode ? form.feeId : 0,
+        organizationId: organizationId,
         classId: form.classId,
-        sessionId: form.sessionId,
-        stream: form.stream,
-        feeComponents: form.feeComponents.map(fee => ({
-          feeComponentId: 0, // Will be auto-generated
-          name: fee.name,
-          amount: fee.amount,
-          frequency: fee.frequency,
-          description: fee.description || ''
-        })),
-        description: form.description.trim(),
-        isActive: form.isActive
+        feeType: form.feeType.trim(),
+        amount: form.amount,
+        dueDate: new Date(form.dueDate).toISOString(),
+        term: form.term.trim(),
+        session: form.session.trim(),
+        status: form.status
       }
 
-      await dispatch(createFeeStructureAsync(feeStructureData)).unwrap()
-      setShow(false)
-      resetForm()
+      const response = await apiClient.post('/admin/fees', payload)
+
+      if (response.data.success) {
+        toast.success(editMode ? 'Fee structure updated successfully' : 'Fee structure created successfully')
+        setShowModal(false)
+        resetForm()
+        loadFeeStructures()
+      } else {
+        toast.error(response.data.message || 'Failed to save fee structure')
+      }
     } catch (error) {
-      console.error('Error creating fee structure:', error)
+      toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEdit = (data) => {
+    setForm({
+      feeId: data.feeId,
+      classId: data.classId,
+      feeType: data.feeType,
+      amount: data.amount,
+      dueDate: new Date(data.dueDate).toISOString().split('T')[0],
+      term: data.term,
+      session: data.session,
+      status: data.status
+    })
+    setEditMode(true)
+    setShowModal(true)
+  }
+
+  const handleDelete = async (data) => {
+    if (window.confirm(`Are you sure you want to delete this fee structure?`)) {
+      setLoading(true)
+      try {
+        const response = await apiClient.delete(`/admin/fees/${data.feeId}`)
+
+        if (response.data.success) {
+          toast.success('Fee structure deleted successfully')
+          loadFeeStructures()
+        } else {
+          toast.error(response.data.message || 'Failed to delete fee structure')
+        }
+      } catch (error) {
+        toast.error(`Network error: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
   const toolbar = (
-    <div className="flex items-center gap-2 flex-wrap">
-      <button onClick={()=>setShow(true)} className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg">+ Add Fee Structure</button>
-      <select
-        value={sessionFilter}
-        onChange={(e) => setSessionFilter(e.target.value)}
-        className="border rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800"
-      >
-        <option value="">All Sessions</option>
-        {sessions.map(session => (
-          <option key={session.sessionId} value={session.sessionName}>{session.sessionName}</option>
-        ))}
-      </select>
-    </div>
+    <button
+      onClick={() => { resetForm(); setShowModal(true) }}
+      className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      </svg>
+      Add Fee Structure
+    </button>
   )
 
-  if (classesLoading || sessionsLoading || feeStructuresLoading) {
-    return <CircularIndeterminate />
-  }
+  return (
+    <LoadingOverlay isLoading={loading}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Fee Structure Management</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Manage fee structures for different classes and terms</p>
+        </div>
 
-  return <>
-    <AgGridBox title="Fee Structures" columnDefs={cols} rowData={filteredRows} toolbar={toolbar} />
-    {show && (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-          <div className="text-lg font-semibold mb-4">Add New Fee Structure</div>
+        <AgGridBox
+          title="Fee Structures"
+          columnDefs={cols}
+          rowData={feeStructures}
+          toolbar={toolbar}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Fee Structure ID *</label>
-            <input
-              type="number"
-              className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.feeStructureId ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-              placeholder="e.g., 1001"
-              value={form.feeStructureId}
-              onChange={(e) => setForm(f => ({...f, feeStructureId: parseInt(e.target.value) || 0}))}
-            />
-            {errors.feeStructureId && <p className="text-red-500 text-xs">{errors.feeStructureId}</p>}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Class *</label>
-              <select
-                value={form.classId}
-                onChange={(e) => setForm(f => ({...f, classId: parseInt(e.target.value) || 0}))}
-                className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.classId ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-              >
-                <option value={0}>Select Class</option>
-                {classes.map(cls => (
-                  <option key={cls.classId} value={cls.classId}>{cls.className}</option>
-                ))}
-              </select>
-              {errors.classId && <p className="text-red-500 text-xs">{errors.classId}</p>}
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Stream</label>
-              <select
-                value={form.stream}
-                onChange={(e) => setForm(f => ({...f, stream: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600"
-              >
-                <option value="All">All</option>
-                <option value="Science">Science</option>
-                <option value="Commerce">Commerce</option>
-                <option value="Arts">Arts</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Session *</label>
-              <select
-                value={form.sessionId}
-                onChange={(e) => setForm(f => ({...f, sessionId: parseInt(e.target.value) || 0}))}
-                className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.sessionId ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-              >
-                <option value={0}>Select Session</option>
-                {sessions.map(session => (
-                  <option key={session.sessionId} value={session.sessionId}>{session.sessionName}</option>
-                ))}
-              </select>
-              {errors.sessionId && <p className="text-red-500 text-xs">{errors.sessionId}</p>}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description *</label>
-            <input
-              className={`w-full border rounded-lg px-3 py-2 bg-white dark:bg-slate-700 ${errors.description ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-              placeholder="Fee structure description"
-              value={form.description}
-              onChange={(e) => setForm(f => ({...f, description: e.target.value}))}
-            />
-            {errors.description && <p className="text-red-500 text-xs">{errors.description}</p>}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Fee Components *</label>
-              <button
-                onClick={addFee}
-                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                + Add Fee
-              </button>
-            </div>
-
-            {form.feeComponents.map((fee, index) => (
-              <div key={index} className="flex gap-2 items-end">
-                <div className="flex-1 space-y-1">
-                  <input
-                    placeholder="Fee Name"
-                    className={`w-full border rounded px-2 py-1 text-sm bg-white dark:bg-slate-700 ${errors[`fee${index}name`] ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                    value={fee.name}
-                    onChange={(e) => updateFee(index, 'name', e.target.value)}
-                  />
-                  {errors[`fee${index}name`] && <p className="text-red-500 text-xs">{errors[`fee${index}name`]}</p>}
-                </div>
-                <div className="w-20 space-y-1">
-                  <input
-                    type="number"
-                    placeholder="₹"
-                    className={`w-full border rounded px-2 py-1 text-sm bg-white dark:bg-slate-700 ${errors[`fee${index}amount`] ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'}`}
-                    value={fee.amount}
-                    onChange={(e) => updateFee(index, 'amount', parseInt(e.target.value) || 0)}
-                  />
-                  {errors[`fee${index}amount`] && <p className="text-red-500 text-xs">{errors[`fee${index}amount`]}</p>}
-                </div>
-                <div className="w-28 space-y-1">
-                  <select
-                    className="w-full border rounded px-2 py-1 text-sm bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600"
-                    value={fee.frequency}
-                    onChange={(e) => updateFee(index, 'frequency', e.target.value)}
-                  >
-                    <option value="Monthly">Monthly</option>
-                    <option value="Quarterly">Quarterly</option>
-                    <option value="Half-Yearly">Half-Yearly</option>
-                    <option value="Annual">Annual</option>
-                  </select>
-                </div>
+        {/* Add/Edit Modal */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">
+                  {editMode ? 'Edit Fee Structure' : 'Add New Fee Structure'}
+                </h3>
                 <button
-                  onClick={() => removeFee(index)}
-                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                  disabled={form.feeComponents.length === 1}
+                  onClick={() => setShowModal(false)}
+                  className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
-                  ✕
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            ))}
 
-            {errors.feeComponents && <p className="text-red-500 text-xs">{errors.feeComponents}</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Class Dropdown */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Class *</label>
+                  <select
+                    value={form.classId}
+                    onChange={(e) => setForm(f => ({...f, classId: parseInt(e.target.value) || 0}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.classId ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  >
+                    <option value="">Select Class</option>
+                    {classes.map(cls => (
+                      <option key={cls.classId} value={cls.classId}>
+                        {cls.className}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.classId && <p className="text-red-500 text-xs mt-1">{errors.classId}</p>}
+                </div>
 
-            <div className="text-right text-sm text-slate-700 dark:text-slate-300">
-              Total Annual: ₹{calculateTotal(form.feeComponents).toLocaleString()}
+                {/* Fee Type Dropdown */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Fee Type *</label>
+                  <select
+                    value={form.feeType}
+                    onChange={(e) => setForm(f => ({...f, feeType: e.target.value}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.feeType ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  >
+                    <option value="">Select Fee Type</option>
+                    {feeTypes.map(feeType => (
+                      <option key={feeType.feeTypeId} value={feeType.feeTypeName}>
+                        {feeType.feeTypeName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.feeType && <p className="text-red-500 text-xs mt-1">{errors.feeType}</p>}
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Amount *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm(f => ({...f, amount: parseFloat(e.target.value) || 0}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.amount ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                    placeholder="Enter amount"
+                  />
+                  {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount}</p>}
+                </div>
+
+                {/* Due Date */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Due Date *</label>
+                  <input
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => setForm(f => ({...f, dueDate: e.target.value}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.dueDate ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  />
+                  {errors.dueDate && <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>}
+                </div>
+
+                {/* Term Dropdown */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Term *</label>
+                  <select
+                    value={form.term}
+                    onChange={(e) => setForm(f => ({...f, term: e.target.value}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.term ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  >
+                    <option value="">Select Term</option>
+                    {terms.map(term => (
+                      <option key={term.termId} value={term.termName}>
+                        {term.termName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.term && <p className="text-red-500 text-xs mt-1">{errors.term}</p>}
+                </div>
+
+                {/* Session Dropdown */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Session *</label>
+                  <select
+                    value={form.session}
+                    onChange={(e) => setForm(f => ({...f, session: e.target.value}))}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      errors.session ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  >
+                    <option value="">Select Session</option>
+                    {sessions.map(session => (
+                      <option key={session.sessionId} value={session.sessionName}>
+                        {session.sessionName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.session && <p className="text-red-500 text-xs mt-1">{errors.session}</p>}
+                </div>
+
+                {/* Status */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2">Status</label>
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm(f => ({...f, status: e.target.value}))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Overdue">Overdue</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : (editMode ? 'Update' : 'Create')}
+                </button>
+              </div>
             </div>
           </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              className="px-3 py-1.5 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-800"
-              onClick={()=>setShow(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-3 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800"
-              onClick={addFeeStructure}
-              disabled={creatingFeeStructure}
-            >
-              {creatingFeeStructure ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
-    )}
-  </>
+      <Toaster position="top-right" />
+    </LoadingOverlay>
+  )
 }
