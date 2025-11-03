@@ -3,20 +3,19 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getParents, getClasses } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser } from '../Services/adminService';
 
-export default function Students() {
+export default function Teachers() {
+  console.log('Teachers component rendering');
   const { permissions } = useSelector((state) => state.auth);
-  const [students, setStudents] = useState([]);
-  const [parents, setParents] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     userId: 0,
-    roleName: 'Student',
+    roleName: 'Teacher',
     firstName: '',
     lastName: '',
     username: '',
@@ -24,52 +23,31 @@ export default function Students() {
     password: '',
     phoneNumber: '',
     address: '',
-    admissionNo: '',
-    parentId: 0,
-    classId: 0
+    qualification: '',
+    designation: '',
+    salary: 0
   });
 
   useEffect(() => {
-    loadStudents();
-    loadParents();
-    loadClasses();
+    loadTeachers();
   }, []);
 
-  const loadStudents = async () => {
+  const loadTeachers = async () => {
+    console.log('Loading teachers...');
     setLoading(true);
     try {
       const response = await getUsers();
+      console.log('Teachers API response:', response);
       if (response.success) {
-        const studentUsers = response.data?.users?.filter(user => user.roleName === 'Student') || [];
-        setStudents(studentUsers);
+        const teacherUsers = response.data?.users?.filter(user => user.roleName === 'Teacher') || [];
+        console.log('Filtered teachers:', teacherUsers);
+        setTeachers(teacherUsers);
       }
     } catch (error) {
-      toast.error('Failed to load students');
+      console.error('Error loading teachers:', error);
+      toast.error('Failed to load teachers');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadParents = async () => {
-    try {
-      const response = await getUsers();
-      if (response.success) {
-        const parentUsers = response.data?.users?.filter(user => user.roleName === 'Parent') || [];
-        setParents(parentUsers);
-      }
-    } catch (error) {
-      console.error('Failed to load parents:', error);
-    }
-  };
-
-  const loadClasses = async () => {
-    try {
-      const response = await getClasses();
-      if (response.success && response.data?.length > 0) {
-        setClasses(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to load classes:', error);
     }
   };
 
@@ -78,21 +56,21 @@ export default function Students() {
     setLoading(true);
     
     try {
-      const userData = { ...form, roleName: 'Student' };
+      const userData = { ...form, roleName: 'Teacher' };
 
       if (editMode) {
         await updateUser(userData);
-        toast.success('Student updated successfully');
+        toast.success('Teacher updated successfully');
       } else {
         await createUser(userData);
-        toast.success('Student created successfully');
+        toast.success('Teacher created successfully');
       }
       
       setShowModal(false);
       resetForm();
-      loadStudents();
+      loadTeachers();
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to save student';
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save teacher';
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -102,7 +80,7 @@ export default function Students() {
   const handleEdit = (userData) => {
     setForm({
       userId: userData.userId,
-      roleName: 'Student',
+      roleName: 'Teacher',
       firstName: userData.firstName,
       lastName: userData.lastName,
       username: userData.username,
@@ -110,9 +88,9 @@ export default function Students() {
       password: '',
       phoneNumber: userData.phoneNumber || userData.phone,
       address: userData.address,
-      admissionNo: userData.admissionNo,
-      parentId: userData.parentId || 0,
-      classId: userData.classId || 0
+      qualification: userData.qualification,
+      designation: userData.designation,
+      salary: userData.salary || 0
     });
     setEditMode(true);
     setShowModal(true);
@@ -123,10 +101,10 @@ export default function Students() {
       setLoading(true);
       try {
         await deleteUser(userData.userId);
-        toast.success('Student deleted successfully');
-        loadStudents();
+        toast.success('Teacher deleted successfully');
+        loadTeachers();
       } catch (error) {
-        toast.error('Failed to delete student');
+        toast.error('Failed to delete teacher');
       } finally {
         setLoading(false);
       }
@@ -136,7 +114,7 @@ export default function Students() {
   const resetForm = () => {
     setForm({
       userId: 0,
-      roleName: 'Student',
+      roleName: 'Teacher',
       firstName: '',
       lastName: '',
       username: '',
@@ -144,29 +122,37 @@ export default function Students() {
       password: '',
       phoneNumber: '',
       address: '',
-      admissionNo: '',
-      parentId: 0,
-      classId: 0
+      qualification: '',
+      designation: '',
+      salary: 0
     });
     setEditMode(false);
   };
 
-  const filteredStudents = useMemo(() => {
-    if (!searchTerm) return students;
-    return students.filter(student => 
-      student.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.admissionNo?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredTeachers = useMemo(() => {
+    if (!searchTerm) return teachers;
+    return teachers.filter(teacher => 
+      teacher.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.qualification?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.designation?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [students, searchTerm]);
+  }, [teachers, searchTerm]);
 
   const columns = useMemo(() => [
     { headerName: 'Name', field: 'fullName', sortable: true },
     { headerName: 'Username', field: 'username', sortable: true },
-    { headerName: 'Admission No', field: 'admissionNo', sortable: true },
     { headerName: 'Email', field: 'email', sortable: true },
     { headerName: 'Phone', field: 'phone', sortable: true },
+    { headerName: 'Qualification', field: 'qualification', sortable: true },
+    { headerName: 'Designation', field: 'designation', sortable: true },
+    { 
+      headerName: 'Salary', 
+      field: 'salary', 
+      sortable: true,
+      valueFormatter: (params) => params.value ? `₹ ${params.value.toLocaleString()}` : 'N/A'
+    },
     {
       headerName: 'Status',
       field: 'status',
@@ -186,7 +172,7 @@ export default function Students() {
       <div className="relative">
         <input
           type="text"
-          placeholder="Search students..."
+          placeholder="Search teachers..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
@@ -203,23 +189,25 @@ export default function Students() {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
         </svg>
-        Add Student
+        Add Teacher
       </button>
     </div>
   );
 
+  console.log('Teachers render - teachers count:', teachers.length, 'loading:', loading);
+  
   return (
     <LoadingOverlay isLoading={loading}>
       <section className="space-y-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Student Management</h1>
-          <p className="text-sm text-slate-600">Manage student accounts and information</p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Teacher Management</h1>
+          <p className="text-sm text-slate-600">Manage teacher accounts and information</p>
         </div>
 
         <AgGridBox
-          title="Students"
+          title="Teachers"
           columnDefs={columns}
-          rowData={filteredStudents}
+          rowData={filteredTeachers}
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
@@ -229,7 +217,7 @@ export default function Students() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">
-                {editMode ? 'Edit Student' : 'Add New Student'}
+                {editMode ? 'Edit Teacher' : 'Add New Teacher'}
               </h3>
               
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -297,59 +285,49 @@ export default function Students() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Admission Number *</label>
-                    <input
-                      type="text"
-                      required
-                      value={form.admissionNo}
-                      onChange={(e) => setForm({...form, admissionNo: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="Enter admission number"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Parent *</label>
-                    <select
-                      required
-                      value={form.parentId}
-                      onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="">Select Parent</option>
-                      {parents.map(parent => (
-                        <option key={parent.userId} value={parent.userId}>
-                          {parent.firstName} {parent.lastName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Class *</label>
-                    <select
-                      required
-                      value={form.classId}
-                      onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="">Select Class</option>
-                      {classes.map(cls => (
-                        <option key={cls.classId} value={cls.classId}>
-                          {cls.className}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Phone Number</label>
+                    <label className="block text-sm font-medium mb-1">Phone Number *</label>
                     <input
                       type="tel"
+                      required
                       value={form.phoneNumber}
                       onChange={(e) => setForm({...form, phoneNumber: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                       placeholder="Enter phone number"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Qualification</label>
+                    <input
+                      type="text"
+                      value={form.qualification}
+                      onChange={(e) => setForm({...form, qualification: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="Enter qualification"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Designation</label>
+                    <input
+                      type="text"
+                      value={form.designation}
+                      onChange={(e) => setForm({...form, designation: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="Enter designation"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Salary</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.salary}
+                      onChange={(e) => setForm({...form, salary: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="Enter salary"
                     />
                   </div>
                   
@@ -371,7 +349,7 @@ export default function Students() {
                     className="btn-primary flex-1"
                     disabled={loading}
                   >
-                    {loading ? 'Saving...' : (editMode ? 'Update Student' : 'Create Student')}
+                    {loading ? 'Saving...' : (editMode ? 'Update Teacher' : 'Create Teacher')}
                   </button>
                   <button
                     type="button"

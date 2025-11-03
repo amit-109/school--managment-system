@@ -17,6 +17,8 @@ import AuditLogs from './components/modules/AuditLogs.tsx'
 import SubscriptionPlans from './components/modules/SubscriptionPlans.tsx'
 import Employees from './components/modules/Employees.jsx'
 import Students from './components/modules/Students.jsx'
+import Teachers from './components/modules/Teachers.jsx'
+import Parents from './components/modules/Parents.jsx'
 import Fees from './components/modules/Fees.jsx'
 import Reports from './components/modules/Reports.jsx'
 import Classes from './components/modules/Classes.jsx'
@@ -328,6 +330,10 @@ export default function App() {
             {tab === 'employees' && <Employees />}
             {tab === 'students' && <Students />}
             {tab === 'student' && <Students />}
+            {tab === 'teachers' && <Teachers />}
+            {tab === 'teacher' && <Teachers />}
+            {tab === 'parents' && <Parents />}
+            {tab === 'parent' && <Parents />}
             {tab === 'fees' && <Fees />}
             {tab === 'fee-management' && <FeeManagement />}
             {tab === 'reports' && <Reports />}

@@ -120,7 +120,7 @@ export const getAvailableRoles = async () => {
 
 // Get Parents (for student creation)
 export const getParents = async () => {
-  const response = await apiClient.get('/admin/users?PageNumber=1&PageSize=100&StatusFilter=Parent');
+  const response = await apiClient.get('/admin/users?PageNumber=1&PageSize=100');
   return response.data;
 };
 

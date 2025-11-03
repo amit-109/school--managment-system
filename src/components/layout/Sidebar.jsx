@@ -54,6 +54,8 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Fee Management': '💼',
     'Users': '👤',
     'Students': '🎓',
+    'Teachers': '👨‍🏫',
+    'Parents': '👪',
     'Employees': '🧑',
     'Reports': '📈'
   };
