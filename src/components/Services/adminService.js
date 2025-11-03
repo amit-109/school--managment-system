@@ -124,6 +124,12 @@ export const getParents = async () => {
   return response.data;
 };
 
+// Get Parents List (specific API)
+export const getParentsList = async () => {
+  const response = await apiClient.get('/admin/list?pageSize=1000');
+  return response.data;
+};
+
 // Additional User Management API exports
 export const getUserById = async (userId) => {
   const response = await apiClient.get(`/admin/users/${userId}`);

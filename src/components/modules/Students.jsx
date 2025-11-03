@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getParents, getClasses } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getParents, getParentsList, getClasses } from '../Services/adminService';
 
 export default function Students() {
   const { permissions } = useSelector((state) => state.auth);
@@ -52,13 +52,28 @@ export default function Students() {
 
   const loadParents = async () => {
     try {
-      const response = await getUsers();
+      const response = await getParentsList();
+      console.log('Parents API response:', response);
       if (response.success) {
-        const parentUsers = response.data?.users?.filter(user => user.roleName === 'Parent') || [];
+        const parentUsers = response.data?.data || [];
         setParents(parentUsers);
+      } else {
+        console.error('Parents API failed:', response);
+        setParents([]);
       }
     } catch (error) {
       console.error('Failed to load parents:', error);
+      // Fallback to filtering users by Parent role
+      try {
+        const usersResponse = await getUsers();
+        if (usersResponse.success) {
+          const parentUsers = usersResponse.data?.users?.filter(user => user.roleName === 'Parent') || [];
+          setParents(parentUsers);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback parent loading failed:', fallbackError);
+        setParents([]);
+      }
     }
   };
 
@@ -318,8 +333,8 @@ export default function Students() {
                     >
                       <option value="">Select Parent</option>
                       {parents.map(parent => (
-                        <option key={parent.userId} value={parent.userId}>
-                          {parent.firstName} {parent.lastName}
+                        <option key={parent.parentId} value={parent.userId}>
+                          {parent.fullName}
                         </option>
                       ))}
                     </select>
