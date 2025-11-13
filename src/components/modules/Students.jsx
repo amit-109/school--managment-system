@@ -333,7 +333,7 @@ export default function Students() {
                     >
                       <option value="">Select Parent</option>
                       {parents.map(parent => (
-                        <option key={parent.parentId} value={parent.userId}>
+                        <option key={parent.parentId} value={parent.parentId}>
                           {parent.fullName}
                         </option>
                       ))}

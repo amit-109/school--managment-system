@@ -31,6 +31,10 @@ import Terms from './components/modules/Terms.jsx'
 import Feetype from './components/modules/Feetype.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
 import FeeManagement from './components/modules/FeeManagement.jsx'
+import Concessions from './components/modules/Concessions.jsx'
+import GenerateInvoice from './components/modules/GenerateInvoice.jsx'
+import Invoices from './components/modules/Invoices.jsx'
+import CollectPayment from './components/modules/CollectPayment.jsx'
 import PermissionAssignment from './components/modules/PermissionAssignment.jsx'
 import PermissionManagement from './components/modules/PermissionManagement.jsx'
 import Login from './components/Auth/Login.jsx'
@@ -347,6 +351,10 @@ export default function App() {
             {tab === 'term' && <Terms />}
             {tab === 'feetype' && <Feetype />}
             {tab === 'fee-structures' && <FeeStructures />}
+            {tab === 'concessions' && <Concessions />}
+            {tab === 'generate-invoice' && <GenerateInvoice />}
+            {tab === 'invoices' && <Invoices />}
+            {tab === 'collect-payment' && <CollectPayment />}
             {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
             {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 

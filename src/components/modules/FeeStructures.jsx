@@ -19,27 +19,27 @@ export default function FeeStructures() {
   const [sessions, setSessions] = useState([])
   
   const [form, setForm] = useState({
-    feeId: 0,
+    classFeeId: 0,
     classId: 0,
-    feeType: '',
+    section: 'A',
+    feeTypeId: 0,
+    termId: 0,
+    sessionId: 0,
     amount: 0,
     dueDate: '',
-    term: '',
-    session: '',
-    status: 'Pending'
+    isActive: true
   })
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
     loadFeeStructures()
     loadDropdownData()
-    loadClasses()
   }, [])
 
   const loadFeeStructures = async () => {
     setLoading(true)
     try {
-      const response = await apiClient.get('/admin/fees')
+      const response = await apiClient.get('/admin/fees/class-fees?page=1&size=1000')
       if (response.data.success) {
         setFeeStructures(response.data.data || [])
       }
@@ -53,48 +53,38 @@ export default function FeeStructures() {
 
   const loadDropdownData = async () => {
     try {
-      const response = await apiClient.get('/admin/feemasters/dropdowns')
+      const response = await apiClient.get('/admin/fees/dropdowns')
       if (response.data.success) {
         const data = response.data.data
         setFeeTypes(data.feeTypes || [])
         setTerms(data.terms || [])
         setSessions(data.sessions || [])
+        setClasses(data.classes || [])
       }
     } catch (error) {
       console.error('Failed to load dropdown data:', error)
     }
   }
 
-  const loadClasses = async () => {
-    try {
-      const response = await apiClient.get('/admin/classes')
-      if (response.data.success) {
-        setClasses(response.data.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to load classes:', error)
-    }
-  }
+  // Classes now loaded from dropdowns API
 
   const cols = useMemo(() => [
-    { field: 'className', headerName: 'Class' },
-    { field: 'feeType', headerName: 'Fee Type' },
-    { field: 'amount', headerName: 'Amount', valueFormatter: (params) => `₹ ${params.value}` },
-    { field: 'dueDate', headerName: 'Due Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
-    { field: 'term', headerName: 'Term' },
-    { field: 'session', headerName: 'Session' },
+    { field: 'ClassName', headerName: 'Class' },
+    { field: 'Section', headerName: 'Section' },
+    { field: 'FeeTypeName', headerName: 'Fee Type' },
+    { field: 'Amount', headerName: 'Amount', valueFormatter: (params) => `₹ ${params.value}` },
+    { field: 'DueDate', headerName: 'Due Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
+    { field: 'TermName', headerName: 'Term' },
+    { field: 'SessionName', headerName: 'Session' },
     { 
-      field: 'status', 
+      field: 'IsActive', 
       headerName: 'Status',
       cellRenderer: (params) => {
-        const statusColors = {
-          'Pending': 'bg-yellow-100 text-yellow-800',
-          'Paid': 'bg-green-100 text-green-800',
-          'Overdue': 'bg-red-100 text-red-800'
-        }
         return (
-          <span className={`px-2 py-1 rounded-full text-xs ${statusColors[params.value] || 'bg-gray-100 text-gray-800'}`}>
-            {params.value}
+          <span className={`px-2 py-1 rounded-full text-xs ${
+            params.value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {params.value ? 'Active' : 'Inactive'}
           </span>
         )
       }
@@ -104,24 +94,25 @@ export default function FeeStructures() {
   const validate = () => {
     const newErrors = {}
     if (!form.classId) newErrors.classId = 'Class is required'
-    if (!form.feeType.trim()) newErrors.feeType = 'Fee type is required'
+    if (!form.feeTypeId) newErrors.feeTypeId = 'Fee type is required'
     if (!form.amount || form.amount <= 0) newErrors.amount = 'Valid amount is required'
     if (!form.dueDate) newErrors.dueDate = 'Due date is required'
-    if (!form.term.trim()) newErrors.term = 'Term is required'
-    if (!form.session.trim()) newErrors.session = 'Session is required'
+    if (!form.termId) newErrors.termId = 'Term is required'
+    if (!form.sessionId) newErrors.sessionId = 'Session is required'
     return newErrors
   }
 
   const resetForm = () => {
     setForm({
-      feeId: 0,
+      classFeeId: 0,
       classId: 0,
-      feeType: '',
+      section: 'A',
+      feeTypeId: 0,
+      termId: 0,
+      sessionId: 0,
       amount: 0,
       dueDate: '',
-      term: '',
-      session: '',
-      status: 'Pending'
+      isActive: true
     })
     setErrors({})
     setEditMode(false)
@@ -140,18 +131,19 @@ export default function FeeStructures() {
     setLoading(true)
     try {
       const payload = {
-        feeId: editMode ? form.feeId : 0,
+        classFeeId: editMode ? form.classFeeId : 0,
         organizationId: organizationId,
         classId: form.classId,
-        feeType: form.feeType.trim(),
+        section: form.section,
+        feeTypeId: form.feeTypeId,
+        termId: form.termId,
+        sessionId: form.sessionId,
         amount: form.amount,
-        dueDate: new Date(form.dueDate).toISOString(),
-        term: form.term.trim(),
-        session: form.session.trim(),
-        status: form.status
+        dueDate: form.dueDate,
+        isActive: form.isActive
       }
 
-      const response = await apiClient.post('/admin/fees', payload)
+      const response = await apiClient.post('/admin/fees/class-fees', payload)
 
       if (response.data.success) {
         toast.success(editMode ? 'Fee structure updated successfully' : 'Fee structure created successfully')
@@ -170,14 +162,15 @@ export default function FeeStructures() {
 
   const handleEdit = (data) => {
     setForm({
-      feeId: data.feeId,
-      classId: data.classId,
-      feeType: data.feeType,
-      amount: data.amount,
-      dueDate: new Date(data.dueDate).toISOString().split('T')[0],
-      term: data.term,
-      session: data.session,
-      status: data.status
+      classFeeId: data.ClassFeeId,
+      classId: data.ClassId,
+      section: data.Section || 'A',
+      feeTypeId: data.FeeTypeId,
+      termId: data.TermId,
+      sessionId: data.SessionId,
+      amount: data.Amount,
+      dueDate: data.DueDate ? new Date(data.DueDate).toISOString().split('T')[0] : '',
+      isActive: data.IsActive
     })
     setEditMode(true)
     setShowModal(true)
@@ -187,7 +180,7 @@ export default function FeeStructures() {
     if (window.confirm(`Are you sure you want to delete this fee structure?`)) {
       setLoading(true)
       try {
-        const response = await apiClient.delete(`/admin/fees/${data.feeId}`)
+        const response = await apiClient.delete(`/admin/fees/class-fees/${data.ClassFeeId}`)
 
         if (response.data.success) {
           toast.success('Fee structure deleted successfully')
@@ -275,20 +268,20 @@ export default function FeeStructures() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Fee Type *</label>
                   <select
-                    value={form.feeType}
-                    onChange={(e) => setForm(f => ({...f, feeType: e.target.value}))}
+                    value={form.feeTypeId}
+                    onChange={(e) => setForm(f => ({...f, feeTypeId: parseInt(e.target.value) || 0}))}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.feeType ? 'border-red-500' : 'border-slate-300'
+                      errors.feeTypeId ? 'border-red-500' : 'border-slate-300'
                     }`}
                   >
                     <option value="">Select Fee Type</option>
                     {feeTypes.map(feeType => (
-                      <option key={feeType.feeTypeId} value={feeType.feeTypeName}>
+                      <option key={feeType.feeTypeId} value={feeType.feeTypeId}>
                         {feeType.feeTypeName}
                       </option>
                     ))}
                   </select>
-                  {errors.feeType && <p className="text-red-500 text-xs mt-1">{errors.feeType}</p>}
+                  {errors.feeTypeId && <p className="text-red-500 text-xs mt-1">{errors.feeTypeId}</p>}
                 </div>
 
                 {/* Amount */}
@@ -326,53 +319,67 @@ export default function FeeStructures() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Term *</label>
                   <select
-                    value={form.term}
-                    onChange={(e) => setForm(f => ({...f, term: e.target.value}))}
+                    value={form.termId}
+                    onChange={(e) => setForm(f => ({...f, termId: parseInt(e.target.value) || 0}))}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.term ? 'border-red-500' : 'border-slate-300'
+                      errors.termId ? 'border-red-500' : 'border-slate-300'
                     }`}
                   >
                     <option value="">Select Term</option>
                     {terms.map(term => (
-                      <option key={term.termId} value={term.termName}>
+                      <option key={term.termId} value={term.termId}>
                         {term.termName}
                       </option>
                     ))}
                   </select>
-                  {errors.term && <p className="text-red-500 text-xs mt-1">{errors.term}</p>}
+                  {errors.termId && <p className="text-red-500 text-xs mt-1">{errors.termId}</p>}
                 </div>
 
                 {/* Session Dropdown */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Session *</label>
                   <select
-                    value={form.session}
-                    onChange={(e) => setForm(f => ({...f, session: e.target.value}))}
+                    value={form.sessionId}
+                    onChange={(e) => setForm(f => ({...f, sessionId: parseInt(e.target.value) || 0}))}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.session ? 'border-red-500' : 'border-slate-300'
+                      errors.sessionId ? 'border-red-500' : 'border-slate-300'
                     }`}
                   >
                     <option value="">Select Session</option>
                     {sessions.map(session => (
-                      <option key={session.sessionId} value={session.sessionName}>
+                      <option key={session.sessionId} value={session.sessionId}>
                         {session.sessionName}
                       </option>
                     ))}
                   </select>
-                  {errors.session && <p className="text-red-500 text-xs mt-1">{errors.session}</p>}
+                  {errors.sessionId && <p className="text-red-500 text-xs mt-1">{errors.sessionId}</p>}
                 </div>
 
-                {/* Status */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Status</label>
+                {/* Section */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Section</label>
                   <select
-                    value={form.status}
-                    onChange={(e) => setForm(f => ({...f, status: e.target.value}))}
+                    value={form.section}
+                    onChange={(e) => setForm(f => ({...f, section: e.target.value}))}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
                   >
-                    <option value="Pending">Pending</option>
-                    <option value="Paid">Paid</option>
-                    <option value="Overdue">Overdue</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                  </select>
+                </div>
+
+                {/* Active Status */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Status</label>
+                  <select
+                    value={form.isActive}
+                    onChange={(e) => setForm(f => ({...f, isActive: e.target.value === 'true'}))}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
                   </select>
                 </div>
               </div>
