@@ -15,6 +15,9 @@ export default function CollectPayment() {
   
   const [students, setStudents] = useState([])
   const [filteredStudents, setFilteredStudents] = useState([])
+  const [paymentMethods, setPaymentMethods] = useState([])
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
+  const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
   
   const [form, setForm] = useState({
     studentId: 0,
@@ -28,6 +31,7 @@ export default function CollectPayment() {
   useEffect(() => {
     loadPayments()
     loadStudents()
+    loadPaymentMethods()
   }, [])
 
   const handlePaymentSearch = (e) => {
@@ -64,6 +68,31 @@ export default function CollectPayment() {
     }
   }
 
+  const loadPaymentMethods = async () => {
+    try {
+      const response = await apiClient.get('/PaymentMethods/methods')
+      if (response.data.success) {
+        setPaymentMethods(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load payment methods:', error)
+    }
+  }
+
+  const loadSpecificPaymentMethod = async (methodType) => {
+    setLoadingPaymentMethod(true)
+    try {
+      const response = await apiClient.get(`/PaymentMethods/methods/${methodType}`)
+      if (response.data.success) {
+        setSelectedPaymentMethod(response.data.data)
+      }
+    } catch (error) {
+      console.error(`Failed to load ${methodType} payment method:`, error)
+    } finally {
+      setLoadingPaymentMethod(false)
+    }
+  }
+
   const cols = useMemo(() => [
     { field: 'ReceiptNo', headerName: 'Receipt No' },
     { field: 'StudentName', headerName: 'Student' },
@@ -79,7 +108,10 @@ export default function CollectPayment() {
     const newErrors = {}
     if (!form.studentId) newErrors.studentId = 'Student is required'
     if (!form.totalPaidAmount || form.totalPaidAmount <= 0) newErrors.totalPaidAmount = 'Valid amount is required'
-    if (form.paymentMode !== 'Cash' && !form.referenceNo) {
+    if ((form.paymentMode === 'UPI' || form.paymentMode === 'QR') && !form.referenceNo) {
+      newErrors.referenceNo = 'Transaction reference number is required for UPI/QR payments'
+    }
+    if (form.paymentMode !== 'Cash' && form.paymentMode !== 'UPI' && form.paymentMode !== 'QR' && !form.referenceNo) {
       newErrors.referenceNo = 'Reference number is required for non-cash payments'
     }
     return newErrors
@@ -95,6 +127,7 @@ export default function CollectPayment() {
     })
     setSearchTerm('')
     setFilteredStudents([])
+    setSelectedPaymentMethod(null)
     setErrors({})
   }
 
@@ -246,7 +279,20 @@ export default function CollectPayment() {
                   <label className="block text-sm font-medium mb-2">Payment Mode</label>
                   <select
                     value={form.paymentMode}
-                    onChange={(e) => setForm(f => ({...f, paymentMode: e.target.value}))}
+                    onChange={(e) => {
+                      const mode = e.target.value
+                      setForm(f => ({...f, paymentMode: mode, referenceNo: ''}))
+                      setErrors({})
+                      
+                      // Load specific payment method for UPI/QR
+                      if (mode === 'UPI') {
+                        loadSpecificPaymentMethod('UPI')
+                      } else if (mode === 'QR') {
+                        loadSpecificPaymentMethod('QR')
+                      } else {
+                        setSelectedPaymentMethod(null)
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
                   >
                     <option value="Cash">Cash</option>
@@ -254,12 +300,63 @@ export default function CollectPayment() {
                     <option value="Online">Online Transfer</option>
                     <option value="Card">Card Payment</option>
                     <option value="UPI">UPI</option>
+                    <option value="QR">QR Code</option>
                   </select>
                 </div>
 
+                {/* Show UPI ID for UPI payments */}
+                {form.paymentMode === 'UPI' && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">UPI ID</label>
+                    {loadingPaymentMethod ? (
+                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
+                        <span className="text-slate-600 dark:text-slate-400">Loading UPI details...</span>
+                      </div>
+                    ) : selectedPaymentMethod ? (
+                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                        {selectedPaymentMethod.upiId}
+                      </div>
+                    ) : (
+                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 text-red-500">
+                        UPI method not configured
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Show QR Code for QR payments */}
+                {form.paymentMode === 'QR' && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">QR Code</label>
+                    {loadingPaymentMethod ? (
+                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
+                          <span className="text-slate-600 dark:text-slate-400">Loading QR code...</span>
+                        </div>
+                      </div>
+                    ) : selectedPaymentMethod && selectedPaymentMethod.qrImageUrl ? (
+                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
+                        <img
+                          src={selectedPaymentMethod.qrImageUrl}
+                          alt="QR Code for Payment"
+                          className="mx-auto max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg"
+                          style={{maxHeight: '300px', maxWidth: '300px'}}
+                        />
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">Scan this QR code to make payment</p>
+                      </div>
+                    ) : (
+                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
+                        <p className="text-red-500">QR code not configured</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Reference No {form.paymentMode !== 'Cash' && '*'}
+                    {form.paymentMode === 'UPI' || form.paymentMode === 'QR' ? 'Transaction Reference No *' : `Reference No ${form.paymentMode !== 'Cash' ? '*' : ''}`}
                   </label>
                   <input
                     type="text"
@@ -268,7 +365,7 @@ export default function CollectPayment() {
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                       errors.referenceNo ? 'border-red-500' : 'border-slate-300'
                     }`}
-                    placeholder="Enter reference number"
+                    placeholder={form.paymentMode === 'UPI' || form.paymentMode === 'QR' ? 'Enter transaction reference number' : 'Enter reference number'}
                     disabled={form.paymentMode === 'Cash'}
                   />
                   {errors.referenceNo && <p className="text-red-500 text-xs mt-1">{errors.referenceNo}</p>}
