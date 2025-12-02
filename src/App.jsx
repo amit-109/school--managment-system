@@ -39,6 +39,8 @@ import PaymentMethods from './components/modules/PaymentMethods.jsx'
 import DailyCollection from './components/modules/DailyCollection.jsx'
 import ClassOutstanding from './components/modules/ClassOutstanding.jsx'
 import StudentOutstanding from './components/modules/StudentOutstanding.jsx'
+import FeeTypeCollection from './components/modules/FeeTypeCollection.jsx'
+import StudentLedger from './components/modules/StudentLedger.jsx'
 import PermissionAssignment from './components/modules/PermissionAssignment.jsx'
 import PermissionManagement from './components/modules/PermissionManagement.jsx'
 import Login from './components/Auth/Login.jsx'
@@ -363,6 +365,8 @@ export default function App() {
             {tab === 'daily-collection' && <DailyCollection />}
             {tab === 'class-outstanding' && <ClassOutstanding />}
             {tab === 'student-outstanding' && <StudentOutstanding />}
+            {tab === 'fee-type-collection' && <FeeTypeCollection />}
+            {tab === 'student-ledger' && <StudentLedger />}
             {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
             {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 
