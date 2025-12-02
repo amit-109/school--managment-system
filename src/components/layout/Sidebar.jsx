@@ -35,7 +35,8 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Student': '🎓',
     'Employee Management': '🧑',
     'Report Management': '📈',
-    'Reports': '📈'
+    'Reports': '📈',
+    'Fee Reports': '📊'
   };
 
   // SubModule icons mapping
@@ -63,7 +64,12 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Teachers': '👨‍🏫',
     'Parents': '👪',
     'Employees': '🧑',
-    'Reports': '📈'
+    'Reports': '📈',
+    'Daily Collection': '📅',
+    'Class Outstanding': '🏫',
+    'Student Outstanding': '🎓',
+    'Fee Type Collection': '💎',
+    'Student Ledger': '📖'
   };
 
   // Static menu items for SuperAdmin
