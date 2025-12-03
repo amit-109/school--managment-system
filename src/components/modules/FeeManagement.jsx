@@ -8,10 +8,10 @@ export default function FeeManagement() {
   const [showFeeModal, setShowFeeModal] = useState(false)
   const [showStructureModal, setShowStructureModal] = useState(false)
   const [feeForm, setFeeForm] = useState({ 
-    studentId: '', student: '', cls: '', month: '', amount: 0, paymentMode: 'Cash' 
+    studentId: '', student: '', cls: '', month: '', amount: '', paymentMode: 'Cash' 
   })
   const [structureForm, setStructureForm] = useState({
-    class: '', tuitionFee: 0, examFee: 0, libraryFee: 0, sportsFee: 0, labFee: 0
+    class: '', tuitionFee: '', examFee: '', libraryFee: '', sportsFee: '', labFee: ''
   })
 
   // Fee Collection Columns
@@ -57,7 +57,7 @@ export default function FeeManagement() {
     }
     setFeeRows(prev => [entry, ...prev])
     setShowFeeModal(false)
-    setFeeForm({ studentId: '', student: '', cls: '', month: '', amount: 0, paymentMode: 'Cash' })
+    setFeeForm({ studentId: '', student: '', cls: '', month: '', amount: '', paymentMode: 'Cash' })
   }
 
   const addStructure = () => {
@@ -74,7 +74,7 @@ export default function FeeManagement() {
     }
     setStructureRows(prev => [entry, ...prev])
     setShowStructureModal(false)
-    setStructureForm({ class: '', tuitionFee: 0, examFee: 0, libraryFee: 0, sportsFee: 0, labFee: 0 })
+    setStructureForm({ class: '', tuitionFee: '', examFee: '', libraryFee: '', sportsFee: '', labFee: '' })
   }
 
   const feeToolbar = (

@@ -286,14 +286,13 @@ export default function Students() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email *</label>
+                    <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
-                      required
                       value={form.email}
                       onChange={(e) => setForm({...form, email: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="Enter email address"
+                      placeholder="Enter email address (optional)"
                     />
                   </div>
                   
@@ -327,7 +326,7 @@ export default function Students() {
                     <label className="block text-sm font-medium mb-1">Parent *</label>
                     <select
                       required
-                      value={form.parentId}
+                      value={form.parentId || ''}
                       onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     >
@@ -344,7 +343,7 @@ export default function Students() {
                     <label className="block text-sm font-medium mb-1">Class *</label>
                     <select
                       required
-                      value={form.classId}
+                      value={form.classId || ''}
                       onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     >
