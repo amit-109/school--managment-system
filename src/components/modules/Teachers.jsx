@@ -25,7 +25,7 @@ export default function Teachers() {
     address: '',
     qualification: '',
     designation: '',
-    salary: 0
+    salary: ''
   });
 
   useEffect(() => {
@@ -78,19 +78,25 @@ export default function Teachers() {
   };
 
   const handleEdit = (userData) => {
+    console.log('Teacher edit data:', userData);
+    // Split fullName into firstName and lastName
+    const nameParts = (userData.fullName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     setForm({
       userId: userData.userId,
       roleName: 'Teacher',
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      username: userData.username,
-      email: userData.email,
+      firstName: firstName,
+      lastName: lastName,
+      username: userData.username || '',
+      email: userData.email || '',
       password: '',
-      phoneNumber: userData.phoneNumber || userData.phone,
-      address: userData.address,
-      qualification: userData.qualification,
-      designation: userData.designation,
-      salary: userData.salary || 0
+      phoneNumber: userData.phone || '',
+      address: userData.address || '',
+      qualification: userData.qualification || '',
+      designation: userData.designation || '',
+      salary: userData.salary || ''
     });
     setEditMode(true);
     setShowModal(true);
@@ -124,7 +130,7 @@ export default function Teachers() {
       address: '',
       qualification: '',
       designation: '',
-      salary: 0
+      salary: ''
     });
     setEditMode(false);
   };
@@ -325,7 +331,7 @@ export default function Teachers() {
                       min="0"
                       step="0.01"
                       value={form.salary}
-                      onChange={(e) => setForm({...form, salary: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setForm({...form, salary: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                       placeholder="Enter salary"
                     />

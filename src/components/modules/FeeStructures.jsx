@@ -20,12 +20,12 @@ export default function FeeStructures() {
   
   const [form, setForm] = useState({
     classFeeId: 0,
-    classId: 0,
+    classId: '',
     section: 'A',
-    feeTypeId: 0,
-    termId: 0,
-    sessionId: 0,
-    amount: 0,
+    feeTypeId: '',
+    termId: '',
+    sessionId: '',
+    amount: '',
     dueDate: '',
     isActive: true
   })
@@ -105,12 +105,12 @@ export default function FeeStructures() {
   const resetForm = () => {
     setForm({
       classFeeId: 0,
-      classId: 0,
+      classId: '',
       section: 'A',
-      feeTypeId: 0,
-      termId: 0,
-      sessionId: 0,
-      amount: 0,
+      feeTypeId: '',
+      termId: '',
+      sessionId: '',
+      amount: '',
       dueDate: '',
       isActive: true
     })
@@ -138,7 +138,7 @@ export default function FeeStructures() {
         feeTypeId: form.feeTypeId,
         termId: form.termId,
         sessionId: form.sessionId,
-        amount: form.amount,
+        amount: parseFloat(form.amount) || 0,
         dueDate: form.dueDate,
         isActive: form.isActive
       }
@@ -292,7 +292,7 @@ export default function FeeStructures() {
                     min="0"
                     step="0.01"
                     value={form.amount}
-                    onChange={(e) => setForm(f => ({...f, amount: parseFloat(e.target.value) || 0}))}
+                    onChange={(e) => setForm(f => ({...f, amount: e.target.value}))}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                       errors.amount ? 'border-red-500' : 'border-slate-300'
                     }`}

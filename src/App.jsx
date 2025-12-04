@@ -39,12 +39,15 @@ import PaymentMethods from './components/modules/PaymentMethods.jsx'
 import DailyCollection from './components/modules/DailyCollection.jsx'
 import ClassOutstanding from './components/modules/ClassOutstanding.jsx'
 import StudentOutstanding from './components/modules/StudentOutstanding.jsx'
+import FeeTypeCollection from './components/modules/FeeTypeCollection.jsx'
+import StudentLedger from './components/modules/StudentLedger.jsx'
 import PermissionAssignment from './components/modules/PermissionAssignment.jsx'
 import PermissionManagement from './components/modules/PermissionManagement.jsx'
 import Login from './components/Auth/Login.jsx'
 import Register from './components/Auth/Register.jsx'
 import LandingPage from './components/LandingPage.jsx'
 import PricingPage from './components/PricingPage.jsx'
+import ForgotPassword from './components/Auth/ForgotPassword.jsx'
 import LoadingOverlay from './components/shared/LoadingOverlay.jsx'
 import { useLoading } from './components/shared/LoadingContext.jsx'
 import { registerUserAsync, loginUserAsync, logoutUserAsync, setTokens } from './components/Auth/store'
@@ -60,6 +63,7 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false)
   const [showLanding, setShowLanding] = useState(true)
   const [showPricing, setShowPricing] = useState(false)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [role, setRole] = useState('operator') // This will be updated based on userRole from auth state
   const [tab, setTab] = useState('dashboard')
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
@@ -306,10 +310,16 @@ export default function App() {
           <PricingPage onContinue={() => { setShowRegister(true); setShowPricing(false); }} />
         ) : showLanding ? (
           <LandingPage onSignIn={() => { setShowLanding(false); setShowRegister(false); }} onRegister={() => { setShowLanding(false); setShowPricing(true); }} />
+        ) : showForgotPassword ? (
+          <ForgotPassword onBack={() => setShowForgotPassword(false)} />
         ) : showRegister ? (
           <Register onRegister={handleRegister} onSwitch={() => setShowRegister(false)} />
         ) : (
-          <Login onLogin={handleLogin} onSwitch={() => setShowPricing(true)} />
+          <Login 
+            onLogin={handleLogin} 
+            onSwitch={() => setShowPricing(true)}
+            onForgotPassword={() => setShowForgotPassword(true)}
+          />
         )}
         <Toaster position="top-right" />
       </LoadingOverlay>
@@ -363,6 +373,8 @@ export default function App() {
             {tab === 'daily-collection' && <DailyCollection />}
             {tab === 'class-outstanding' && <ClassOutstanding />}
             {tab === 'student-outstanding' && <StudentOutstanding />}
+            {tab === 'fee-type-collection' && <FeeTypeCollection />}
+            {tab === 'student-ledger' && <StudentLedger />}
             {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
             {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 

@@ -115,19 +115,25 @@ export default function Students() {
   };
 
   const handleEdit = (userData) => {
+    console.log('Student edit data:', userData);
+    // Split fullName into firstName and lastName
+    const nameParts = (userData.fullName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     setForm({
       userId: userData.userId,
       roleName: 'Student',
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      username: userData.username,
-      email: userData.email,
+      firstName: firstName,
+      lastName: lastName,
+      username: userData.username || '',
+      email: userData.email || '',
       password: '',
-      phoneNumber: userData.phoneNumber || userData.phone,
-      address: userData.address,
-      admissionNo: userData.admissionNo,
+      phoneNumber: userData.phone || '',
+      address: userData.address || '',
+      admissionNo: userData.admissionNo || '',
       parentId: userData.parentId || 0,
-      classId: userData.classId || 0
+      classId: userData.currentClassId || userData.classId || 0
     });
     setEditMode(true);
     setShowModal(true);
@@ -286,14 +292,13 @@ export default function Students() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email *</label>
+                    <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
-                      required
                       value={form.email}
                       onChange={(e) => setForm({...form, email: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="Enter email address"
+                      placeholder="Enter email address (optional)"
                     />
                   </div>
                   
@@ -327,7 +332,7 @@ export default function Students() {
                     <label className="block text-sm font-medium mb-1">Parent *</label>
                     <select
                       required
-                      value={form.parentId}
+                      value={form.parentId || ''}
                       onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     >
@@ -344,7 +349,7 @@ export default function Students() {
                     <label className="block text-sm font-medium mb-1">Class *</label>
                     <select
                       required
-                      value={form.classId}
+                      value={form.classId || ''}
                       onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     >
