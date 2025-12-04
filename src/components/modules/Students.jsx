@@ -115,17 +115,23 @@ export default function Students() {
   };
 
   const handleEdit = (userData) => {
+    console.log('Student edit data:', userData);
+    // Split fullName into firstName and lastName
+    const nameParts = (userData.fullName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     setForm({
       userId: userData.userId,
       roleName: 'Student',
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      username: userData.username,
-      email: userData.email,
+      firstName: firstName,
+      lastName: lastName,
+      username: userData.username || '',
+      email: userData.email || '',
       password: '',
-      phoneNumber: userData.phoneNumber || userData.phone,
-      address: userData.address,
-      admissionNo: userData.admissionNo,
+      phoneNumber: userData.phone || '',
+      address: userData.address || '',
+      admissionNo: userData.admissionNo || '',
       parentId: userData.parentId || 0,
       classId: userData.classId || 0
     });

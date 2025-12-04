@@ -71,16 +71,21 @@ export default function Parents() {
   };
 
   const handleEdit = (userData) => {
-    console.log('Edit parent data:', userData);
+    console.log('Parent edit data:', userData);
+    // Split fullName into firstName and lastName
+    const nameParts = (userData.fullName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     setForm({
       userId: userData.userId,
       roleName: 'Parent',
-      firstName: userData.firstName || '',
-      lastName: userData.lastName || '',
+      firstName: firstName,
+      lastName: lastName,
       username: userData.username || '',
       email: userData.email || '',
       password: '',
-      phoneNumber: userData.phoneNumber || userData.phone || '',
+      phoneNumber: userData.phone || '',
       address: userData.address || '',
       occupation: userData.occupation || ''
     });

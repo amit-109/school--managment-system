@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
 
-export default function Login({ onLogin, onSwitch }) {
+export default function Login({ onLogin, onSwitch, onForgotPassword }) {
   const { loggingIn } = useSelector((state) => state.auth);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -101,6 +101,7 @@ export default function Login({ onLogin, onSwitch }) {
               </label>
               <button
                 type="button"
+                onClick={onForgotPassword}
                 className="text-indigo-600 dark:text-indigo-400 hover:underline"
               >
                 Forgot password?
