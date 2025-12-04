@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function ForgotPassword({ onBack }) {
   const [step, setStep] = useState(1); // 1: username, 2: reset password
@@ -9,6 +9,7 @@ export default function ForgotPassword({ onBack }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
 
   const handleUsernameSubmit = async (e) => {
     e.preventDefault();
@@ -19,14 +20,28 @@ export default function ForgotPassword({ onBack }) {
 
     setLoading(true);
     try {
-      // Simulate API call for username verification
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('https://sfms-api.abhiworld.in/api/Auth/verify-username', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*'
+        },
+        body: JSON.stringify({
+          usernameOrEmail: username.trim()
+        })
+      });
+
+      const result = await response.json();
       
-      // Mock verification - in real implementation, call API here
-      toast.success("Username verified! Please set your new password.");
-      setStep(2);
+      if (response.ok && result.success) {
+        setUserId(result.data?.userId || result.userId);
+        toast.success("Username verified! Please set your new password.");
+        setStep(2);
+      } else {
+        toast.error(result.message || "Username not found");
+      }
     } catch (error) {
-      toast.error("Username not found");
+      toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -50,44 +65,65 @@ export default function ForgotPassword({ onBack }) {
       return;
     }
 
+    if (!userId) {
+      toast.error("User ID not found. Please start over.");
+      setStep(1);
+      return;
+    }
+
     setLoading(true);
     try {
-      // Simulate API call for password reset
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('https://sfms-api.abhiworld.in/api/Auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': '*/*'
+        },
+        body: JSON.stringify({
+          userId: userId,
+          newPassword: password
+        })
+      });
+
+      const result = await response.json();
       
-      // Mock success - in real implementation, call API here
-      toast.success("Password reset successfully! Please login with your new password.");
-      onBack();
+      if (response.ok && result.success) {
+        toast.success("Password reset successfully! Please login with your new password.");
+        onBack();
+      } else {
+        toast.error(result.message || "Failed to reset password");
+      }
     } catch (error) {
-      toast.error("Failed to reset password");
+      toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-blue-900/20 dark:to-indigo-900/10">
-      {/* Left Side Illustration */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-10 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-500 to-green-500 opacity-80"></div>
-        <img
-          src="/imgRL.jpg"
-          alt="School Management Illustration"
-          className="relative z-10 w-4/5 rounded-3xl shadow-2xl border-4 border-white object-cover"
-        />
-        <div className="absolute bottom-10 left-10 z-10">
-          <h1 className="text-white text-4xl font-bold tracking-wide drop-shadow-lg">
-            Reset Password 🔐
-          </h1>
-          <p className="text-white/90 mt-2 text-lg font-medium">
-            Secure your account with a new password
-          </p>
+    <>
+      <div className="flex min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-blue-900/20 dark:to-indigo-900/10">
+        {/* Left Side Illustration */}
+        <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-10 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-500 to-green-500 opacity-80"></div>
+          <img
+            src="/imgRL.jpg"
+            alt="School Management Illustration"
+            className="relative z-10 w-4/5 rounded-3xl shadow-2xl border-4 border-white object-cover"
+          />
+          <div className="absolute bottom-10 left-10 z-10">
+            <h1 className="text-white text-4xl font-bold tracking-wide drop-shadow-lg">
+              Reset Password 🔐
+            </h1>
+            <p className="text-white/90 mt-2 text-lg font-medium">
+              Secure your account with a new password
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Right Side Form */}
-      <div className="flex flex-col items-center justify-center w-full lg:w-1/2 px-6 py-10">
-        <div className="w-full max-w-md bg-white dark:bg-slate-800/90 rounded-3xl shadow-2xl border border-white/30 dark:border-slate-700 p-8 space-y-6 backdrop-blur-md">
+        {/* Right Side Form */}
+        <div className="flex flex-col items-center justify-center w-full lg:w-1/2 px-6 py-10">
+          <div className="w-full max-w-md bg-white dark:bg-slate-800/90 rounded-3xl shadow-2xl border border-white/30 dark:border-slate-700 p-8 space-y-6 backdrop-blur-md">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
               {step === 1 ? "Forgot Password" : "Reset Password"}
@@ -208,8 +244,10 @@ export default function ForgotPassword({ onBack }) {
               ← Back to Login
             </button>
           </div>
+          </div>
         </div>
       </div>
-    </div>
+      <Toaster position="top-right" />
+    </>
   );
 }
