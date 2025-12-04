@@ -133,7 +133,7 @@ export default function Students() {
       address: userData.address || '',
       admissionNo: userData.admissionNo || '',
       parentId: userData.parentId || 0,
-      classId: userData.classId || 0
+      classId: userData.currentClassId || userData.classId || 0
     });
     setEditMode(true);
     setShowModal(true);
