@@ -38,7 +38,7 @@ interface AuthState {
 }
 import toast from 'react-hot-toast';
 
-const muiTheme = createTheme(); // Default MUI theme, can be customized
+const muiTheme = createTheme(); 
 
 interface TopBarProps {
   role: string;
