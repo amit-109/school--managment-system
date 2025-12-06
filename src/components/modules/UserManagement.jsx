@@ -355,10 +355,11 @@ export default function UserManagement() {
           className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         >
           <option value="All">All</option>
-          <option value="Admin">Admin</option>
-          <option value="Student">Student</option>
-          <option value="Parent">Parent</option>
-          <option value="Teacher">Teacher</option>
+          {roles.map(role => (
+            <option key={role.roleName} value={role.roleName}>
+              {role.roleName}
+            </option>
+          ))}
         </select>
       </div>
       
