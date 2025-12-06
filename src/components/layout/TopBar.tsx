@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -28,6 +28,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../Auth/store';
 import { logoutUserAsync } from '../Auth/store';
 import TokenManager from '../Auth/tokenManager';
+import { apiClient } from '../Auth/base';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -50,6 +51,7 @@ interface TopBarProps {
   toggleLanguage: () => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  orgData: any;
 }
 
 interface AuthState {
@@ -67,13 +69,27 @@ export default function TopBar({
   language,
   toggleLanguage,
   sidebarOpen,
-  setSidebarOpen
+  setSidebarOpen,
+  orgData
 }: TopBarProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const dispatch = useDispatch<AppDispatch>();
   const authState = useSelector((state: any) => state.auth);
   const refreshToken = authState.refreshToken;
+
+  // School data from props or default
+  const schoolData = orgData ? {
+    name: orgData.schoolName || "St. Mary's High School",
+    logoUrl: orgData.logoUrl || "/src/assets/logo.svg",
+    helplineNumber: orgData.phone || "+91 98765 43210"
+  } : {
+    name: "St. Mary's High School",
+    logoUrl: "/src/assets/logo.svg",
+    helplineNumber: "+91 98765 43210"
+  };
+
+  const loading = false; // No loading since data comes from props
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -128,16 +144,74 @@ export default function TopBar({
             <MenuIcon />
           </IconButton>
 
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <img 
-              src="/src/assets/logo.svg" 
-              alt="School Management System" 
-              style={{ 
-                height: '42px',
-                opacity: '0.95',
-                marginLeft: '8px'
-              }} 
-            />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* School Logo */}
+            {loading ? (
+              <Box 
+                sx={{ 
+                  height: '42px',
+                  width: '42px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
+              </Box>
+            ) : (
+              <img 
+                src={schoolData.logoUrl} 
+                alt="School Logo" 
+                style={{ 
+                  height: '42px',
+                  width: '42px',
+                  borderRadius: '8px',
+                  objectFit: 'contain',
+                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  padding: '4px'
+                }} 
+              />
+            )}
+            
+            {/* School Info */}
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+              {loading ? (
+                <Box>
+                  <Box sx={{ height: '1.3rem', width: '150px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '4px', mb: 0.5 }} />
+                  <Box sx={{ height: '1rem', width: '120px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }} />
+                </Box>
+              ) : (
+                <>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    sx={{ 
+                      fontWeight: 600,
+                      fontSize: '1.1rem',
+                      lineHeight: 1.2,
+                      color: 'white'
+                    }}
+                  >
+                    {schoolData.name}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      fontSize: '0.75rem',
+                      opacity: 0.8,
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5
+                    }}
+                  >
+                    📞 {schoolData.helplineNumber}
+                  </Typography>
+                </>
+              )}
+            </Box>
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />

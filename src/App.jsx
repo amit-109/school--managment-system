@@ -87,6 +87,7 @@ export default function App() {
     setSidebarOpen(false) // Close sidebar on mobile when navigating
   }
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [orgData, setOrgData] = useState(null)
 
   const handleLogout = useCallback(async () => {
     try {
@@ -263,7 +264,7 @@ export default function App() {
       const response = await dispatch(loginUserAsync({ username, password })).unwrap();
 
       // Wait for Redux state to be updated and then set tokens
-      setTimeout(() => {
+      setTimeout(async () => {
         const authState = store.getState().auth;
 
         if (authState.accessToken && authState.refreshToken) {
@@ -277,6 +278,20 @@ export default function App() {
             refresh_token: response.refresh_token,
           });
         }
+
+        // Fetch org data after setting tokens
+        try {
+          const { apiClient } = await import('./components/Auth/base');
+          const orgResponse = await apiClient.get('/admin/org');
+          if (orgResponse.data.success) {
+            setOrgData(orgResponse.data.data);
+          }
+        } catch (orgError) {
+          console.error('Failed to fetch org data:', orgError);
+        }
+
+        // Show success toast after org API completes (success or failure)
+        toast.success('Login successful!');
       }, 100);
 
       setUser({ username });
@@ -284,7 +299,6 @@ export default function App() {
       setShowLanding(false);
       localStorage.setItem('lastUser', username);
       setTab('dashboard'); // Ensure we start on dashboard
-      toast.success('Login successful!');
     } catch (error) {
       toast.error(`Login Failed: ${error}`);
     }
@@ -329,7 +343,7 @@ export default function App() {
   return (
     <LoadingOverlay isLoading={isLoading}>
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
-      <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} orgData={orgData} />
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-5">
         <div className="flex">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
