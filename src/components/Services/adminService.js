@@ -323,3 +323,21 @@ export const getUserLoginPermissions = async (userId) => {
   const response = await apiClient.get(`/admin/permissions/user/${userId}/login`);
   return response.data;
 };
+
+// Create Student with Parent (combined endpoint)
+export const createStudentWithParent = async (studentParentData) => {
+  const response = await apiClient.post('/admin/create-with-parent', studentParentData);
+  return response.data;
+};
+
+// Get Student Users (specific endpoint for students)
+export const getStudentUsers = async (pageNumber = 1, pageSize = 100) => {
+  const response = await apiClient.get(`/admin/student-users?PageNumber=${pageNumber}&PageSize=${pageSize}`);
+  return response.data;
+};
+
+// Get Student by ID (for edit functionality)
+export const getStudentById = async (studentUserId) => {
+  const response = await apiClient.get(`/admin/student-get-by-id/${studentUserId}`);
+  return response.data;
+};

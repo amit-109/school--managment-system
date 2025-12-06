@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getParents, getParentsList, getClasses } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getParents, getParentsList, getClasses, createStudentWithParent, getStudentUsers, getStudentById } from '../Services/adminService';
 
 export default function Students() {
   const { permissions } = useSelector((state) => state.auth);
@@ -14,6 +14,9 @@ export default function Students() {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [parentExists, setParentExists] = useState(true);
+  const [parentSearchTerm, setParentSearchTerm] = useState('');
+  const [selectedParentDetails, setSelectedParentDetails] = useState(null);
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Student',
@@ -28,6 +31,16 @@ export default function Students() {
     parentId: 0,
     classId: 0
   });
+  const [parentForm, setParentForm] = useState({
+    firstName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    password: '',
+    phoneNumber: '',
+    address: '',
+    occupation: ''
+  });
 
   useEffect(() => {
     loadStudents();
@@ -38,10 +51,9 @@ export default function Students() {
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const response = await getUsers();
+      const response = await getStudentUsers();
       if (response.success) {
-        const studentUsers = response.data?.users?.filter(user => user.roleName === 'Student') || [];
-        setStudents(studentUsers);
+        setStudents(response.data?.users || []);
       }
     } catch (error) {
       toast.error('Failed to load students');
@@ -93,19 +105,55 @@ export default function Students() {
     setLoading(true);
     
     try {
-      const userData = { ...form, roleName: 'Student' };
-
       if (editMode) {
+        // For edit mode, use existing update logic with proper field mapping
+        const userData = { 
+          ...form, 
+          roleName: 'Student',
+          phone: form.phoneNumber // Map phoneNumber to phone for API
+        };
         await updateUser(userData);
         toast.success('Student updated successfully');
       } else {
-        await createUser(userData);
-        toast.success('Student created successfully');
+        // For create mode, use combined API
+        const requestData = {
+          organizationId: 0, // Handled by backend
+          createdBy: 0, // Handled by backend
+          parentId: parentExists ? form.parentId : null,
+          
+          // Parent fields (only used if parentId is null)
+          parentFirstName: parentForm.firstName,
+          parentLastName: parentForm.lastName,
+          parentUsername: parentForm.username,
+          parentEmail: parentForm.email,
+          parentPasswordHash: parentForm.password, // API will hash this
+          parentPhoneNumber: parentForm.phoneNumber,
+          parentOccupation: parentForm.occupation,
+          parentAddress: parentForm.address,
+          
+          // Student fields
+          studentFirstName: form.firstName,
+          studentLastName: form.lastName,
+          studentUsername: form.username,
+          studentEmail: form.email,
+          studentPasswordHash: form.password, // API will hash this
+          studentPhoneNumber: form.phoneNumber,
+          admissionNo: form.admissionNo,
+          classId: form.classId
+        };
+        
+        const response = await createStudentWithParent(requestData);
+        if (response.success) {
+          toast.success(response.message);
+        } else {
+          throw new Error(response.message);
+        }
       }
       
       setShowModal(false);
       resetForm();
       loadStudents();
+      loadParents(); // Reload parents list
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save student';
       toast.error(errorMessage);
@@ -114,29 +162,38 @@ export default function Students() {
     }
   };
 
-  const handleEdit = (userData) => {
+  const handleEdit = async (userData) => {
     console.log('Student edit data:', userData);
-    // Split fullName into firstName and lastName
-    const nameParts = (userData.fullName || '').split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
+    setLoading(true);
     
-    setForm({
-      userId: userData.userId,
-      roleName: 'Student',
-      firstName: firstName,
-      lastName: lastName,
-      username: userData.username || '',
-      email: userData.email || '',
-      password: '',
-      phoneNumber: userData.phone || '',
-      address: userData.address || '',
-      admissionNo: userData.admissionNo || '',
-      parentId: userData.parentId || 0,
-      classId: userData.currentClassId || userData.classId || 0
-    });
-    setEditMode(true);
-    setShowModal(true);
+    try {
+      // Get detailed student data using the new API
+      const response = await getStudentById(userData.userId);
+      if (response.success) {
+        const studentData = response.data;
+        setForm({
+          userId: studentData.studentUserId,
+          roleName: 'Student',
+          firstName: studentData.studentFirstName || '',
+          lastName: studentData.studentLastName || '',
+          username: studentData.studentUsername || '',
+          email: studentData.studentEmail || '',
+          password: '',
+          phoneNumber: studentData.studentPhoneNumber || '',
+          address: '', // Not in API response
+          admissionNo: studentData.admissionNo || '',
+          parentId: studentData.parentId || 0,
+          classId: studentData.classId || 0
+        });
+        setEditMode(true);
+        setShowModal(true);
+      }
+    } catch (error) {
+      toast.error('Failed to load student details');
+      console.error('Error loading student:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (userData) => {
@@ -169,7 +226,56 @@ export default function Students() {
       parentId: 0,
       classId: 0
     });
+    setParentForm({
+      firstName: '',
+      lastName: '',
+      username: '',
+      email: '',
+      password: '',
+      phoneNumber: '',
+      address: '',
+      occupation: ''
+    });
+    setParentExists(true);
+    setParentSearchTerm('');
+    setSelectedParentDetails(null);
     setEditMode(false);
+  };
+
+  const handleParentSelect = (parent) => {
+    setForm({...form, parentId: parent.parentId});
+    setSelectedParentDetails(parent);
+    setParentForm({
+      firstName: parent.fullName.split(' ')[0] || '',
+      lastName: parent.fullName.split(' ').slice(1).join(' ') || '',
+      username: parent.username || '',
+      email: parent.email || '',
+      password: '',
+      phoneNumber: parent.phoneNumber || '',
+      address: parent.address || '',
+      occupation: parent.occupation || ''
+    });
+  };
+
+  const filteredParents = parents.filter(parent => 
+    parent.fullName?.toLowerCase().includes(parentSearchTerm.toLowerCase()) ||
+    parent.username?.toLowerCase().includes(parentSearchTerm.toLowerCase())
+  );
+
+  const clearParentData = () => {
+    setForm({...form, parentId: 0});
+    setParentForm({
+      firstName: '',
+      lastName: '',
+      username: '',
+      email: '',
+      password: '',
+      phoneNumber: '',
+      address: '',
+      occupation: ''
+    });
+    setSelectedParentDetails(null);
+    setParentSearchTerm('');
   };
 
   const filteredStudents = useMemo(() => {
@@ -328,22 +434,223 @@ export default function Students() {
                     />
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Parent *</label>
-                    <select
-                      required
-                      value={form.parentId || ''}
-                      onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="">Select Parent</option>
-                      {parents.map(parent => (
-                        <option key={parent.parentId} value={parent.parentId}>
-                          {parent.fullName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Parent Toggle - Only show in create mode */}
+                  {!editMode && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-center gap-4 mb-4 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                        <span className="text-sm font-medium">Parent Information:</span>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="parentOption"
+                            checked={parentExists}
+                            onChange={() => {
+                              setParentExists(true);
+                              clearParentData();
+                            }}
+                            className="text-primary-500"
+                          />
+                          <span className="text-sm">Select Existing Parent</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="parentOption"
+                            checked={!parentExists}
+                            onChange={() => {
+                              setParentExists(false);
+                              clearParentData();
+                            }}
+                            className="text-primary-500"
+                          />
+                          <span className="text-sm">Create New Parent</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Parent Selection - Different for create vs edit */}
+                  {editMode ? (
+                    /* Simple parent dropdown for edit mode */
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Parent *</label>
+                      <select
+                        required
+                        value={form.parentId || ''}
+                        onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      >
+                        <option value="">Select Parent</option>
+                        {parents.map(parent => (
+                          <option key={parent.parentId} value={parent.parentId}>
+                            {parent.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : parentExists ? (
+                    /* Advanced parent selection for create mode */
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-1">Select Parent *</label>
+                      <div className="relative">
+                        <select
+                          required
+                          value={form.parentId || ''}
+                          onChange={(e) => {
+                            const selectedParent = parents.find(p => p.parentId === parseInt(e.target.value));
+                            if (selectedParent) {
+                              handleParentSelect(selectedParent);
+                            } else {
+                              setSelectedParentDetails(null);
+                            }
+                            setForm({...form, parentId: parseInt(e.target.value) || 0});
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                        >
+                          <option value="">Select Parent</option>
+                          {parents.map(parent => (
+                            <option key={parent.parentId} value={parent.parentId}>
+                              {parent.fullName}
+                            </option>
+                          ))}
+                        </select>
+                        
+                        {/* Display selected parent details */}
+                        {selectedParentDetails && (
+                          <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg border">
+                            <h5 className="text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Selected Parent Details:</h5>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div><span className="font-medium">Name:</span> {selectedParentDetails.fullName}</div>
+                              <div><span className="font-medium">Username:</span> {selectedParentDetails.username}</div>
+                              <div><span className="font-medium">Email:</span> {selectedParentDetails.email || 'N/A'}</div>
+                              <div><span className="font-medium">Phone:</span> {selectedParentDetails.phoneNumber || 'N/A'}</div>
+                              <div className="col-span-2"><span className="font-medium">Occupation:</span> {selectedParentDetails.occupation || 'N/A'}</div>
+                            </div>
+                          </div>
+                        )}
+                        <input
+                          type="text"
+                          placeholder="Type to search parents..."
+                          value={parentSearchTerm}
+                          onChange={(e) => setParentSearchTerm(e.target.value)}
+                          className="w-full px-3 py-2 mt-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100 text-sm"
+                        />
+                        {parentSearchTerm && (
+                          <div className="absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {filteredParents.length > 0 ? (
+                              filteredParents.map(parent => (
+                                <div
+                                  key={parent.parentId}
+                                  onClick={() => {
+                                    handleParentSelect(parent);
+                                    setForm({...form, parentId: parent.parentId});
+                                    setParentSearchTerm('');
+                                  }}
+                                  className="p-3 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-200 dark:border-slate-600 last:border-b-0"
+                                >
+                                  <div className="font-medium">{parent.fullName}</div>
+                                  <div className="text-sm text-slate-600 dark:text-slate-400">{parent.username} • {parent.phoneNumber}</div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-3 text-slate-500 dark:text-slate-400 text-center">No parents found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="md:col-span-2">
+                        <h4 className="text-md font-semibold mb-3 text-primary-600 dark:text-primary-400">Parent Information</h4>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent First Name *</label>
+                        <input
+                          type="text"
+                          required={!parentExists}
+                          value={parentForm.firstName}
+                          onChange={(e) => setParentForm({...parentForm, firstName: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent first name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Last Name *</label>
+                        <input
+                          type="text"
+                          required={!parentExists}
+                          value={parentForm.lastName}
+                          onChange={(e) => setParentForm({...parentForm, lastName: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent last name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Username *</label>
+                        <input
+                          type="text"
+                          required={!parentExists}
+                          value={parentForm.username}
+                          onChange={(e) => setParentForm({...parentForm, username: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent username"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Email</label>
+                        <input
+                          type="email"
+                          value={parentForm.email}
+                          onChange={(e) => setParentForm({...parentForm, email: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent email"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Password *</label>
+                        <input
+                          type="password"
+                          required={!parentExists}
+                          value={parentForm.password}
+                          onChange={(e) => setParentForm({...parentForm, password: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent password"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Phone *</label>
+                        <input
+                          type="tel"
+                          required={!parentExists}
+                          value={parentForm.phoneNumber}
+                          onChange={(e) => setParentForm({...parentForm, phoneNumber: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent phone"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Parent Occupation</label>
+                        <input
+                          type="text"
+                          value={parentForm.occupation}
+                          onChange={(e) => setParentForm({...parentForm, occupation: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          placeholder="Enter parent occupation"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1">Parent Address</label>
+                        <textarea
+                          value={parentForm.address}
+                          onChange={(e) => setParentForm({...parentForm, address: e.target.value})}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          rows={2}
+                          placeholder="Enter parent address"
+                        />
+                      </div>
+                    </>
+                  )}
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Class *</label>
