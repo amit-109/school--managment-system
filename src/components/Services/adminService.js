@@ -341,3 +341,27 @@ export const getStudentById = async (studentUserId) => {
   const response = await apiClient.get(`/admin/student-get-by-id/${studentUserId}`);
   return response.data;
 };
+
+// Get Parent Users (specific endpoint for parents)
+export const getParentUsers = async () => {
+  const response = await apiClient.get('/admin/parent-users');
+  return response.data;
+};
+
+// Get Parent by ID (for edit functionality)
+export const getParentById = async (parentUserId) => {
+  const response = await apiClient.get(`/admin/parent-get-by-id/${parentUserId}`);
+  return response.data;
+};
+
+// Get Teacher Users (specific endpoint for teachers)
+export const getTeacherUsers = async () => {
+  const response = await apiClient.get('/admin/teacher-users');
+  return response.data;
+};
+
+// Get Teacher by ID (for edit functionality)
+export const getTeacherById = async (teacherUserId) => {
+  const response = await apiClient.get(`/admin/teacher-get-by-id/${teacherUserId}`);
+  return response.data;
+};

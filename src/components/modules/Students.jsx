@@ -138,6 +138,7 @@ export default function Students() {
           studentEmail: form.email,
           studentPasswordHash: form.password, // API will hash this
           studentPhoneNumber: form.phoneNumber,
+          studentAddress: form.address,
           admissionNo: form.admissionNo,
           classId: form.classId
         };
@@ -180,7 +181,7 @@ export default function Students() {
           email: studentData.studentEmail || '',
           password: '',
           phoneNumber: studentData.studentPhoneNumber || '',
-          address: '', // Not in API response
+          address: studentData.address || '',
           admissionNo: studentData.admissionNo || '',
           parentId: studentData.parentId || 0,
           classId: studentData.classId || 0

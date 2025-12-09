@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getParentUsers, getParentById } from '../Services/adminService';
 
 export default function Parents() {
   const { permissions } = useSelector((state) => state.auth);
@@ -32,10 +32,9 @@ export default function Parents() {
   const loadParents = async () => {
     setLoading(true);
     try {
-      const response = await getUsers();
+      const response = await getParentUsers();
       if (response.success) {
-        const parentUsers = response.data?.users?.filter(user => user.roleName === 'Parent') || [];
-        setParents(parentUsers);
+        setParents(response.data?.users || []);
       }
     } catch (error) {
       toast.error('Failed to load parents');
@@ -49,7 +48,11 @@ export default function Parents() {
     setLoading(true);
     
     try {
-      const userData = { ...form, roleName: 'Parent' };
+      const userData = { 
+        ...form, 
+        roleName: 'Parent',
+        phone: form.phoneNumber // Map phoneNumber to phone for API
+      };
 
       if (editMode) {
         await updateUser(userData);
@@ -70,27 +73,36 @@ export default function Parents() {
     }
   };
 
-  const handleEdit = (userData) => {
+  const handleEdit = async (userData) => {
     console.log('Parent edit data:', userData);
-    // Split fullName into firstName and lastName
-    const nameParts = (userData.fullName || '').split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
+    setLoading(true);
     
-    setForm({
-      userId: userData.userId,
-      roleName: 'Parent',
-      firstName: firstName,
-      lastName: lastName,
-      username: userData.username || '',
-      email: userData.email || '',
-      password: '',
-      phoneNumber: userData.phone || '',
-      address: userData.address || '',
-      occupation: userData.occupation || ''
-    });
-    setEditMode(true);
-    setShowModal(true);
+    try {
+      // Get detailed parent data using the new API
+      const response = await getParentById(userData.userId);
+      if (response.success) {
+        const parentData = response.data;
+        setForm({
+          userId: parentData.parentUserId,
+          roleName: 'Parent',
+          firstName: parentData.parentFirstName || '',
+          lastName: parentData.parentLastName || '',
+          username: parentData.parentUsername || '',
+          email: parentData.parentEmail || '',
+          password: '',
+          phoneNumber: parentData.parentPhoneNumber || '',
+          address: parentData.address || '',
+          occupation: parentData.occupation || ''
+        });
+        setEditMode(true);
+        setShowModal(true);
+      }
+    } catch (error) {
+      toast.error('Failed to load parent details');
+      console.error('Error loading parent:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (userData) => {
