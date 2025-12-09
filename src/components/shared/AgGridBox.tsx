@@ -8,11 +8,12 @@ interface ActionRendererProps {
   onEdit?: (data: any) => void;
   onView?: (data: any) => void;
   onDelete?: (data: any) => void;
+  onPrint?: (data: any) => void;
   viewTitle?: string;
   viewIcon?: React.ReactNode;
 }
 
-const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelete, viewTitle = 'View', viewIcon }) => {
+const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelete, onPrint, viewTitle = 'View', viewIcon }) => {
   return (
     <div className="flex items-center gap-2 justify-center">
       {onView && (
@@ -27,6 +28,17 @@ const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelet
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
             </svg>
           )}
+        </button>
+      )}
+      {onPrint && (
+        <button
+          onClick={() => onPrint(data)}
+          className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-200 group"
+          title="Print"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
         </button>
       )}
       {onEdit && (
@@ -63,6 +75,7 @@ interface AgGridBoxProps {
   onEdit?: (data: any) => void;
   onView?: (data: any) => void;
   onDelete?: (data: any) => void;
+  onPrint?: (data: any) => void;
   showActions?: boolean;
   viewTitle?: string;
   viewIcon?: React.ReactNode;
@@ -76,6 +89,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   onEdit,
   onView,
   onDelete,
+  onPrint,
   showActions = true,
   viewTitle,
   viewIcon
@@ -92,7 +106,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
 
   const finalColumnDefs = useMemo(() => {
     const cols = [...columnDefs];
-    if (showActions && (onEdit || onView || onDelete)) {
+    if (showActions && (onEdit || onView || onDelete || onPrint)) {
       cols.push({
         headerName: 'Actions',
         field: 'actions',
@@ -105,6 +119,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
             onEdit={onEdit}
             onView={onView}
             onDelete={onDelete}
+            onPrint={onPrint}
             viewTitle={viewTitle}
             viewIcon={viewIcon}
           />
@@ -117,7 +132,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
       });
     }
     return cols;
-  }, [columnDefs, onEdit, onView, onDelete, showActions]);
+  }, [columnDefs, onEdit, onView, onDelete, onPrint, showActions]);
 
   const autoSizeAll = useCallback(() => {
     const api = gridRef.current?.api;
