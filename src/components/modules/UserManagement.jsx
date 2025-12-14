@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getParents, getClasses } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getParents, getClasses, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
 
 export default function UserManagement() {
   const { permissions } = useSelector((state) => state.auth);
@@ -20,6 +20,7 @@ export default function UserManagement() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewUser, setViewUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: '',
@@ -114,8 +115,38 @@ export default function UserManagement() {
     }
   };
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const checkEmailExists = async (email) => {
+    if (!email) return;
+    
+    try {
+      const response = await checkEmailExistsAPI(email);
+      console.log('Email check response:', response);
+      
+      if (response?.success === true) {
+        setEmailError('Email already exists in system');
+      } else if (response?.success === false) {
+        setEmailError('');
+      }
+    } catch (error) {
+      console.error('Email check failed:', error);
+      setEmailError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Only check email errors if user has entered an email
+    if (form.email && emailError) {
+      toast.error('Please fix email errors before submitting');
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -202,6 +233,7 @@ export default function UserManagement() {
       classId: 0
     });
     setSelectedRole('');
+    setEmailError('');
     setEditMode(false);
   };
 
@@ -390,7 +422,7 @@ export default function UserManagement() {
       firstName: { label: 'First Name', type: 'text', placeholder: 'Enter first name' },
       lastName: { label: 'Last Name', type: 'text', placeholder: 'Enter last name' },
       username: { label: 'Username', type: 'text', placeholder: 'Enter username' },
-      email: { label: 'Email', type: 'email', placeholder: 'Enter email address' },
+      email: { label: 'Email', type: 'email', placeholder: 'Enter email address (optional)' },
       password: { label: editMode ? 'Password (leave blank to keep current)' : 'Password', type: 'password', placeholder: 'Enter password' },
       phoneNumber: { label: 'Phone Number', type: 'tel', placeholder: 'Enter phone number' },
       qualification: { label: 'Qualification', type: 'text', placeholder: 'Enter qualification' },
@@ -464,6 +496,47 @@ export default function UserManagement() {
             rows={2}
             placeholder={config.placeholder}
           />
+        </div>
+      );
+    }
+
+    if (fieldName === 'email') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">
+            {config.label} {isRequired && '*'}
+          </label>
+          <input
+            type={config.type}
+            required={isRequired && !(editMode && fieldName === 'password')}
+            value={form[fieldName]}
+            onChange={(e) => {
+              const email = e.target.value;
+              setForm({...form, [fieldName]: email});
+              setEmailError('');
+            }}
+            onBlur={(e) => {
+              const email = e.target.value.trim();
+              if (email) {
+                if (!validateEmail(email)) {
+                  setEmailError('Invalid email format');
+                } else {
+                  checkEmailExists(email);
+                }
+              } else {
+                setEmailError('');
+              }
+            }}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+              emailError 
+                ? 'border-red-500 focus:ring-red-500' 
+                : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+            }`}
+            placeholder={config.placeholder}
+          />
+          {emailError && (
+            <p className="text-red-500 text-sm mt-1">{emailError}</p>
+          )}
         </div>
       );
     }
@@ -588,7 +661,7 @@ export default function UserManagement() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || !selectedRole}
+                    disabled={loading || !selectedRole || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update User' : 'Create User')}
                   </button>
