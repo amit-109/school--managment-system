@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import apiClient from './base';
 
 export default function ForgotPassword({ onBack }) {
   const [step, setStep] = useState(1); // 1: username, 2: reset password
@@ -20,20 +21,13 @@ export default function ForgotPassword({ onBack }) {
 
     setLoading(true);
     try {
-      const response = await fetch('https://sfms-api.abhiworld.in/api/Auth/verify-username', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify({
-          usernameOrEmail: username.trim()
-        })
+      const response = await apiClient.post('/Auth/verify-username', {
+        usernameOrEmail: username.trim()
       });
 
-      const result = await response.json();
+      const result = response.data;
       
-      if (response.ok && result.success) {
+      if (result.success) {
         setUserId(result.data?.userId || result.userId);
         toast.success("Username verified! Please set your new password.");
         setStep(2);
@@ -73,21 +67,14 @@ export default function ForgotPassword({ onBack }) {
 
     setLoading(true);
     try {
-      const response = await fetch('https://sfms-api.abhiworld.in/api/Auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify({
-          userId: userId,
-          newPassword: password
-        })
+      const response = await apiClient.post('/Auth/change-password', {
+        userId: userId,
+        newPassword: password
       });
 
-      const result = await response.json();
+      const result = response.data;
       
-      if (response.ok && result.success) {
+      if (result.success) {
         toast.success("Password reset successfully! Please login with your new password.");
         onBack();
       } else {
