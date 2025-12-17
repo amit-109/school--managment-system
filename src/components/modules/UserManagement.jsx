@@ -21,6 +21,9 @@ export default function UserManagement() {
   const [viewUser, setViewUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [originalEmail, setOriginalEmail] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+
   const [form, setForm] = useState({
     userId: 0,
     roleName: '',
@@ -41,18 +44,29 @@ export default function UserManagement() {
   });
 
   useEffect(() => {
-    loadUsers();
     loadRoles();
     loadParents();
     loadClasses();
+    loadUsers(searchTerm, roleFilter !== 'All' ? roleFilter : '');
   }, []);
 
-  const loadUsers = async () => {
+  // Note: We use client-side filtering with filteredUsers instead of API calls
+
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+  };
+
+  const handleRoleFilterChange = (value) => {
+    setRoleFilter(value);
+  };
+
+  const loadUsers = async (search = '', filter = '') => {
     setLoading(true);
     try {
-      const response = await getUsers();
+      const response = await getUsers(1, 10000, search, filter);
       if (response.success) {
         setUsers(response.data?.users || []);
+        setTotalCount(response.data?.totalCount || 0);
       }
     } catch (error) {
       toast.error('Failed to load users');
@@ -175,13 +189,14 @@ export default function UserManagement() {
   };
 
   const handleEdit = (userData) => {
+    const email = userData.email || '';
     setForm({
       userId: userData.userId,
       roleName: userData.roleName,
       firstName: userData.firstName,
       lastName: userData.lastName,
       username: userData.username,
-      email: userData.email,
+      email: email,
       password: '', // Don't populate password for security
       phoneNumber: userData.phoneNumber || userData.phone,
       qualification: userData.qualification,
@@ -194,6 +209,7 @@ export default function UserManagement() {
       classId: userData.classId || 0
     });
     setSelectedRole(userData.roleName);
+    setOriginalEmail(email);
     setEditMode(true);
     setShowModal(true);
   };
@@ -234,6 +250,7 @@ export default function UserManagement() {
     });
     setSelectedRole('');
     setEmailError('');
+    setOriginalEmail('');
     setEditMode(false);
   };
 
@@ -242,37 +259,46 @@ export default function UserManagement() {
     setShowViewModal(true);
   };
 
-  const handleExport = () => {
-    const csvData = filteredUsers.map(user => ({
-      'Full Name': user.fullName,
-      'Username': user.username,
-      'Role': user.roleName,
-      'Email': user.email,
-      'Phone': user.phone || '',
-      'Status': user.status,
-      'Admission No': user.admissionNo || '',
-      'Qualification': user.qualification || '',
-      'Designation': user.designation || '',
-      'Salary': user.salary || '',
-      'Occupation': user.occupation || '',
-      'Address': user.address || ''
-    }));
+  const handleExport = async () => {
+    try {
+      // Export all users by getting them all at once
+      const response = await getUsers(1, 10000, '', '');
+      if (response.success) {
+        const allUsers = response.data?.users || [];
+        const csvData = allUsers.map(user => ({
+          'Full Name': user.fullName,
+          'Username': user.username,
+          'Role': user.roleName,
+          'Email': user.email,
+          'Phone': user.phone || '',
+          'Status': user.status,
+          'Admission No': user.admissionNo || '',
+          'Qualification': user.qualification || '',
+          'Designation': user.designation || '',
+          'Salary': user.salary || '',
+          'Occupation': user.occupation || '',
+          'Address': user.address || ''
+        }));
 
-    const csvContent = [
-      Object.keys(csvData[0] || {}).join(','),
-      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
-    ].join('\n');
+        const csvContent = [
+          Object.keys(csvData[0] || {}).join(','),
+          ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+        ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `users_${roleFilter !== 'All' ? roleFilter.toLowerCase() + '_' : ''}${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    toast.success('Users exported successfully!');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        toast.success('Users exported successfully!');
+      }
+    } catch (error) {
+      toast.error('Failed to export users');
+    }
   };
 
   const getFieldsForRole = (role) => {
@@ -310,12 +336,13 @@ export default function UserManagement() {
     
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(user => 
-        user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.roleName?.toLowerCase().includes(searchTerm.toLowerCase())
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(user =>
+        (user.fullName || '').toLowerCase().includes(searchLower) ||
+        (user.username || '').toLowerCase().includes(searchLower) ||
+        (user.email || '').toLowerCase().includes(searchLower) ||
+        (user.phone || '').toLowerCase().includes(searchLower) ||
+        (user.roleName || '').toLowerCase().includes(searchLower)
       );
     }
     
@@ -370,20 +397,20 @@ export default function UserManagement() {
           type="text"
           placeholder="Search users..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         />
         <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
-      
+
       {/* Role Filter */}
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role:</label>
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => handleRoleFilterChange(e.target.value)}
           className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         >
           <option value="All">All</option>
@@ -514,22 +541,27 @@ export default function UserManagement() {
               const email = e.target.value;
               setForm({...form, [fieldName]: email});
               setEmailError('');
+              if (email.trim() && !validateEmail(email.trim())) {
+                setEmailError('Invalid email format');
+              }
             }}
             onBlur={(e) => {
               const email = e.target.value.trim();
               if (email) {
                 if (!validateEmail(email)) {
                   setEmailError('Invalid email format');
-                } else {
+                } else if (!editMode || email !== originalEmail) {
                   checkEmailExists(email);
+                } else {
+                  setEmailError('');
                 }
               } else {
                 setEmailError('');
               }
             }}
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
-              emailError 
-                ? 'border-red-500 focus:ring-red-500' 
+              emailError
+                ? 'border-red-500 focus:ring-red-500'
                 : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
             }`}
             placeholder={config.placeholder}
@@ -569,7 +601,7 @@ export default function UserManagement() {
           <button
             onClick={handleExport}
             className="btn-secondary flex items-center gap-2"
-            disabled={filteredUsers.length === 0}
+            disabled={users.length === 0}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -595,7 +627,7 @@ export default function UserManagement() {
               <h3 className="text-lg font-semibold mb-4">
                 {editMode ? 'Edit User' : 'Add New User'}
               </h3>
-              
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Role *</label>
@@ -696,7 +728,7 @@ export default function UserManagement() {
                   </svg>
                 </button>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -731,7 +763,7 @@ export default function UserManagement() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex justify-end pt-4 mt-6 border-t border-slate-200 dark:border-slate-700">
                 <button
                   onClick={() => setShowViewModal(false)}

@@ -13,6 +13,7 @@ export default function Parents() {
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [originalEmail, setOriginalEmail] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Parent',
@@ -107,24 +108,26 @@ export default function Parents() {
   const handleEdit = async (userData) => {
     console.log('Parent edit data:', userData);
     setLoading(true);
-    
+
     try {
       // Get detailed parent data using the new API
       const response = await getParentById(userData.userId);
       if (response.success) {
         const parentData = response.data;
+        const email = parentData.parentEmail || '';
         setForm({
           userId: parentData.parentUserId,
           roleName: 'Parent',
           firstName: parentData.parentFirstName || '',
           lastName: parentData.parentLastName || '',
           username: parentData.parentUsername || '',
-          email: parentData.parentEmail || '',
+          email: email,
           password: '',
           phoneNumber: parentData.parentPhoneNumber || '',
           address: parentData.address || '',
           occupation: parentData.occupation || ''
         });
+        setOriginalEmail(email);
         setEditMode(true);
         setShowModal(true);
       }
@@ -165,6 +168,7 @@ export default function Parents() {
       occupation: ''
     });
     setEmailError('');
+    setOriginalEmail('');
     setEditMode(false);
   };
 
@@ -296,22 +300,27 @@ export default function Parents() {
                         const email = e.target.value;
                         setForm({...form, email});
                         setEmailError('');
+                        if (email.trim() && !validateEmail(email.trim())) {
+                          setEmailError('Invalid email format');
+                        }
                       }}
                       onBlur={(e) => {
                         const email = e.target.value.trim();
                         if (email) {
                           if (!validateEmail(email)) {
                             setEmailError('Invalid email format');
-                          } else {
+                          } else if (!editMode || email !== originalEmail) {
                             checkEmailExists(email);
+                          } else {
+                            setEmailError('');
                           }
                         } else {
                           setEmailError('');
                         }
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
-                        emailError 
-                          ? 'border-red-500 focus:ring-red-500' 
+                        emailError
+                          ? 'border-red-500 focus:ring-red-500'
                           : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
                       }`}
                       placeholder="Enter email address (optional)"
