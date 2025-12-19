@@ -24,7 +24,7 @@ export default function CollectPayment() {
     paymentMode: 'Cash',
     referenceNo: '',
     notes: '',
-    totalPaidAmount: 0
+    totalPaidAmount: ''
   })
   const [errors, setErrors] = useState({})
 
@@ -123,7 +123,7 @@ export default function CollectPayment() {
       paymentMode: 'Cash',
       referenceNo: '',
       notes: '',
-      totalPaidAmount: 0
+      totalPaidAmount: ''
     })
     setSearchTerm('')
     setFilteredStudents([])
@@ -378,7 +378,10 @@ export default function CollectPayment() {
                     min="0"
                     step="0.01"
                     value={form.totalPaidAmount}
-                    onChange={(e) => setForm(f => ({...f, totalPaidAmount: parseFloat(e.target.value) || 0}))}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm(f => ({...f, totalPaidAmount: value === '' ? '' : parseFloat(value) || 0}));
+                    }}
                     className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                       errors.totalPaidAmount ? 'border-red-500' : 'border-slate-300'
                     }`}

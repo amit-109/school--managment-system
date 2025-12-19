@@ -61,7 +61,7 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
-  const [showLanding, setShowLanding] = useState(true)
+  const [showLanding, setShowLanding] = useState(false)
   const [showPricing, setShowPricing] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [role, setRole] = useState('operator') // This will be updated based on userRole from auth state
@@ -102,7 +102,7 @@ export default function App() {
       setAuthenticated(false)
       setUser(null)
       setShowRegister(false)
-      setShowLanding(true)
+      setShowLanding(false)
       setShowPricing(false)
       toast.info('You have been logged out successfully.')
     }
@@ -151,7 +151,7 @@ export default function App() {
     } else {
       setUser(null);
       setAuthenticated(false);
-      setShowLanding(true);
+      setShowLanding(false);
       setRole('operator'); // Reset to default
     }
   }, [isAuthenticated, userRole])
@@ -215,7 +215,7 @@ export default function App() {
         setAuthenticated(false)
         setUser(null)
         setShowRegister(false)
-        setShowLanding(true)
+        setShowLanding(false)
         setShowPricing(false)
       })
       .catch((error) => {
@@ -224,7 +224,7 @@ export default function App() {
         setAuthenticated(false)
         setUser(null)
         setShowRegister(false)
-        setShowLanding(true)
+        setShowLanding(false)
         setShowPricing(false)
       })
   }
@@ -345,9 +345,9 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
       <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} orgData={orgData} />
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-5">
-        <div className="flex">
+        <div className="flex h-[calc(100vh-56px)]">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <main className="flex-1 p-3 sm:p-6 space-y-5">
+          <main className="flex-1 p-3 sm:p-6 space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {/* Show ALL components during development */}
             {tab === 'dashboard' && <Dashboard role={role} />}
             {tab === 'users' && <UserManagement />}
