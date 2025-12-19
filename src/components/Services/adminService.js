@@ -365,3 +365,9 @@ export const getTeacherById = async (teacherUserId) => {
   const response = await apiClient.get(`/admin/teacher-get-by-id/${teacherUserId}`);
   return response.data;
 };
+
+// Email Check API
+export const checkEmailExists = async (email) => {
+  const response = await apiClient.get(`/admin/email-check?email=${encodeURIComponent(email)}`);
+  return response.data;
+};

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
 
 export default function Teachers() {
   console.log('Teachers component rendering');
@@ -13,6 +13,8 @@ export default function Teachers() {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [originalEmail, setOriginalEmail] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Teacher',
@@ -36,7 +38,7 @@ export default function Teachers() {
     console.log('Loading teachers...');
     setLoading(true);
     try {
-      const response = await getTeacherUsers();
+      const response = await getUsers(1, 10000, '', 'Teacher');
       console.log('Teachers API response:', response);
       if (response.success) {
         setTeachers(response.data?.users || []);
@@ -49,8 +51,38 @@ export default function Teachers() {
     }
   };
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const checkEmailExists = async (email) => {
+    if (!email) return;
+    
+    try {
+      const response = await checkEmailExistsAPI(email);
+      console.log('Email check response:', response);
+      
+      if (response?.success === true) {
+        setEmailError('Email already exists in system');
+      } else if (response?.success === false) {
+        setEmailError('');
+      }
+    } catch (error) {
+      console.error('Email check failed:', error);
+      setEmailError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Only check email errors if user has entered an email
+    if (form.email && emailError) {
+      toast.error('Please fix email errors before submitting');
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -82,19 +114,20 @@ export default function Teachers() {
   const handleEdit = async (userData) => {
     console.log('Teacher edit data:', userData);
     setLoading(true);
-    
+
     try {
       // Get detailed teacher data using the new API
       const response = await getTeacherById(userData.userId);
       if (response.success) {
         const teacherData = response.data;
+        const email = teacherData.teacherEmail || '';
         setForm({
           userId: teacherData.teacherUserId,
           roleName: 'Teacher',
           firstName: teacherData.teacherFirstName || '',
           lastName: teacherData.teacherLastName || '',
           username: teacherData.teacherUsername || '',
-          email: teacherData.teacherEmail || '',
+          email: email,
           password: '',
           phoneNumber: teacherData.teacherPhoneNumber || '',
           address: teacherData.address || '',
@@ -102,6 +135,7 @@ export default function Teachers() {
           designation: teacherData.designation || '',
           salary: teacherData.salary || ''
         });
+        setOriginalEmail(email);
         setEditMode(true);
         setShowModal(true);
       }
@@ -143,6 +177,8 @@ export default function Teachers() {
       designation: '',
       salary: ''
     });
+    setEmailError('');
+    setOriginalEmail('');
     setEditMode(false);
   };
 
@@ -276,15 +312,42 @@ export default function Teachers() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Email *</label>
+                    <label className="block text-sm font-medium mb-1">Email</label>
                     <input
                       type="email"
-                      required
                       value={form.email}
-                      onChange={(e) => setForm({...form, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="Enter email address"
+                      onChange={(e) => {
+                        const email = e.target.value;
+                        setForm({...form, email});
+                        setEmailError('');
+                        if (email.trim() && !validateEmail(email.trim())) {
+                          setEmailError('Invalid email format');
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const email = e.target.value.trim();
+                        if (email) {
+                          if (!validateEmail(email)) {
+                            setEmailError('Invalid email format');
+                          } else if (!editMode || email !== originalEmail) {
+                            checkEmailExists(email);
+                          } else {
+                            setEmailError('');
+                          }
+                        } else {
+                          setEmailError('');
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        emailError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
+                      placeholder="Enter email address (optional)"
                     />
+                    {emailError && (
+                      <p className="text-red-500 text-sm mt-1">{emailError}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -364,7 +427,7 @@ export default function Teachers() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading}
+                    disabled={loading || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update Teacher' : 'Create Teacher')}
                   </button>

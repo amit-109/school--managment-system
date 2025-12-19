@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getParents, getParentsList, getClasses, createStudentWithParent, getStudentUsers, getStudentById } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getParents, getParentsList, getClasses, createStudentWithParent, getStudentUsers, getStudentById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
 
 export default function Students() {
   const { permissions } = useSelector((state) => state.auth);
@@ -17,6 +17,10 @@ export default function Students() {
   const [parentExists, setParentExists] = useState(true);
   const [parentSearchTerm, setParentSearchTerm] = useState('');
   const [selectedParentDetails, setSelectedParentDetails] = useState(null);
+  const [sameAsParentAddress, setSameAsParentAddress] = useState(false);
+  const [emailErrors, setEmailErrors] = useState({ student: '', parent: '' });
+  const [originalStudentEmail, setOriginalStudentEmail] = useState('');
+  const [originalParentEmail, setOriginalParentEmail] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Student',
@@ -51,7 +55,7 @@ export default function Students() {
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const response = await getStudentUsers();
+      const response = await getStudentUsers(1, 10000);
       if (response.success) {
         setStudents(response.data?.users || []);
       }
@@ -102,6 +106,13 @@ export default function Students() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Only check email errors if user has entered emails
+    if ((form.email && emailErrors.student) || (parentForm.email && emailErrors.parent)) {
+      toast.error('Please fix email errors before submitting');
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -166,19 +177,20 @@ export default function Students() {
   const handleEdit = async (userData) => {
     console.log('Student edit data:', userData);
     setLoading(true);
-    
+
     try {
       // Get detailed student data using the new API
       const response = await getStudentById(userData.userId);
       if (response.success) {
         const studentData = response.data;
+        const email = studentData.studentEmail || '';
         setForm({
           userId: studentData.studentUserId,
           roleName: 'Student',
           firstName: studentData.studentFirstName || '',
           lastName: studentData.studentLastName || '',
           username: studentData.studentUsername || '',
-          email: studentData.studentEmail || '',
+          email: email,
           password: '',
           phoneNumber: studentData.studentPhoneNumber || '',
           address: studentData.address || '',
@@ -186,6 +198,7 @@ export default function Students() {
           parentId: studentData.parentId || 0,
           classId: studentData.classId || 0
         });
+        setOriginalStudentEmail(email);
         setEditMode(true);
         setShowModal(true);
       }
@@ -240,6 +253,10 @@ export default function Students() {
     setParentExists(true);
     setParentSearchTerm('');
     setSelectedParentDetails(null);
+    setSameAsParentAddress(false);
+    setEmailErrors({ student: '', parent: '' });
+    setOriginalStudentEmail('');
+    setOriginalParentEmail('');
     setEditMode(false);
   };
 
@@ -262,6 +279,41 @@ export default function Students() {
     parent.fullName?.toLowerCase().includes(parentSearchTerm.toLowerCase()) ||
     parent.username?.toLowerCase().includes(parentSearchTerm.toLowerCase())
   );
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const checkEmailExists = async (email, type) => {
+    if (!email) return;
+    
+    try {
+      const response = await checkEmailExistsAPI(email);
+      console.log('Email check response:', response);
+      
+      // API returns success: true when email exists, success: false when not found
+      if (response?.success === true) {
+        setEmailErrors(prev => ({
+          ...prev,
+          [type]: 'Email already exists in system'
+        }));
+      } else if (response?.success === false) {
+        // Email not found - this is good, clear any errors
+        setEmailErrors(prev => ({
+          ...prev,
+          [type]: ''
+        }));
+      }
+    } catch (error) {
+      console.error('Email check failed:', error);
+      // Clear error on API failure (network issues, etc.)
+      setEmailErrors(prev => ({
+        ...prev,
+        [type]: ''
+      }));
+    }
+  };
 
   const clearParentData = () => {
     setForm({...form, parentId: 0});
@@ -403,10 +455,38 @@ export default function Students() {
                     <input
                       type="email"
                       value={form.email}
-                      onChange={(e) => setForm({...form, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      onChange={(e) => {
+                        const email = e.target.value;
+                        setForm({...form, email});
+                        setEmailErrors(prev => ({...prev, student: ''}));
+                        if (email.trim() && !validateEmail(email.trim())) {
+                          setEmailErrors(prev => ({...prev, student: 'Invalid email format'}));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const email = e.target.value.trim();
+                        if (email) {
+                          if (!validateEmail(email)) {
+                            setEmailErrors(prev => ({...prev, student: 'Invalid email format'}));
+                          } else if (!editMode || email !== originalStudentEmail) {
+                            checkEmailExists(email, 'student');
+                          } else {
+                            setEmailErrors(prev => ({...prev, student: ''}));
+                          }
+                        } else {
+                          setEmailErrors(prev => ({...prev, student: ''}));
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        emailErrors.student
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
                       placeholder="Enter email address (optional)"
                     />
+                    {emailErrors.student && (
+                      <p className="text-red-500 text-sm mt-1">{emailErrors.student}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -603,10 +683,36 @@ export default function Students() {
                         <input
                           type="email"
                           value={parentForm.email}
-                          onChange={(e) => setParentForm({...parentForm, email: e.target.value})}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                          onChange={(e) => {
+                            const email = e.target.value;
+                            setParentForm({...parentForm, email});
+                            setEmailErrors(prev => ({...prev, parent: ''}));
+                            if (email.trim() && !validateEmail(email.trim())) {
+                              setEmailErrors(prev => ({...prev, parent: 'Invalid email format'}));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const email = e.target.value.trim();
+                            if (email) {
+                              if (!validateEmail(email)) {
+                                setEmailErrors(prev => ({...prev, parent: 'Invalid email format'}));
+                              } else {
+                                checkEmailExists(email, 'parent');
+                              }
+                            } else {
+                              setEmailErrors(prev => ({...prev, parent: ''}));
+                            }
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                            emailErrors.parent
+                              ? 'border-red-500 focus:ring-red-500'
+                              : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                          }`}
                           placeholder="Enter parent email"
                         />
+                        {emailErrors.parent && (
+                          <p className="text-red-500 text-sm mt-1">{emailErrors.parent}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Parent Password *</label>
@@ -644,7 +750,12 @@ export default function Students() {
                         <label className="block text-sm font-medium mb-1">Parent Address</label>
                         <textarea
                           value={parentForm.address}
-                          onChange={(e) => setParentForm({...parentForm, address: e.target.value})}
+                          onChange={(e) => {
+                            setParentForm({...parentForm, address: e.target.value});
+                            if (sameAsParentAddress) {
+                              setForm({...form, address: e.target.value});
+                            }
+                          }}
                           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                           rows={2}
                           placeholder="Enter parent address"
@@ -682,13 +793,37 @@ export default function Students() {
                   </div>
                   
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium">Address</label>
+                      {!editMode && !parentExists && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={sameAsParentAddress}
+                            onChange={(e) => {
+                              setSameAsParentAddress(e.target.checked);
+                              if (e.target.checked) {
+                                setForm({...form, address: parentForm.address});
+                              } else {
+                                setForm({...form, address: ''});
+                              }
+                            }}
+                            className="text-primary-500"
+                          />
+                          <span className="text-sm text-slate-600 dark:text-slate-400">Same as Parent Address</span>
+                        </label>
+                      )}
+                    </div>
                     <textarea
                       value={form.address}
-                      onChange={(e) => setForm({...form, address: e.target.value})}
+                      onChange={(e) => {
+                        setForm({...form, address: e.target.value});
+                        if (sameAsParentAddress) setSameAsParentAddress(false);
+                      }}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                       rows={2}
                       placeholder="Enter address"
+                      disabled={sameAsParentAddress}
                     />
                   </div>
                 </div>
@@ -697,7 +832,7 @@ export default function Students() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading}
+                    disabled={loading || (form.email && emailErrors.student) || (parentForm.email && emailErrors.parent)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update Student' : 'Create Student')}
                   </button>
