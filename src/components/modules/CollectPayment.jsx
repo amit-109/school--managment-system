@@ -169,14 +169,14 @@ export default function CollectPayment() {
   }
 
   const toolbar = (
-    <div className="flex gap-3 items-center">
-      <div className="relative">
+    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+      <div className="relative w-full sm:w-auto">
         <input
           type="text"
           placeholder="Search payments..."
           value={paymentSearchTerm}
           onChange={handlePaymentSearch}
-          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64"
+          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-full sm:w-64 min-h-[44px]"
         />
         <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -184,7 +184,7 @@ export default function CollectPayment() {
       </div>
       <button
         onClick={() => { resetForm(); setShowModal(true) }}
-        className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+        className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 min-h-[44px] w-full sm:w-auto justify-center"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -210,8 +210,8 @@ export default function CollectPayment() {
         />
 
         {showModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-2 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold">Collect Payment</h3>
                 <button
@@ -256,7 +256,7 @@ export default function CollectPayment() {
                               setSearchTerm(student.studentName)
                               setFilteredStudents([])
                             }}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0"
+                            className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
                           >
                             <div className="font-medium">{student.studentName}</div>
                             <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
@@ -402,16 +402,16 @@ export default function CollectPayment() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="px-6 py-3 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                  className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium min-h-[44px]"
                   disabled={loading}
                 >
                   {loading ? 'Processing...' : 'Collect Payment'}

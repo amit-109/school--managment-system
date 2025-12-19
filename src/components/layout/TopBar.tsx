@@ -22,8 +22,6 @@ import {
   Logout,
   Translate,
 } from '@mui/icons-material';
-import { Select, FormControl } from '@mui/material';
-import { SelectChangeEvent } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch } from '../Auth/store';
 import { logoutUserAsync } from '../Auth/store';
@@ -97,10 +95,6 @@ export default function TopBar({
 
   const handleProfileMenuClose = () => {
     setAnchorEl(null);
-  };
-
-  const handleRoleChange = (event: SelectChangeEvent<string>) => {
-    setRole(event.target.value);
   };
 
   const getThemeIcon = () => {
@@ -288,17 +282,9 @@ export default function TopBar({
               <Avatar /> Profile
             </MenuItem>
             <MenuItem>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={role}
-                  onChange={handleRoleChange}
-                  size="small"
-                >
-                  <MenuItem value="superadmin">Super Admin</MenuItem>
-                  <MenuItem value="admin">Admin (Principal)</MenuItem>
-                  <MenuItem value="operator">Operator</MenuItem>
-                </Select>
-              </FormControl>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                {role.charAt(0).toUpperCase() + role.slice(1).replace('admin', ' Admin')}
+              </Typography>
             </MenuItem>
             <MenuItem>
               <Settings sx={{ mr: 1 }} />

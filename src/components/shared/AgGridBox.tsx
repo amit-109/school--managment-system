@@ -15,11 +15,11 @@ interface ActionRendererProps {
 
 const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelete, onPrint, viewTitle = 'View', viewIcon }) => {
   return (
-    <div className="flex items-center gap-2 justify-center">
+    <div className="flex items-center gap-1 sm:gap-2 justify-center">
       {onView && (
         <button
           onClick={() => onView(data)}
-          className="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-800/50 text-primary-600 dark:text-primary-400 flex items-center justify-center transition-all duration-200 group"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-800/50 text-primary-600 dark:text-primary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
           title={viewTitle}
         >
           {viewIcon || (
@@ -33,7 +33,7 @@ const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelet
       {onPrint && (
         <button
           onClick={() => onPrint(data)}
-          className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-200 group"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
           title="Print"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,7 +44,7 @@ const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelet
       {onEdit && (
         <button
           onClick={() => onEdit(data)}
-          className="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-900/30 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 text-secondary-600 dark:text-secondary-400 flex items-center justify-center transition-all duration-200 group"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-secondary-100 dark:bg-secondary-900/30 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 text-secondary-600 dark:text-secondary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
           title="Edit"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +55,7 @@ const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelet
       {onDelete && (
         <button
           onClick={() => onDelete(data)}
-          className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400 flex items-center justify-center transition-all duration-200 group"
+          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
           title="Delete"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,9 +110,9 @@ const AgGridBox: FC<AgGridBoxProps> = ({
       cols.push({
         headerName: 'Actions',
         field: 'actions',
-        width: 140,
-        minWidth: 140,
-        maxWidth: 140,
+        width: 120,
+        minWidth: 120,
+        maxWidth: 160,
         cellRenderer: (params: any) => (
           <ActionRenderer
             data={params.data}
@@ -143,33 +143,33 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   }, []);
 
   return (
-    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
-      <header className="px-6 py-5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-b border-slate-200 dark:border-slate-600 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg">
+    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
+      <header className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-b border-slate-200 dark:border-slate-600 flex items-center justify-between">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-xl shadow-lg">
             📊
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{rowData?.length || 0} total records</p>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{rowData?.length || 0} total records</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {toolbar}
           <button
             onClick={autoSizeAll}
-            className="px-4 py-2.5 text-sm btn-secondary font-medium flex items-center gap-2"
+            className="px-3 sm:px-4 py-2 text-sm btn-secondary font-medium flex items-center gap-2 min-h-[40px] sm:min-h-[44px]"
             title="Auto-resize columns"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
-            Auto-fit
+            <span className="hidden sm:inline">Auto-fit</span>
           </button>
         </div>
       </header>
-      <div className="p-6">
-        <div className="ag-theme-quartz w-full overflow-hidden border border-slate-200 dark:border-slate-600 rounded-2xl shadow-inner">
+      <div className="p-3 sm:p-6">
+        <div className="ag-theme-quartz w-full overflow-x-auto border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl shadow-inner">
           <AgGridReact
             ref={gridRef}
             rowData={rowData}

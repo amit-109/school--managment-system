@@ -245,7 +245,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
       ) }
       {/* <aside className={`fixed inset-y-0 left-0 md:relative w-56 h-[calc(100vh-56px)] border-r p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static`}> */ }
       <aside
-        className={ `fixed inset-y-0 left-0 md:relative w-56 h-screen border-r p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static` }
+        className={ `fixed inset-y-0 left-0 md:relative w-72 sm:w-64 md:w-56 lg:w-52 xl:w-56 h-screen border-r p-2 sm:p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static` }
       >
 
         {/* Search Box */}
