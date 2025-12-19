@@ -343,8 +343,14 @@ export const getStudentById = async (studentUserId) => {
 };
 
 // Get Parent Users (specific endpoint for parents)
-export const getParentUsers = async () => {
-  const response = await apiClient.get('/admin/parent-users');
+export const getParentUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+  const params = new URLSearchParams();
+  params.append('PageNumber', pageNumber.toString());
+  params.append('PageSize', pageSize.toString());
+  if (search) params.append('Search', search);
+  if (statusFilter) params.append('StatusFilter', statusFilter);
+
+  const response = await apiClient.get(`/admin/parent-users?${params.toString()}`);
   return response.data;
 };
 
@@ -355,8 +361,14 @@ export const getParentById = async (parentUserId) => {
 };
 
 // Get Teacher Users (specific endpoint for teachers)
-export const getTeacherUsers = async () => {
-  const response = await apiClient.get('/admin/teacher-users');
+export const getTeacherUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+  const params = new URLSearchParams();
+  params.append('PageNumber', pageNumber.toString());
+  params.append('PageSize', pageSize.toString());
+  if (search) params.append('Search', search);
+  if (statusFilter) params.append('StatusFilter', statusFilter);
+
+  const response = await apiClient.get(`/admin/teacher-users?${params.toString()}`);
   return response.data;
 };
 

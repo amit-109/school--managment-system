@@ -38,7 +38,7 @@ export default function Teachers() {
     console.log('Loading teachers...');
     setLoading(true);
     try {
-      const response = await getUsers(1, 10000, '', 'Teacher');
+      const response = await getTeacherUsers(1, 10000, '', '');
       console.log('Teachers API response:', response);
       if (response.success) {
         setTeachers(response.data?.users || []);
