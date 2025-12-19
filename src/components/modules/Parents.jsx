@@ -34,7 +34,7 @@ export default function Parents() {
   const loadParents = async () => {
     setLoading(true);
     try {
-      const response = await getParentUsers();
+      const response = await getUsers(1, 10000, '', 'Parent');
       if (response.success) {
         setParents(response.data?.users || []);
       }

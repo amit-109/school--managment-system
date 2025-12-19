@@ -55,7 +55,7 @@ export default function Students() {
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const response = await getStudentUsers();
+      const response = await getStudentUsers(1, 10000);
       if (response.success) {
         setStudents(response.data?.users || []);
       }
