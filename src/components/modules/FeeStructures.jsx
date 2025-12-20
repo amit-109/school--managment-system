@@ -95,7 +95,7 @@ export default function FeeStructures() {
     const newErrors = {}
     if (!form.classId) newErrors.classId = 'Class is required'
     if (!form.feeTypeId) newErrors.feeTypeId = 'Fee type is required'
-    if (!form.amount || form.amount <= 0) newErrors.amount = 'Valid amount is required'
+    // if (!form.amount || form.amount <= 0) newErrors.amount = 'Valid amount is required'
     if (!form.dueDate) newErrors.dueDate = 'Due date is required'
     if (!form.termId) newErrors.termId = 'Term is required'
     if (!form.sessionId) newErrors.sessionId = 'Session is required'
