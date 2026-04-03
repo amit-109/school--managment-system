@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import TokenManager from '../Auth/tokenManager';
+import { apiClient } from '../Auth/base';
 
 interface DashboardProps {
   role: 'superadmin' | 'admin' | 'operator';
@@ -42,22 +43,12 @@ const Dashboard: FC<DashboardProps> = ({ role }) => {
         return;
       }
 
-      const response = await fetch('https://sfms-api.abhiworld.in/api/admin/dashboard/overview', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': '*/*'
-        }
-      });
+      const response = await apiClient.get('/admin/dashboard/overview');
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      if (result.success) {
-        setData(result.data);
+      if (response.data.success) {
+        setData(response.data.data);
       } else {
-        toast.error(result.message || 'Failed to load dashboard data');
+        toast.error(response.data.message || 'Failed to load dashboard data');
       }
     } catch (error) {
       console.error('Dashboard API error:', error);

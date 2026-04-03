@@ -16,7 +16,27 @@ export default function Register({ onRegister, onSwitch }) {
     password: "",
     confirmPassword: "",
     adminPhone: "",
+    schoolLogo: "",
   });
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size should be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setForm(prev => ({ ...prev, schoolLogo: event.target.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleRegister = (e) => {
     e.preventDefault();
@@ -39,6 +59,7 @@ export default function Register({ onRegister, onSwitch }) {
         adminEmail: form.email,
         adminPassword: form.password,
         adminPhone: form.adminPhone,
+        LogoUrl: form.schoolLogo || null,
       };
       onRegister(registerData);
     }
@@ -133,6 +154,33 @@ export default function Register({ onRegister, onSwitch }) {
                 />
               </div>
             ))}
+
+            {/* School Logo Upload */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                School Logo (Optional)
+              </label>
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 transition-all duration-200"
+                />
+                {form.schoolLogo && (
+                  <div className="flex items-center justify-center p-4 bg-gray-50 dark:bg-slate-700 rounded-xl">
+                    <img
+                      src={form.schoolLogo}
+                      alt="School Logo Preview"
+                      className="max-w-32 max-h-32 object-contain rounded-lg shadow-md"
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Upload school logo (Max 5MB, Image files only)
+                </p>
+              </div>
+            </div>
 
             {/* Password Fields */}
             {[

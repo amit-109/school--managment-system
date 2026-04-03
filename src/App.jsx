@@ -48,7 +48,7 @@ import Register from './components/Auth/Register.jsx'
 import LandingPage from './components/LandingPage.jsx'
 import PricingPage from './components/PricingPage.jsx'
 import ForgotPassword from './components/Auth/ForgotPassword.jsx'
-import LoadingOverlay from './components/shared/LoadingOverlay.jsx'
+import LoadingOverlay from './components/shared/LoadingOverlay'
 import { useLoading } from './components/shared/LoadingContext.jsx'
 import { registerUserAsync, loginUserAsync, logoutUserAsync, setTokens } from './components/Auth/store'
 import { store } from './store'
@@ -61,7 +61,7 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
-  const [showLanding, setShowLanding] = useState(true)
+  const [showLanding, setShowLanding] = useState(false)
   const [showPricing, setShowPricing] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [role, setRole] = useState('operator') // This will be updated based on userRole from auth state
@@ -87,6 +87,7 @@ export default function App() {
     setSidebarOpen(false) // Close sidebar on mobile when navigating
   }
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [orgData, setOrgData] = useState(null)
 
   const handleLogout = useCallback(async () => {
     try {
@@ -101,7 +102,7 @@ export default function App() {
       setAuthenticated(false)
       setUser(null)
       setShowRegister(false)
-      setShowLanding(true)
+      setShowLanding(false)
       setShowPricing(false)
       toast.info('You have been logged out successfully.')
     }
@@ -150,7 +151,7 @@ export default function App() {
     } else {
       setUser(null);
       setAuthenticated(false);
-      setShowLanding(true);
+      setShowLanding(false);
       setRole('operator'); // Reset to default
     }
   }, [isAuthenticated, userRole])
@@ -214,7 +215,7 @@ export default function App() {
         setAuthenticated(false)
         setUser(null)
         setShowRegister(false)
-        setShowLanding(true)
+        setShowLanding(false)
         setShowPricing(false)
       })
       .catch((error) => {
@@ -223,7 +224,7 @@ export default function App() {
         setAuthenticated(false)
         setUser(null)
         setShowRegister(false)
-        setShowLanding(true)
+        setShowLanding(false)
         setShowPricing(false)
       })
   }
@@ -263,7 +264,7 @@ export default function App() {
       const response = await dispatch(loginUserAsync({ username, password })).unwrap();
 
       // Wait for Redux state to be updated and then set tokens
-      setTimeout(() => {
+      setTimeout(async () => {
         const authState = store.getState().auth;
 
         if (authState.accessToken && authState.refreshToken) {
@@ -277,6 +278,20 @@ export default function App() {
             refresh_token: response.refresh_token,
           });
         }
+
+        // Fetch org data after setting tokens
+        try {
+          const { apiClient } = await import('./components/Auth/base');
+          const orgResponse = await apiClient.get('/admin/org');
+          if (orgResponse.data.success) {
+            setOrgData(orgResponse.data.data);
+          }
+        } catch (orgError) {
+          console.error('Failed to fetch org data:', orgError);
+        }
+
+        // Show success toast after org API completes (success or failure)
+        toast.success('Login successful!');
       }, 100);
 
       setUser({ username });
@@ -284,7 +299,6 @@ export default function App() {
       setShowLanding(false);
       localStorage.setItem('lastUser', username);
       setTab('dashboard'); // Ensure we start on dashboard
-      toast.success('Login successful!');
     } catch (error) {
       toast.error(`Login Failed: ${error}`);
     }
@@ -329,11 +343,11 @@ export default function App() {
   return (
     <LoadingOverlay isLoading={isLoading}>
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
-      <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} orgData={orgData} />
       <div className="mx-auto w-full max-w-7xl px-3 sm:px-5">
-        <div className="flex">
+        <div className="flex h-[calc(100vh-56px)]">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <main className="flex-1 p-3 sm:p-6 space-y-5">
+          <main className="flex-1 p-3 sm:p-6 space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {/* Show ALL components during development */}
             {tab === 'dashboard' && <Dashboard role={role} />}
             {tab === 'users' && <UserManagement />}

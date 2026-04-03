@@ -215,3 +215,18 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* Print styles for logos and images */
+@media print {
+  img {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .logo {
+    max-height: 80px !important;
+    max-width: 200px !important;
+    display: block !important;
+  }
+}

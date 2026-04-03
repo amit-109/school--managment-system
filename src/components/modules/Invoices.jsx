@@ -81,6 +81,186 @@ export default function Invoices() {
     loadInvoiceDetail(data.InvoiceId)
   }
 
+  const handlePrint = async (data) => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get(`/admin/fees/invoices/${data.InvoiceId}`)
+      if (response.data.success) {
+        const invoiceData = response.data.data
+        
+        // Get organization details if not available
+        let orgData = null
+        try {
+          const orgResponse = await apiClient.get('/admin/org')
+          if (orgResponse.data.success) {
+            orgData = orgResponse.data.data
+          }
+        } catch (error) {
+          console.log('Could not fetch organization data')
+        }
+        
+        await printInvoice(invoiceData, orgData)
+      }
+    } catch (error) {
+      console.error('Failed to load invoice for printing:', error)
+      toast.error('Failed to load invoice for printing')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const printInvoice = async (invoiceData, orgData) => {
+    let logoBase64 = ''
+    const logoPath = orgData?.logo || orgData?.logoUrl || '/src/assets/logo.svg'
+    
+    if (logoPath) {
+      // Check if logo is already Base64
+      if (logoPath.startsWith('data:image/')) {
+        logoBase64 = logoPath
+      } else {
+        // Convert URL/path to base64
+        try {
+          const logoUrl = logoPath.startsWith('http') ? logoPath : 
+                         logoPath.startsWith('/') ? window.location.origin + logoPath :
+                         window.location.origin + '/' + logoPath
+          
+          const response = await fetch(logoUrl)
+          const blob = await response.blob()
+          logoBase64 = await new Promise((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.readAsDataURL(blob)
+          })
+        } catch (error) {
+          console.log('Could not convert logo to base64:', error)
+          logoBase64 = logoPath.startsWith('http') ? logoPath : 
+                      window.location.origin + (logoPath.startsWith('/') ? logoPath : '/' + logoPath)
+        }
+      }
+    }
+    
+    const printWindow = window.open('', '_blank')
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice - ${invoiceData.header?.invoiceNo}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+          .invoice-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+          .logo { max-height: 80px; max-width: 200px; -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
+          .org-info { text-align: right; }
+          .org-name { font-size: 24px; font-weight: bold; color: #2563eb; }
+          .invoice-title { text-align: center; font-size: 28px; font-weight: bold; margin: 20px 0; color: #1e40af; }
+          .invoice-details { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+          .detail-section h3 { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #374151; }
+          .detail-item { margin-bottom: 5px; }
+          .detail-label { font-weight: 600; display: inline-block; width: 120px; }
+          .fee-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          .fee-table th, .fee-table td { border: 1px solid #d1d5db; padding: 12px; text-align: left; }
+          .fee-table th { background-color: #f3f4f6; font-weight: 600; }
+          .fee-table .amount { text-align: right; }
+          .total-row { background-color: #f9fafb; font-weight: bold; }
+          .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+          .status-paid { background-color: #dcfce7; color: #166534; }
+          .status-partial { background-color: #fef3c7; color: #92400e; }
+          .status-pending { background-color: #fee2e2; color: #991b1b; }
+          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #6b7280; }
+          @media print { 
+            body { padding: 0; } 
+            .logo { display: block !important; }
+            img { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-header">
+          <div>
+            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : ''}
+          </div>
+          <div class="org-info">
+            <div class="org-name">${orgData?.schoolName || orgData?.name || 'School Name'}</div>
+            <div>${orgData?.address || ''}</div>
+            <div>${orgData?.phone || ''} | ${orgData?.email || ''}</div>
+          </div>
+        </div>
+        
+        <div class="invoice-title">FEE INVOICE</div>
+        
+        <div class="invoice-details">
+          <div class="detail-section">
+            <h3>Invoice Details</h3>
+            <div class="detail-item"><span class="detail-label">Invoice No:</span> ${invoiceData.header?.invoiceNo || ''}</div>
+            <div class="detail-item"><span class="detail-label">Invoice Date:</span> ${invoiceData.header?.invoiceDate ? new Date(invoiceData.header.invoiceDate).toLocaleDateString() : ''}</div>
+            <div class="detail-item"><span class="detail-label">Due Date:</span> ${invoiceData.header?.dueDate ? new Date(invoiceData.header.dueDate).toLocaleDateString() : ''}</div>
+            <div class="detail-item"><span class="detail-label">Status:</span> <span class="status-badge status-${invoiceData.header?.status?.toLowerCase()}">${invoiceData.header?.status || ''}</span></div>
+          </div>
+          <div class="detail-section">
+            <h3>Student Details</h3>
+            <div class="detail-item"><span class="detail-label">Name:</span> ${invoiceData.header?.studentName || ''}</div>
+            <div class="detail-item"><span class="detail-label">Admission No:</span> ${invoiceData.header?.admissionNo || ''}</div>
+            <div class="detail-item"><span class="detail-label">Email:</span> ${invoiceData.header?.email || ''}</div>
+            <div class="detail-item"><span class="detail-label">Phone:</span> ${invoiceData.header?.phone || ''}</div>
+          </div>
+        </div>
+        
+        <table class="fee-table">
+          <thead>
+            <tr>
+              <th>Fee Type</th>
+              <th class="amount">Amount</th>
+              ${invoiceData.header?.totalDiscount > 0 ? '<th class="amount">Discount</th>' : ''}
+              ${invoiceData.header?.totalDiscount > 0 ? '<th class="amount">Net Amount</th>' : ''}
+              <th class="amount">Paid Amount</th>
+              <th class="amount">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoiceData.items?.map(item => `
+              <tr>
+                <td>${item.feeTypeName}</td>
+                <td class="amount">₹ ${item.amount}</td>
+                ${invoiceData.header?.totalDiscount > 0 ? `<td class="amount">₹ ${item.discountAmount || 0}</td>` : ''}
+                ${invoiceData.header?.totalDiscount > 0 ? `<td class="amount">₹ ${item.netAmount}</td>` : ''}
+                <td class="amount">₹ ${item.paidAmount}</td>
+                <td class="amount">₹ ${(item.netAmount || item.amount) - item.paidAmount}</td>
+              </tr>
+            `).join('') || ''}
+            <tr class="total-row">
+              <td><strong>TOTAL</strong></td>
+              <td class="amount"><strong>₹ ${invoiceData.header?.totalAmount || 0}</strong></td>
+              ${invoiceData.header?.totalDiscount > 0 ? `<td class="amount"><strong>₹ ${invoiceData.header?.totalDiscount || 0}</strong></td>` : ''}
+              ${invoiceData.header?.totalDiscount > 0 ? `<td class="amount"><strong>₹ ${invoiceData.header?.netPayable || 0}</strong></td>` : ''}
+              <td class="amount"><strong>₹ ${invoiceData.header?.paidAmount || 0}</strong></td>
+              <td class="amount"><strong>₹ ${invoiceData.header?.balanceAmount || 0}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        
+        ${invoiceData.header?.notes ? `
+          <div style="margin-top: 20px; padding: 15px; background-color: #f8fafc; border-left: 4px solid #3b82f6;">
+            <strong>Notes:</strong> ${invoiceData.header.notes}
+          </div>
+        ` : ''}
+        
+        <div class="footer">
+          <p>This is a computer generated invoice. No signature required.</p>
+          <p>Generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `
+    
+    printWindow.document.write(printContent)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 250)
+  }
+
   const toolbar = (
     <div className="flex gap-2">
       <button
@@ -109,6 +289,7 @@ export default function Invoices() {
           rowData={invoices}
           toolbar={toolbar}
           onView={handleView}
+          onPrint={handlePrint}
         />
 
         {/* Invoice Detail Modal */}

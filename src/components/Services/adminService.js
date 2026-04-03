@@ -323,3 +323,63 @@ export const getUserLoginPermissions = async (userId) => {
   const response = await apiClient.get(`/admin/permissions/user/${userId}/login`);
   return response.data;
 };
+
+// Create Student with Parent (combined endpoint)
+export const createStudentWithParent = async (studentParentData) => {
+  const response = await apiClient.post('/admin/create-with-parent', studentParentData);
+  return response.data;
+};
+
+// Get Student Users (specific endpoint for students)
+export const getStudentUsers = async (pageNumber = 1, pageSize = 100) => {
+  const response = await apiClient.get(`/admin/student-users?PageNumber=${pageNumber}&PageSize=${pageSize}`);
+  return response.data;
+};
+
+// Get Student by ID (for edit functionality)
+export const getStudentById = async (studentUserId) => {
+  const response = await apiClient.get(`/admin/student-get-by-id/${studentUserId}`);
+  return response.data;
+};
+
+// Get Parent Users (specific endpoint for parents)
+export const getParentUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+  const params = new URLSearchParams();
+  params.append('PageNumber', pageNumber.toString());
+  params.append('PageSize', pageSize.toString());
+  if (search) params.append('Search', search);
+  if (statusFilter) params.append('StatusFilter', statusFilter);
+
+  const response = await apiClient.get(`/admin/parent-users?${params.toString()}`);
+  return response.data;
+};
+
+// Get Parent by ID (for edit functionality)
+export const getParentById = async (parentUserId) => {
+  const response = await apiClient.get(`/admin/parent-get-by-id/${parentUserId}`);
+  return response.data;
+};
+
+// Get Teacher Users (specific endpoint for teachers)
+export const getTeacherUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+  const params = new URLSearchParams();
+  params.append('PageNumber', pageNumber.toString());
+  params.append('PageSize', pageSize.toString());
+  if (search) params.append('Search', search);
+  if (statusFilter) params.append('StatusFilter', statusFilter);
+
+  const response = await apiClient.get(`/admin/teacher-users?${params.toString()}`);
+  return response.data;
+};
+
+// Get Teacher by ID (for edit functionality)
+export const getTeacherById = async (teacherUserId) => {
+  const response = await apiClient.get(`/admin/teacher-get-by-id/${teacherUserId}`);
+  return response.data;
+};
+
+// Email Check API
+export const checkEmailExists = async (email) => {
+  const response = await apiClient.get(`/admin/email-check?email=${encodeURIComponent(email)}`);
+  return response.data;
+};
