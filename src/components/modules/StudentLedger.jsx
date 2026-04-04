@@ -14,6 +14,9 @@ export default function StudentLedger() {
   
   // Dropdown options
   const [students, setStudents] = useState([]);
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false);
 
   useEffect(() => {
     loadStudents();
@@ -23,7 +26,9 @@ export default function StudentLedger() {
     try {
       const response = await apiClient.get('/admin/fees/students?page=1&pageSize=10000');
       if (response.data.success) {
-        setStudents(response.data.data.data || []);
+        const studentData = response.data.data.data || [];
+        setStudents(studentData);
+        setFilteredStudents(studentData);
       }
     } catch (error) {
       console.error('Error loading students:', error);
@@ -110,8 +115,6 @@ export default function StudentLedger() {
     { headerName: 'Credit', field: 'credit', sortable: true, filter: true, width: 120 }
   ];
 
-  const selectedStudent = students.find(s => s.studentId == filters.studentId);
-
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -124,9 +127,9 @@ export default function StudentLedger() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Student Ledger Report</h2>
               <p className="text-sm text-gray-600 dark:text-gray-300">View detailed transaction history for students</p>
-              {selectedStudent && (
+              {studentSearchTerm && filters.studentId && (
                 <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mt-1">
-                  Student: {selectedStudent.studentName}{selectedStudent.admissionNo ? ` (${selectedStudent.admissionNo})` : ''}
+                  Student: {studentSearchTerm}
                 </p>
               )}
             </div>
@@ -161,18 +164,55 @@ export default function StudentLedger() {
                 <span className="text-indigo-500">🎓</span>
                 Student
               </label>
-              <select
-                value={filters.studentId}
-                onChange={(e) => setFilters(prev => ({ ...prev, studentId: e.target.value }))}
-                className="input-primary w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Select Student</option>
-                {students.map(student => (
-                  <option key={student.studentId} value={student.studentId}>
-                    {student.studentName}{student.admissionNo ? ` (${student.admissionNo})` : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search and select student..."
+                  value={studentSearchTerm}
+                  onFocus={() => {
+                    setFilteredStudents(students)
+                    setStudentDropdownOpen(true)
+                  }}
+                  onBlur={() => setTimeout(() => setStudentDropdownOpen(false), 150)}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setStudentSearchTerm(value)
+                    setFilters(prev => ({ ...prev, studentId: '' }))
+                    setFilteredStudents(
+                      value
+                        ? students.filter(s =>
+                            s.studentName.toLowerCase().includes(value.toLowerCase()) ||
+                            s.admissionNo.toLowerCase().includes(value.toLowerCase())
+                          )
+                        : students
+                    )
+                    setStudentDropdownOpen(true)
+                  }}
+                  className="input-primary w-full focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                {studentDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {filteredStudents.length > 0 ? filteredStudents.map(student => (
+                      <button
+                        key={student.studentId}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setFilters(prev => ({ ...prev, studentId: student.studentId }))
+                          setStudentSearchTerm(`${student.studentName}${student.admissionNo ? ` (${student.admissionNo})` : ''}`)
+                          setStudentDropdownOpen(false)
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
+                      >
+                        <div className="font-medium">{student.studentName}</div>
+                        <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
+                      </button>
+                    )) : (
+                      <div className="p-3"><p className="text-sm text-slate-500">No students found</p></div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             
             <div>

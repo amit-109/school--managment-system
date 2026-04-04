@@ -79,6 +79,13 @@ interface AgGridBoxProps {
   showActions?: boolean;
   viewTitle?: string;
   viewIcon?: React.ReactNode;
+  serverPagination?: boolean;
+  currentPage?: number;
+  pageSize?: number;
+  totalRecords?: number;
+  pageSizeOptions?: number[];
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
 }
 
 const AgGridBox: FC<AgGridBoxProps> = ({
@@ -92,9 +99,22 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   onPrint,
   showActions = true,
   viewTitle,
-  viewIcon
+  viewIcon,
+  serverPagination = false,
+  currentPage = 1,
+  pageSize = 10,
+  totalRecords = 0,
+  pageSizeOptions = [5, 10, 20, 50],
+  onPageChange,
+  onPageSizeChange
 }) => {
   const gridRef = useRef<AgGridReact>(null);
+  const safePageSize = pageSize > 0 ? pageSize : 10;
+  const safeCurrentPage = currentPage > 0 ? currentPage : 1;
+  const effectiveTotalRecords = serverPagination ? totalRecords : (rowData?.length || 0);
+  const totalPages = Math.max(1, Math.ceil((effectiveTotalRecords || 0) / safePageSize));
+  const startRecord = effectiveTotalRecords === 0 ? 0 : ((safeCurrentPage - 1) * safePageSize) + 1;
+  const endRecord = effectiveTotalRecords === 0 ? 0 : Math.min(safeCurrentPage * safePageSize, effectiveTotalRecords);
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -151,7 +171,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
           </div>
           <div>
             <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{rowData?.length || 0} total records</p>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{effectiveTotalRecords || 0} total records</p>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -178,9 +198,9 @@ const AgGridBox: FC<AgGridBoxProps> = ({
             animateRows
             rowSelection="single"
             suppressCellFocus
-            pagination
-            paginationPageSize={10}
-            paginationPageSizeSelector={[5, 10, 20, 50]}
+            pagination={!serverPagination}
+            paginationPageSize={safePageSize}
+            paginationPageSizeSelector={pageSizeOptions}
             domLayout="autoHeight"
             onGridReady={(params) => {
               setTimeout(() => {
@@ -190,6 +210,50 @@ const AgGridBox: FC<AgGridBoxProps> = ({
           />
         </div>
       </div>
+      {serverPagination && (
+        <div className="px-3 sm:px-6 pb-4 sm:pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <div>
+              Showing {startRecord} to {endRecord} of {effectiveTotalRecords} entries
+            </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm">Page Size:</span>
+                <select
+                  value={safePageSize}
+                  onChange={(e) => onPageSizeChange?.(parseInt(e.target.value, 10))}
+                  className="px-2 py-1 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700"
+                >
+                  {pageSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => onPageChange?.(safeCurrentPage - 1)}
+                disabled={safeCurrentPage <= 1 || effectiveTotalRecords === 0}
+                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Prev
+              </button>
+              <span className="text-xs sm:text-sm">
+                Page {effectiveTotalRecords === 0 ? 0 : safeCurrentPage} of {effectiveTotalRecords === 0 ? 0 : totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => onPageChange?.(safeCurrentPage + 1)}
+                disabled={safeCurrentPage >= totalPages || effectiveTotalRecords === 0}
+                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

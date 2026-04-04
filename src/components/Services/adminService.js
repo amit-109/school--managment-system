@@ -331,9 +331,15 @@ export const createStudentWithParent = async (studentParentData) => {
 };
 
 // Get Student Users (specific endpoint for students)
-export const getStudentUsers = async (pageNumber = 1, pageSize = 100) => {
+export const getStudentUsers = async (pageNumber = 1, pageSize = 10, search = '', statusFilter = '') => {
   try {
-    const response = await apiClient.get(`/admin/student-users?PageNumber=${pageNumber}&PageSize=${pageSize}`);
+    const params = new URLSearchParams();
+    params.append('PageNumber', pageNumber.toString());
+    params.append('PageSize', pageSize.toString());
+    if (search) params.append('Search', search);
+    if (statusFilter) params.append('StatusFilter', statusFilter);
+
+    const response = await apiClient.get(`/admin/student-users?${params.toString()}`);
     return response.data;
   } catch (error) {
     if (error?.response?.status === 404) {
@@ -360,7 +366,7 @@ export const getStudentById = async (studentUserId) => {
 };
 
 // Get Parent Users (specific endpoint for parents)
-export const getParentUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+export const getParentUsers = async (pageNumber = 1, pageSize = 10, search = '', statusFilter = '') => {
   const params = new URLSearchParams();
   params.append('PageNumber', pageNumber.toString());
   params.append('PageSize', pageSize.toString());
@@ -378,7 +384,7 @@ export const getParentById = async (parentUserId) => {
 };
 
 // Get Teacher Users (specific endpoint for teachers)
-export const getTeacherUsers = async (pageNumber = 1, pageSize = 10000, search = '', statusFilter = '') => {
+export const getTeacherUsers = async (pageNumber = 1, pageSize = 10, search = '', statusFilter = '') => {
   const params = new URLSearchParams();
   params.append('PageNumber', pageNumber.toString());
   params.append('PageSize', pageSize.toString());

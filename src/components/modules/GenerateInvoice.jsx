@@ -11,6 +11,7 @@ export default function GenerateInvoice() {
   
   const [students, setStudents] = useState([])
   const [filteredStudents, setFilteredStudents] = useState([])
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
   const [classes, setClasses] = useState([])
   const [terms, setTerms] = useState([])
   const [sessions, setSessions] = useState([])
@@ -76,6 +77,8 @@ export default function GenerateInvoice() {
       notes: ''
     })
     setErrors({})
+    setSearchTerm('')
+    setStudentDropdownOpen(false)
   }
 
   const handleSubmit = async () => {
@@ -127,36 +130,49 @@ export default function GenerateInvoice() {
                   type="text"
                   placeholder="Search and select student..."
                   value={searchTerm}
+                  onFocus={() => {
+                    setFilteredStudents(students)
+                    setStudentDropdownOpen(true)
+                  }}
+                  onBlur={() => setTimeout(() => setStudentDropdownOpen(false), 150)}
                   onChange={(e) => {
                     const value = e.target.value
                     setSearchTerm(value)
-                    const filtered = students.filter(student => 
-                      student.studentName.toLowerCase().includes(value.toLowerCase()) ||
-                      student.admissionNo.toLowerCase().includes(value.toLowerCase())
+                    setForm(f => ({...f, studentId: 0}))
+                    setFilteredStudents(
+                      value
+                        ? students.filter(s =>
+                            s.studentName.toLowerCase().includes(value.toLowerCase()) ||
+                            s.admissionNo.toLowerCase().includes(value.toLowerCase())
+                          )
+                        : students
                     )
-                    setFilteredStudents(filtered)
+                    setStudentDropdownOpen(true)
                   }}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                     errors.studentId ? 'border-red-500' : 'border-slate-300'
                   }`}
                 />
-                {searchTerm && filteredStudents.length > 0 && (
+                {studentDropdownOpen && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {filteredStudents.map(student => (
+                    {filteredStudents.length > 0 ? filteredStudents.map(student => (
                       <button
-                        key={student.userId}
+                        key={student.studentId}
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setForm(f => ({...f, studentId: student.studentId}))
                           setSearchTerm(student.studentName)
-                          setFilteredStudents([])
+                          setStudentDropdownOpen(false)
                         }}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0"
+                        className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
                       >
                         <div className="font-medium">{student.studentName}</div>
                         <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
                       </button>
-                    ))}
+                    )) : (
+                      <div className="p-3"><p className="text-sm text-slate-500">No students found</p></div>
+                    )}
                   </div>
                 )}
               </div>

@@ -21,6 +21,9 @@ export default function Teachers() {
   const [originalEmail, setOriginalEmail] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [originalUsername, setOriginalUsername] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Teacher',
@@ -39,17 +42,18 @@ export default function Teachers() {
   });
 
   useEffect(() => {
-    loadTeachers();
-  }, []);
+    loadTeachers(currentPage, pageSize, searchTerm);
+  }, [currentPage, pageSize, searchTerm]);
 
-  const loadTeachers = async () => {
+  const loadTeachers = async (pageNumber = 1, size = 10, search = '') => {
     console.log('Loading teachers...');
     setLoading(true);
     try {
-      const response = await getTeacherUsers(1, 10000, '', '');
+      const response = await getTeacherUsers(pageNumber, size, search, '');
       console.log('Teachers API response:', response);
       if (response.success) {
         setTeachers(response.data?.users || []);
+        setTotalCount(response.data?.totalCount || response.data?.users?.length || 0);
       }
     } catch (error) {
       console.error('Error loading teachers:', error);
@@ -149,7 +153,7 @@ export default function Teachers() {
       
       setShowModal(false);
       resetForm();
-      loadTeachers();
+      loadTeachers(currentPage, pageSize, searchTerm);
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save teacher';
       toast.error(errorMessage);
@@ -216,7 +220,7 @@ export default function Teachers() {
     try {
       await deleteUser(userData.userId);
       toast.success('Teacher deleted successfully');
-      loadTeachers();
+      loadTeachers(currentPage, pageSize, searchTerm);
     } catch (error) {
       toast.error('Failed to delete teacher');
     } finally {
@@ -248,18 +252,7 @@ export default function Teachers() {
     setEditMode(false);
   };
 
-  const filteredTeachers = useMemo(() => {
-    if (!searchTerm) return teachers;
-    return teachers.filter(teacher => 
-      teacher.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.qualification?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.designation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [teachers, searchTerm]);
+  const filteredTeachers = teachers;
 
   const columns = useMemo(() => [
     { headerName: 'Name', field: 'fullName', sortable: true },
@@ -295,7 +288,10 @@ export default function Teachers() {
           type="text"
           placeholder="Search teachers..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         />
         <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,6 +328,15 @@ export default function Teachers() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
         />
 
         {showModal && (

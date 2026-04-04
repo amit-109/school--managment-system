@@ -19,6 +19,9 @@ export default function Parents() {
   const [originalEmail, setOriginalEmail] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [originalUsername, setOriginalUsername] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Parent',
@@ -35,15 +38,16 @@ export default function Parents() {
   });
 
   useEffect(() => {
-    loadParents();
-  }, []);
+    loadParents(currentPage, pageSize, searchTerm);
+  }, [currentPage, pageSize, searchTerm]);
 
-  const loadParents = async () => {
+  const loadParents = async (pageNumber = 1, size = 10, search = '') => {
     setLoading(true);
     try {
-      const response = await getParentUsers(1, 10000, '', '');
+      const response = await getParentUsers(pageNumber, size, search, '');
       if (response.success) {
         setParents(response.data?.users || []);
+        setTotalCount(response.data?.totalCount || response.data?.users?.length || 0);
       }
     } catch (error) {
       toast.error('Failed to load parents');
@@ -142,7 +146,7 @@ export default function Parents() {
       
       setShowModal(false);
       resetForm();
-      loadParents();
+      loadParents(currentPage, pageSize, searchTerm);
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save parent';
       toast.error(errorMessage);
@@ -196,7 +200,7 @@ export default function Parents() {
       try {
         await deleteUser(userData.userId);
         toast.success('Parent deleted successfully');
-        loadParents();
+        loadParents(currentPage, pageSize, searchTerm);
       } catch (error) {
         toast.error('Failed to delete parent');
       } finally {
@@ -227,17 +231,7 @@ export default function Parents() {
     setEditMode(false);
   };
 
-  const filteredParents = useMemo(() => {
-    if (!searchTerm) return parents;
-    return parents.filter(parent => 
-      parent.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [parents, searchTerm]);
+  const filteredParents = parents;
 
   const columns = useMemo(() => [
     { headerName: 'Name', field: 'fullName', sortable: true },
@@ -266,7 +260,10 @@ export default function Parents() {
           type="text"
           placeholder="Search parents..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         />
         <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,6 +298,15 @@ export default function Parents() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
         />
 
         {showModal && (

@@ -8,6 +8,9 @@ import apiClient from '../Auth/base'
 export default function CollectPayment() {
   const { organizationId } = useSelector((state) => state.auth)
   const [payments, setPayments] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -15,6 +18,7 @@ export default function CollectPayment() {
   
   const [students, setStudents] = useState([])
   const [filteredStudents, setFilteredStudents] = useState([])
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
   const [paymentMethods, setPaymentMethods] = useState([])
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
@@ -29,23 +33,26 @@ export default function CollectPayment() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    loadPayments()
+    loadPayments(currentPage, pageSize, paymentSearchTerm)
+  }, [currentPage, pageSize, paymentSearchTerm])
+
+  useEffect(() => {
     loadStudents()
     loadPaymentMethods()
   }, [])
 
   const handlePaymentSearch = (e) => {
-    const value = e.target.value
-    setPaymentSearchTerm(value)
-    loadPayments(value)
+    setPaymentSearchTerm(e.target.value)
+    setCurrentPage(1)
   }
 
-  const loadPayments = async (search = '') => {
+  const loadPayments = async (page = 1, size = 10, search = '') => {
     setLoading(true)
     try {
-      const response = await apiClient.get(`/admin/fees/payments?page=1&size=1000${search ? `&search=${search}` : ''}`)
+      const response = await apiClient.get(`/admin/fees/payments?page=${page}&size=${size}${search ? `&search=${search}` : ''}`)
       if (response.data.success) {
-        setPayments(response.data.data || [])
+        setPayments(response.data.data?.payments || response.data.data || [])
+        setTotalCount(response.data.data?.totalCount || response.data.totalCount || response.data.data?.length || 0)
       }
     } catch (error) {
       console.error('Failed to load payments:', error)
@@ -101,7 +108,7 @@ export default function CollectPayment() {
     { field: 'PaymentDate', headerName: 'Payment Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
     { field: 'ReferenceNo', headerName: 'Reference No' },
     { field: 'AllocatedAmount', headerName: 'Allocated', valueFormatter: (params) => `₹ ${params.value || 0}` },
-    { field: 'UnallocatedAmount', headerName: 'Unallocated', valueFormatter: (params) => `₹ ${params.value || 0}` }
+    { field: 'UnAllocatedAmount', headerName: 'Unallocated', valueFormatter: (params) => `₹ ${params.value || 0}` }
   ], [])
 
   const validate = () => {
@@ -127,6 +134,7 @@ export default function CollectPayment() {
     })
     setSearchTerm('')
     setFilteredStudents([])
+    setStudentDropdownOpen(false)
     setSelectedPaymentMethod(null)
     setErrors({})
   }
@@ -157,7 +165,7 @@ export default function CollectPayment() {
         }
         setShowModal(false)
         resetForm()
-        loadPayments()
+        loadPayments(currentPage, pageSize, paymentSearchTerm)
       } else {
         toast.error(response.data.message || 'Failed to collect payment')
       }
@@ -207,6 +215,12 @@ export default function CollectPayment() {
           columnDefs={cols}
           rowData={payments}
           toolbar={toolbar}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
         />
 
         {showModal && (
@@ -232,41 +246,49 @@ export default function CollectPayment() {
                       type="text"
                       placeholder="Search and select student..."
                       value={searchTerm}
+                      onFocus={() => {
+                        setFilteredStudents(students)
+                        setStudentDropdownOpen(true)
+                      }}
+                      onBlur={() => setTimeout(() => setStudentDropdownOpen(false), 150)}
                       onChange={(e) => {
                         const value = e.target.value
                         setSearchTerm(value)
-                        const filtered = students.filter(student => 
-                          student.studentName.toLowerCase().includes(value.toLowerCase()) ||
-                          student.admissionNo.toLowerCase().includes(value.toLowerCase())
+                        setForm(f => ({...f, studentId: 0}))
+                        setFilteredStudents(
+                          value
+                            ? students.filter(s =>
+                                s.studentName.toLowerCase().includes(value.toLowerCase()) ||
+                                s.admissionNo.toLowerCase().includes(value.toLowerCase())
+                              )
+                            : students
                         )
-                        setFilteredStudents(filtered)
+                        setStudentDropdownOpen(true)
                       }}
                       className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                         errors.studentId ? 'border-red-500' : 'border-slate-300'
                       }`}
                     />
-                    {filteredStudents.length > 0 && searchTerm && form.studentId === 0 && (
+                    {studentDropdownOpen && (
                       <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {filteredStudents.map(student => (
+                        {filteredStudents.length > 0 ? filteredStudents.map(student => (
                           <button
                             key={student.studentId}
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => {
                               setForm(f => ({...f, studentId: student.studentId}))
                               setSearchTerm(student.studentName)
-                              setFilteredStudents([])
+                              setStudentDropdownOpen(false)
                             }}
                             className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
                           >
                             <div className="font-medium">{student.studentName}</div>
                             <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
                           </button>
-                        ))}
-                      </div>
-                    )}
-                    {searchTerm && filteredStudents.length === 0 && form.studentId === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg p-3">
-                        <p className="text-sm text-slate-500">No students found</p>
+                        )) : (
+                          <div className="p-3"><p className="text-sm text-slate-500">No students found</p></div>
+                        )}
                       </div>
                     )}
                   </div>

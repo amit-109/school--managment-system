@@ -8,21 +8,26 @@ import apiClient from '../Auth/base'
 export default function Invoices() {
   const { organizationId } = useSelector((state) => state.auth)
   const [invoices, setInvoices] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [invoiceDetail, setInvoiceDetail] = useState(null)
 
   useEffect(() => {
-    loadInvoices()
-  }, [])
+    loadInvoices(currentPage, pageSize, searchTerm)
+  }, [currentPage, pageSize, searchTerm])
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (page = 1, size = 10, search = '') => {
     setLoading(true)
     try {
-      const response = await apiClient.get('/admin/fees/invoices?page=1&size=1000')
+      const response = await apiClient.get(`/admin/fees/invoices?page=${page}&size=${size}${search ? `&search=${search}` : ''}`)
       if (response.data.success) {
-        setInvoices(response.data.data || [])
+        setInvoices(response.data.data?.invoices || response.data.data || [])
+        setTotalCount(response.data.data?.totalCount || response.data.data?.length || 0)
       }
     } catch (error) {
       console.error('Failed to load invoices:', error)
@@ -263,8 +268,20 @@ export default function Invoices() {
 
   const toolbar = (
     <div className="flex gap-2">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search invoices..."
+          value={searchTerm}
+          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
+        />
+        <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
       <button
-        onClick={loadInvoices}
+        onClick={() => loadInvoices(currentPage, pageSize, searchTerm)}
         className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,6 +307,12 @@ export default function Invoices() {
           toolbar={toolbar}
           onView={handleView}
           onPrint={handlePrint}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={(page) => setCurrentPage(page)}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
         />
 
         {/* Invoice Detail Modal */}

@@ -30,6 +30,8 @@ export default function UserManagement() {
   const [admissionNoError, setAdmissionNoError] = useState('');
   const [originalAdmissionNo, setOriginalAdmissionNo] = useState('');
   const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [form, setForm] = useState({
     userId: 0,
@@ -56,26 +58,31 @@ export default function UserManagement() {
   useEffect(() => {
     loadRoles();
     loadClasses();
-    loadUsers(searchTerm, roleFilter !== 'All' ? roleFilter : '');
   }, []);
+
+  useEffect(() => {
+    loadUsers(currentPage, pageSize, searchTerm, roleFilter !== 'All' ? roleFilter : '');
+  }, [currentPage, pageSize, searchTerm, roleFilter]);
 
   // Note: We use client-side filtering with filteredUsers instead of API calls
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
+    setCurrentPage(1);
   };
 
   const handleRoleFilterChange = (value) => {
     setRoleFilter(value);
+    setCurrentPage(1);
   };
 
-  const loadUsers = async (search = '', filter = '') => {
+  const loadUsers = async (pageNumber = 1, size = 10, search = '', filter = '') => {
     setLoading(true);
     try {
-      const response = await getUsers(1, 10000, search, filter);
+      const response = await getUsers(pageNumber, size, search, filter);
       if (response.success) {
         setUsers(response.data?.users || []);
-        setTotalCount(response.data?.totalCount || 0);
+        setTotalCount(response.data?.totalCount || response.data?.users?.length || 0);
       }
     } catch (error) {
       toast.error('Failed to load users');
@@ -247,7 +254,7 @@ export default function UserManagement() {
       
       setShowModal(false);
       resetForm();
-      loadUsers();
+      loadUsers(currentPage, pageSize, searchTerm, roleFilter !== 'All' ? roleFilter : '');
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save user';
       toast.error(errorMessage);
@@ -313,7 +320,7 @@ export default function UserManagement() {
     try {
       await deleteUser(userData.userId);
       toast.success('User deleted successfully');
-      loadUsers();
+      loadUsers(currentPage, pageSize, searchTerm, roleFilter !== 'All' ? roleFilter : '');
     } catch (error) {
       toast.error('Failed to delete user');
     } finally {
@@ -432,33 +439,7 @@ export default function UserManagement() {
     roles.filter((role) => role?.roleName?.toLowerCase() !== 'parent')
   ), [roles]);
 
-  // Filter users based on role filter and search term
-  const filteredUsers = useMemo(() => {
-    let filtered = users;
-    
-    // Filter by role
-    if (roleFilter !== 'All') {
-      filtered = filtered.filter(user => user.roleName === roleFilter);
-    }
-    
-    // Filter by search term
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(user =>
-        (user.fullName || '').toLowerCase().includes(searchLower) ||
-        (user.username || '').toLowerCase().includes(searchLower) ||
-        (user.email || '').toLowerCase().includes(searchLower) ||
-        (user.phone || '').toLowerCase().includes(searchLower) ||
-        (user.roleName || '').toLowerCase().includes(searchLower) ||
-        (user.gender || '').toLowerCase().includes(searchLower) ||
-        (user.category || '').toLowerCase().includes(searchLower) ||
-        (user.fatherName || '').toLowerCase().includes(searchLower) ||
-        (user.motherName || '').toLowerCase().includes(searchLower)
-      );
-    }
-    
-    return filtered;
-  }, [users, roleFilter, searchTerm]);
+  const filteredUsers = users;
 
   const columns = useMemo(() => [
     {
@@ -839,6 +820,15 @@ export default function UserManagement() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
         />
 
         {/* Add/Edit Modal */}
