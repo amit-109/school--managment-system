@@ -30,7 +30,7 @@ const Dashboard: FC<DashboardProps> = ({ role }) => {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [accessToken]);
 
   const loadDashboardData = async () => {
     setLoading(true);

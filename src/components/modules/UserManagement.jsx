@@ -4,13 +4,15 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getParents, getClasses, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
+
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
 
 export default function UserManagement() {
   const { permissions } = useSelector((state) => state.auth);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [parents, setParents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -39,13 +41,15 @@ export default function UserManagement() {
     occupation: '',
     address: '',
     admissionNo: '',
-    parentId: 0,
-    classId: 0
+    fatherName: '',
+    motherName: '',
+    classId: 0,
+    gender: '',
+    category: ''
   });
 
   useEffect(() => {
     loadRoles();
-    loadParents();
     loadClasses();
     loadUsers(searchTerm, roleFilter !== 'All' ? roleFilter : '');
   }, []);
@@ -83,25 +87,6 @@ export default function UserManagement() {
       }
     } catch (error) {
       console.error('Failed to load roles:', error);
-    }
-  };
-
-  const loadParents = async () => {
-    // Always set dummy data first
-    setParents([
-      { userId: 1, firstName: 'John', lastName: 'Smith' },
-      { userId: 2, firstName: 'Sarah', lastName: 'Johnson' },
-      { userId: 3, firstName: 'Michael', lastName: 'Brown' }
-    ]);
-    
-    try {
-      const response = await getParents();
-
-      if (response.success && response.data?.users?.length > 0) {
-        setParents(response.data.users);
-      }
-    } catch (error) {
-      console.error('Failed to load parents:', error);
     }
   };
 
@@ -205,8 +190,11 @@ export default function UserManagement() {
       occupation: userData.occupation,
       address: userData.address,
       admissionNo: userData.admissionNo,
-      parentId: userData.parentId || 0,
-      classId: userData.classId || 0
+      fatherName: userData.fatherName || '',
+      motherName: userData.motherName || '',
+      classId: userData.classId || 0,
+      gender: userData.gender || '',
+      category: userData.category || ''
     });
     setSelectedRole(userData.roleName);
     setOriginalEmail(email);
@@ -245,8 +233,11 @@ export default function UserManagement() {
       occupation: '',
       address: '',
       admissionNo: '',
-      parentId: 0,
-      classId: 0
+      fatherName: '',
+      motherName: '',
+      classId: 0,
+      gender: '',
+      category: ''
     });
     setSelectedRole('');
     setEmailError('');
@@ -273,10 +264,14 @@ export default function UserManagement() {
           'Phone': user.phone || '',
           'Status': user.status,
           'Admission No': user.admissionNo || '',
+          'Father Name': user.fatherName || '',
+          'Mother Name': user.motherName || '',
           'Qualification': user.qualification || '',
           'Designation': user.designation || '',
           'Salary': user.salary || '',
           'Occupation': user.occupation || '',
+          'Gender': user.gender || '',
+          'Category': user.category || '',
           'Address': user.address || ''
         }));
 
@@ -302,28 +297,32 @@ export default function UserManagement() {
   };
 
   const getFieldsForRole = (role) => {
-    const commonFields = ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber', 'address'];
-    
+    const baseFields = ['firstName', 'lastName', 'username', 'email', 'password'];
+
     switch (role) {
       case 'Teacher':
-        return [...commonFields, 'qualification', 'designation', 'salary'];
+        return [...baseFields, 'phoneNumber', 'gender', 'category', 'qualification', 'designation', 'salary', 'address'];
       case 'Student':
-        return [...commonFields, 'admissionNo', 'parentId', 'classId'];
+        return [...baseFields, 'admissionNo', 'fatherName', 'motherName', 'gender', 'category', 'classId', 'phoneNumber', 'address'];
       case 'Parent':
-        return [...commonFields, 'occupation'];
+        return [...baseFields, 'phoneNumber', 'gender', 'category', 'occupation', 'address'];
       default:
-        return commonFields;
+        return [...baseFields, 'phoneNumber', 'gender', 'category', 'address'];
     }
   };
 
   const isFieldRequired = (field, role) => {
     const requiredFields = {
       Teacher: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber'],
-      Student: ['firstName', 'lastName', 'username', 'email', 'password', 'admissionNo', 'parentId', 'classId'],
+      Student: ['firstName', 'lastName', 'username', 'password', 'admissionNo', 'classId'],
       Parent: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber']
     };
     return requiredFields[role]?.includes(field) || false;
   };
+
+  const selectableRoles = useMemo(() => (
+    roles.filter((role) => role?.roleName?.toLowerCase() !== 'parent')
+  ), [roles]);
 
   // Filter users based on role filter and search term
   const filteredUsers = useMemo(() => {
@@ -342,7 +341,11 @@ export default function UserManagement() {
         (user.username || '').toLowerCase().includes(searchLower) ||
         (user.email || '').toLowerCase().includes(searchLower) ||
         (user.phone || '').toLowerCase().includes(searchLower) ||
-        (user.roleName || '').toLowerCase().includes(searchLower)
+        (user.roleName || '').toLowerCase().includes(searchLower) ||
+        (user.gender || '').toLowerCase().includes(searchLower) ||
+        (user.category || '').toLowerCase().includes(searchLower) ||
+        (user.fatherName || '').toLowerCase().includes(searchLower) ||
+        (user.motherName || '').toLowerCase().includes(searchLower)
       );
     }
     
@@ -414,7 +417,7 @@ export default function UserManagement() {
           className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         >
           <option value="All">All</option>
-          {roles.map(role => (
+          {selectableRoles.map(role => (
             <option key={role.roleName} value={role.roleName}>
               {role.roleName}
             </option>
@@ -456,35 +459,16 @@ export default function UserManagement() {
       designation: { label: 'Designation', type: 'text', placeholder: 'Enter designation' },
       salary: { label: 'Salary', type: 'number', placeholder: 'Enter salary' },
       occupation: { label: 'Occupation', type: 'text', placeholder: 'Enter occupation' },
+      gender: { label: 'Gender', type: 'select-gender' },
+      category: { label: 'Category', type: 'select-category' },
+      fatherName: { label: 'Father Name', type: 'text', placeholder: 'Enter father name (optional)' },
+      motherName: { label: 'Mother Name', type: 'text', placeholder: 'Enter mother name (optional)' },
       address: { label: 'Address', type: 'textarea', placeholder: 'Enter address' },
       admissionNo: { label: 'Admission Number', type: 'text', placeholder: 'Enter admission number' }
     };
 
     const config = fieldConfig[fieldName];
     if (!config) return null;
-
-    if (fieldName === 'parentId') {
-      return (
-        <div key={fieldName}>
-          <label className="block text-sm font-medium mb-1">
-            Parent {isRequired && '*'}
-          </label>
-          <select
-            required={isRequired}
-            value={form.parentId}
-            onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-          >
-            <option value="">Select Parent</option>
-            {parents.map(parent => (
-              <option key={parent.userId} value={parent.userId}>
-                {parent.firstName} {parent.lastName}
-              </option>
-            ))}
-          </select>
-        </div>
-      );
-    }
 
     if (fieldName === 'classId') {
       return (
@@ -502,6 +486,52 @@ export default function UserManagement() {
             {classes.map(cls => (
               <option key={cls.classId} value={cls.classId}>
                 {cls.className}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    if (fieldName === 'gender') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">
+            {config.label} {isRequired && '*'}
+          </label>
+          <select
+            required={isRequired}
+            value={form.gender}
+            onChange={(e) => setForm({...form, gender: e.target.value})}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          >
+            <option value="">Select gender</option>
+            {GENDER_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    if (fieldName === 'category') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">
+            {config.label} {isRequired && '*'}
+          </label>
+          <select
+            required={isRequired}
+            value={form.category}
+            onChange={(e) => setForm({...form, category: e.target.value})}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          >
+            <option value="">Select category</option>
+            {CATEGORY_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
@@ -596,7 +626,7 @@ export default function UserManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">User Management</h1>
-            <p className="text-sm text-slate-600">Manage teachers, students, and parents</p>
+            <p className="text-sm text-slate-600">Manage teachers and students</p>
           </div>
           <button
             onClick={handleExport}
@@ -639,7 +669,7 @@ export default function UserManagement() {
                     disabled={editMode}
                   >
                     <option value="">Select Role</option>
-                    {roles.map(role => (
+                    {selectableRoles.map(role => (
                       <option key={role.roleName} value={role.roleName}>
                         {role.roleName}
                       </option>
@@ -650,42 +680,6 @@ export default function UserManagement() {
                 {selectedRole && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {getFieldsForRole(selectedRole).map(field => renderField(field, selectedRole))}
-                    {selectedRole === 'Student' && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Parent *</label>
-                          <select
-                            required
-                            value={form.parentId}
-                            onChange={(e) => setForm({...form, parentId: parseInt(e.target.value) || 0})}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                          >
-                            <option value="">Select Parent</option>
-                            {parents.map(parent => (
-                              <option key={parent.userId} value={parent.userId}>
-                                {parent.firstName} {parent.lastName}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Class *</label>
-                          <select
-                            required
-                            value={form.classId}
-                            onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                          >
-                            <option value="">Select Class</option>
-                            {classes.map(cls => (
-                              <option key={cls.classId} value={cls.classId}>
-                                {cls.className}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </>
-                    )}
                   </div>
                 )}
 

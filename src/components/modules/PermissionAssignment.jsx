@@ -8,6 +8,14 @@ import {
   updateUserPermissionsForAssignment
 } from '../Services/adminService';
 
+const HIDDEN_PARENT_NAMES = new Set(['parent', 'parents']);
+const normalizeName = (value = '') => value.toString().trim().toLowerCase();
+
+const shouldHideParentPermission = (moduleName, subModuleName) => (
+  HIDDEN_PARENT_NAMES.has(normalizeName(moduleName)) ||
+  HIDDEN_PARENT_NAMES.has(normalizeName(subModuleName))
+);
+
 const PermissionAssignment = ({ onNavigate }) => {
   const { accessToken } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
@@ -99,6 +107,10 @@ const PermissionAssignment = ({ onNavigate }) => {
     
     // Group by moduleName and subModuleName
     adminPermissions.forEach(adminPerm => {
+      if (shouldHideParentPermission(adminPerm.moduleName, adminPerm.subModuleName)) {
+        return;
+      }
+
       const moduleKey = adminPerm.moduleName;
       const subModuleKey = adminPerm.subModuleName || 'General';
       const permissionType = adminPerm.permissionKey.split('.').pop(); // Get View/Create/Edit/Delete

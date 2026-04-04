@@ -7,6 +7,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   const [role, setRole] = useState('operator');
   const [expandedModules, setExpandedModules] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const disabledSubmoduleIds = new Set(['parents', 'parent']);
 
   // Update local role state when Redux userRole changes
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
           label: subModule.subModuleName,
           icon: subModuleIcons[subModule.subModuleName] || '📄',
           permissions: subModule.permissions
-        }));
+        })).filter(subModule => !disabledSubmoduleIds.has(subModule.id));
 
         // Add module if it has accessible submodules OR if it has no submodules (direct module)
         if (accessibleSubmodules.length > 0) {

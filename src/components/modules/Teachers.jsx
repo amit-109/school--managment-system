@@ -5,6 +5,9 @@ import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
 
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
+
 export default function Teachers() {
   console.log('Teachers component rendering');
   const { permissions } = useSelector((state) => state.auth);
@@ -27,7 +30,9 @@ export default function Teachers() {
     address: '',
     qualification: '',
     designation: '',
-    salary: ''
+    salary: '',
+    gender: '',
+    category: ''
   });
 
   useEffect(() => {
@@ -133,7 +138,9 @@ export default function Teachers() {
           address: teacherData.address || '',
           qualification: teacherData.qualification || '',
           designation: teacherData.designation || '',
-          salary: teacherData.salary || ''
+          salary: teacherData.salary || '',
+          gender: teacherData.gender || teacherData.teacherGender || '',
+          category: teacherData.category || teacherData.teacherCategory || ''
         });
         setOriginalEmail(email);
         setEditMode(true);
@@ -175,7 +182,9 @@ export default function Teachers() {
       address: '',
       qualification: '',
       designation: '',
-      salary: ''
+      salary: '',
+      gender: '',
+      category: ''
     });
     setEmailError('');
     setOriginalEmail('');
@@ -189,7 +198,9 @@ export default function Teachers() {
       teacher.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       teacher.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       teacher.qualification?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      teacher.designation?.toLowerCase().includes(searchTerm.toLowerCase())
+      teacher.designation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [teachers, searchTerm]);
 
@@ -409,6 +420,38 @@ export default function Teachers() {
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                       placeholder="Enter salary"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Gender</label>
+                    <select
+                      value={form.gender}
+                      onChange={(e) => setForm({...form, gender: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value="">Select gender</option>
+                      {GENDER_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Category</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({...form, category: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value="">Select category</option>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="md:col-span-2">

@@ -71,6 +71,10 @@ export default function App() {
   const { isLoading, setIsLoading } = useLoading()
 
   const handleNavigate = (tab, fromComponent = false) => {
+    if (tab === 'parents' || tab === 'parent') {
+      return;
+    }
+
     // Only redirect permission-assignment from sidebar to permission-management (user list)
     // Allow direct navigation when coming from PermissionManagement component
     if (tab === 'permission-assignment' && !fromComponent) {
@@ -262,43 +266,52 @@ export default function App() {
   const handleLogin = async ({ username, password }) => {
     try {
       const response = await dispatch(loginUserAsync({ username, password })).unwrap();
+      const authState = store.getState().auth;
+      const responseData = response?.data || response;
 
-      // Wait for Redux state to be updated and then set tokens
-      setTimeout(async () => {
-        const authState = store.getState().auth;
+      const resolvedAccessToken =
+        authState.accessToken ||
+        responseData?.accessToken ||
+        responseData?.access_token;
 
-        if (authState.accessToken && authState.refreshToken) {
-          TokenManager.getInstance().setTokens({
-            accessToken: authState.accessToken,
-            refreshToken: authState.refreshToken,
-          });
-        } else if (response.access_token && response.refresh_token) {
-          TokenManager.getInstance().setTokens({
-            access_token: response.access_token,
-            refresh_token: response.refresh_token,
-          });
-        }
+      const resolvedRefreshToken =
+        authState.refreshToken ||
+        responseData?.refreshToken ||
+        responseData?.refresh_token;
 
-        // Fetch org data after setting tokens
-        try {
-          const { apiClient } = await import('./components/Auth/base');
-          const orgResponse = await apiClient.get('/admin/org');
-          if (orgResponse.data.success) {
-            setOrgData(orgResponse.data.data);
-          }
-        } catch (orgError) {
-          console.error('Failed to fetch org data:', orgError);
-        }
+      if (!resolvedAccessToken || !resolvedRefreshToken) {
+        throw new Error('Login succeeded but token data is missing');
+      }
 
-        // Show success toast after org API completes (success or failure)
-        toast.success('Login successful!');
-      }, 100);
+      // Set TokenManager immediately before rendering protected modules.
+      TokenManager.getInstance().setTokens({
+        accessToken: resolvedAccessToken,
+        refreshToken: resolvedRefreshToken,
+        expires_in: responseData?.expires_in
+      });
 
       setUser({ username });
       setAuthenticated(true);
       setShowLanding(false);
       localStorage.setItem('lastUser', username);
       setTab('dashboard'); // Ensure we start on dashboard
+
+      // Defer org bootstrap to the next task so dashboard overview runs first.
+      setTimeout(() => {
+        (async () => {
+          try {
+            const { apiClient } = await import('./components/Auth/base');
+            const orgResponse = await apiClient.get('/admin/org');
+            if (orgResponse.data.success) {
+              setOrgData(orgResponse.data.data);
+            }
+          } catch (orgError) {
+            console.error('Failed to fetch org data:', orgError);
+          }
+        })();
+      }, 0);
+
+      toast.success('Login successful!');
     } catch (error) {
       toast.error(`Login Failed: ${error}`);
     }

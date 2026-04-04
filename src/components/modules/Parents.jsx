@@ -5,6 +5,9 @@ import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import { getUsers, createUser, updateUser, deleteUser, getParentUsers, getParentById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
 
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
+const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
+
 export default function Parents() {
   const { permissions } = useSelector((state) => state.auth);
   const [parents, setParents] = useState([]);
@@ -24,7 +27,9 @@ export default function Parents() {
     password: '',
     phoneNumber: '',
     address: '',
-    occupation: ''
+    occupation: '',
+    gender: '',
+    category: ''
   });
 
   useEffect(() => {
@@ -125,7 +130,9 @@ export default function Parents() {
           password: '',
           phoneNumber: parentData.parentPhoneNumber || '',
           address: parentData.address || '',
-          occupation: parentData.occupation || ''
+          occupation: parentData.occupation || '',
+          gender: parentData.gender || parentData.parentGender || '',
+          category: parentData.category || parentData.parentCategory || ''
         });
         setOriginalEmail(email);
         setEditMode(true);
@@ -165,7 +172,9 @@ export default function Parents() {
       password: '',
       phoneNumber: '',
       address: '',
-      occupation: ''
+      occupation: '',
+      gender: '',
+      category: ''
     });
     setEmailError('');
     setOriginalEmail('');
@@ -178,7 +187,9 @@ export default function Parents() {
       parent.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       parent.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       parent.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      parent.occupation?.toLowerCase().includes(searchTerm.toLowerCase())
+      parent.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parent.gender?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      parent.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [parents, searchTerm]);
 
@@ -365,6 +376,38 @@ export default function Parents() {
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                       placeholder="Enter occupation"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Gender</label>
+                    <select
+                      value={form.gender}
+                      onChange={(e) => setForm({...form, gender: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value="">Select gender</option>
+                      {GENDER_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Category</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({...form, category: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value="">Select category</option>
+                      {CATEGORY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   
                   <div className="md:col-span-2">

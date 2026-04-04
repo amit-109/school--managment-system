@@ -332,8 +332,25 @@ export const createStudentWithParent = async (studentParentData) => {
 
 // Get Student Users (specific endpoint for students)
 export const getStudentUsers = async (pageNumber = 1, pageSize = 100) => {
-  const response = await apiClient.get(`/admin/student-users?PageNumber=${pageNumber}&PageSize=${pageSize}`);
-  return response.data;
+  try {
+    const response = await apiClient.get(`/admin/student-users?PageNumber=${pageNumber}&PageSize=${pageSize}`);
+    return response.data;
+  } catch (error) {
+    if (error?.response?.status === 404) {
+      return {
+        success: true,
+        message: error?.response?.data?.message || 'No students found.',
+        code: error?.response?.data?.code || 'NOT_FOUND',
+        data: {
+          users: [],
+          totalCount: 0,
+          pageNumber,
+          pageSize
+        }
+      };
+    }
+    throw error;
+  }
 };
 
 // Get Student by ID (for edit functionality)
