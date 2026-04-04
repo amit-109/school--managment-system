@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
@@ -24,6 +25,10 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
+  const [admissionNoError, setAdmissionNoError] = useState('');
+  const [originalAdmissionNo, setOriginalAdmissionNo] = useState('');
   const [totalCount, setTotalCount] = useState(0);
 
   const [form, setForm] = useState({
@@ -137,9 +142,87 @@ export default function UserManagement() {
     }
   };
 
+  const checkUsernameExists = async (username) => {
+    if (!username) return;
+
+    try {
+      const response = await checkUsernameExistsAPI(username);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setUsernameError('Username already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setUsernameError('');
+      } else {
+        setUsernameError('');
+      }
+    } catch (error) {
+      console.error('Username check failed:', error);
+      setUsernameError('');
+    }
+  };
+
+  const checkAdmissionNoExists = async (admissionNo) => {
+    if (!admissionNo) return;
+
+    try {
+      const response = await checkAdmissionNoExistsAPI(admissionNo);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setAdmissionNoError('Admission number already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setAdmissionNoError('');
+      } else {
+        setAdmissionNoError('');
+      }
+    } catch (error) {
+      console.error('Admission number check failed:', error);
+      setAdmissionNoError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (usernameError) {
+      toast.error('Please fix username errors before submitting');
+      return;
+    }
+
+    if (selectedRole === 'Student' && admissionNoError) {
+      toast.error('Please fix admission number errors before submitting');
+      return;
+    }
+
     // Only check email errors if user has entered an email
     if (form.email && emailError) {
       toast.error('Please fix email errors before submitting');
@@ -175,12 +258,19 @@ export default function UserManagement() {
 
   const handleEdit = (userData) => {
     const email = userData.email || '';
+    const username = userData.username || '';
+    const admissionNo = userData.admissionNo || userData.studentAdmissionNo || '';
+    const resolvedClassId = parseInt(
+      userData.classId ?? userData.currentClassId ?? userData.studentClassId ?? 0,
+      10
+    ) || 0;
+
     setForm({
       userId: userData.userId,
       roleName: userData.roleName,
       firstName: userData.firstName,
       lastName: userData.lastName,
-      username: userData.username,
+      username: username,
       email: email,
       password: '', // Don't populate password for security
       phoneNumber: userData.phoneNumber || userData.phone,
@@ -189,31 +279,45 @@ export default function UserManagement() {
       salary: userData.salary || 0,
       occupation: userData.occupation,
       address: userData.address,
-      admissionNo: userData.admissionNo,
+      admissionNo: admissionNo,
       fatherName: userData.fatherName || '',
       motherName: userData.motherName || '',
-      classId: userData.classId || 0,
+      classId: resolvedClassId,
       gender: userData.gender || '',
       category: userData.category || ''
     });
     setSelectedRole(userData.roleName);
     setOriginalEmail(email);
+    setOriginalUsername(username);
+    setUsernameError('');
+    setOriginalAdmissionNo(admissionNo);
+    setAdmissionNoError('');
     setEditMode(true);
     setShowModal(true);
   };
 
   const handleDelete = async (userData) => {
-    if (window.confirm(`Are you sure you want to delete ${userData.fullName}?`)) {
-      setLoading(true);
-      try {
-        await deleteUser(userData.userId);
-        toast.success('User deleted successfully');
-        loadUsers();
-      } catch (error) {
-        toast.error('Failed to delete user');
-      } finally {
-        setLoading(false);
-      }
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `Delete user "${userData.fullName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete'
+    });
+
+    if (!result.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteUser(userData.userId);
+      toast.success('User deleted successfully');
+      loadUsers();
+    } catch (error) {
+      toast.error('Failed to delete user');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -242,6 +346,10 @@ export default function UserManagement() {
     setSelectedRole('');
     setEmailError('');
     setOriginalEmail('');
+    setUsernameError('');
+    setOriginalUsername('');
+    setAdmissionNoError('');
+    setOriginalAdmissionNo('');
     setEditMode(false);
   };
 
@@ -463,6 +571,7 @@ export default function UserManagement() {
       category: { label: 'Category', type: 'select-category' },
       fatherName: { label: 'Father Name', type: 'text', placeholder: 'Enter father name (optional)' },
       motherName: { label: 'Mother Name', type: 'text', placeholder: 'Enter mother name (optional)' },
+      classId: { label: 'Class', type: 'select-class' },
       address: { label: 'Address', type: 'textarea', placeholder: 'Enter address' },
       admissionNo: { label: 'Admission Number', type: 'text', placeholder: 'Enter admission number' }
     };
@@ -478,7 +587,7 @@ export default function UserManagement() {
           </label>
           <select
             required={isRequired}
-            value={form.classId}
+            value={form.classId || ''}
             onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
           >
@@ -603,6 +712,88 @@ export default function UserManagement() {
       );
     }
 
+    if (fieldName === 'username') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">
+            {config.label} {isRequired && '*'}
+          </label>
+          <input
+            type={config.type}
+            required={isRequired}
+            value={form.username}
+            onChange={(e) => {
+              const username = e.target.value;
+              setForm({...form, username});
+              setUsernameError('');
+            }}
+            onBlur={(e) => {
+              const username = e.target.value.trim();
+              if (!username) {
+                setUsernameError('');
+                return;
+              }
+              if (editMode && username === originalUsername) {
+                setUsernameError('');
+                return;
+              }
+              checkUsernameExists(username);
+            }}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+              usernameError
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+            }`}
+            placeholder={config.placeholder}
+          />
+          {usernameError && (
+            <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (fieldName === 'admissionNo') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">
+            {config.label} {isRequired && '*'}
+          </label>
+          <input
+            type={config.type}
+            required={isRequired}
+            value={form.admissionNo}
+            onChange={(e) => {
+              const admissionNo = e.target.value;
+              setForm({...form, admissionNo});
+              setAdmissionNoError('');
+            }}
+            onBlur={(e) => {
+              const admissionNo = e.target.value.trim();
+              if (!admissionNo) {
+                setAdmissionNoError('');
+                return;
+              }
+              if (editMode && admissionNo === originalAdmissionNo) {
+                setAdmissionNoError('');
+                return;
+              }
+              checkAdmissionNoExists(admissionNo);
+            }}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+              admissionNoError
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+            }`}
+            placeholder={config.placeholder}
+          />
+          {admissionNoError && (
+            <p className="text-red-500 text-sm mt-1">{admissionNoError}</p>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div key={fieldName}>
         <label className="block text-sm font-medium mb-1">
@@ -687,7 +878,7 @@ export default function UserManagement() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || !selectedRole || (form.email && emailError)}
+                    disabled={loading || !selectedRole || !!usernameError || (selectedRole === 'Student' && !!admissionNoError) || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update User' : 'Create User')}
                   </button>

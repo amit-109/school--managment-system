@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getParentUsers, getParentById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getParentUsers, getParentById, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
@@ -17,6 +17,8 @@ export default function Parents() {
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Parent',
@@ -73,9 +75,48 @@ export default function Parents() {
     }
   };
 
+  const checkUsernameExists = async (username) => {
+    if (!username) return;
+
+    try {
+      const response = await checkUsernameExistsAPI(username);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setUsernameError('Username already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setUsernameError('');
+      } else {
+        setUsernameError('');
+      }
+    } catch (error) {
+      console.error('Username check failed:', error);
+      setUsernameError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (usernameError) {
+      toast.error('Please fix username errors before submitting');
+      return;
+    }
+
     // Only check email errors if user has entered an email
     if (form.email && emailError) {
       toast.error('Please fix email errors before submitting');
@@ -120,12 +161,13 @@ export default function Parents() {
       if (response.success) {
         const parentData = response.data;
         const email = parentData.parentEmail || '';
+        const username = parentData.parentUsername || userData.username || '';
         setForm({
           userId: parentData.parentUserId,
           roleName: 'Parent',
           firstName: parentData.parentFirstName || '',
           lastName: parentData.parentLastName || '',
-          username: parentData.parentUsername || '',
+          username: username,
           email: email,
           password: '',
           phoneNumber: parentData.parentPhoneNumber || '',
@@ -135,6 +177,8 @@ export default function Parents() {
           category: parentData.category || parentData.parentCategory || ''
         });
         setOriginalEmail(email);
+        setOriginalUsername(username);
+        setUsernameError('');
         setEditMode(true);
         setShowModal(true);
       }
@@ -178,6 +222,8 @@ export default function Parents() {
     });
     setEmailError('');
     setOriginalEmail('');
+    setUsernameError('');
+    setOriginalUsername('');
     setEditMode(false);
   };
 
@@ -296,10 +342,33 @@ export default function Parents() {
                       type="text"
                       required
                       value={form.username}
-                      onChange={(e) => setForm({...form, username: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      onChange={(e) => {
+                        const username = e.target.value;
+                        setForm({...form, username});
+                        setUsernameError('');
+                      }}
+                      onBlur={(e) => {
+                        const username = e.target.value.trim();
+                        if (!username) {
+                          setUsernameError('');
+                          return;
+                        }
+                        if (editMode && username === originalUsername) {
+                          setUsernameError('');
+                          return;
+                        }
+                        checkUsernameExists(username);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        usernameError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
                       placeholder="Enter username"
                     />
+                    {usernameError && (
+                      <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -426,7 +495,7 @@ export default function Parents() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || (form.email && emailError)}
+                    disabled={loading || !!usernameError || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update Parent' : 'Create Parent')}
                   </button>

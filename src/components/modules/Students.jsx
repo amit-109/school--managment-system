@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
+import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import {
@@ -10,7 +11,9 @@ import {
   getClasses,
   getStudentUsers,
   getStudentById,
-  checkEmailExists as checkEmailExistsAPI
+  checkEmailExists as checkEmailExistsAPI,
+  checkUsernameExists as checkUsernameExistsAPI,
+  checkAdmissionNoExists as checkAdmissionNoExistsAPI
 } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
@@ -26,6 +29,10 @@ export default function Students() {
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
+  const [admissionNoError, setAdmissionNoError] = useState('');
+  const [originalAdmissionNo, setOriginalAdmissionNo] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Student',
@@ -96,8 +103,86 @@ export default function Students() {
     }
   };
 
+  const checkUsernameExists = async (username) => {
+    if (!username) return;
+
+    try {
+      const response = await checkUsernameExistsAPI(username);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setUsernameError('Username already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setUsernameError('');
+      } else {
+        setUsernameError('');
+      }
+    } catch (error) {
+      console.error('Username check failed:', error);
+      setUsernameError('');
+    }
+  };
+
+  const checkAdmissionNoExists = async (admissionNo) => {
+    if (!admissionNo) return;
+
+    try {
+      const response = await checkAdmissionNoExistsAPI(admissionNo);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setAdmissionNoError('Admission number already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setAdmissionNoError('');
+      } else {
+        setAdmissionNoError('');
+      }
+    } catch (error) {
+      console.error('Admission number check failed:', error);
+      setAdmissionNoError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (usernameError) {
+      toast.error('Please fix username errors before submitting');
+      return;
+    }
+
+    if (admissionNoError) {
+      toast.error('Please fix admission number errors before submitting');
+      return;
+    }
 
     if (form.email && emailError) {
       toast.error('Please fix email errors before submitting');
@@ -140,26 +225,36 @@ export default function Students() {
       if (response.success) {
         const studentData = response.data;
         const email = studentData.studentEmail || studentData.email || '';
+        const username = studentData.studentUsername || studentData.username || userData.username || '';
+        const admissionNo = studentData.admissionNo || userData.admissionNo || '';
+        const resolvedClassId = parseInt(
+          studentData.classId ?? studentData.currentClassId ?? studentData.studentClassId ?? 0,
+          10
+        ) || 0;
 
         setForm({
           userId: studentData.studentUserId || studentData.userId || userData.userId,
           roleName: 'Student',
           firstName: studentData.studentFirstName || studentData.firstName || '',
           lastName: studentData.studentLastName || studentData.lastName || '',
-          username: studentData.studentUsername || studentData.username || '',
+          username: username,
           email: email,
           password: '',
           phoneNumber: studentData.studentPhoneNumber || studentData.phoneNumber || studentData.phone || '',
           address: studentData.address || studentData.studentAddress || '',
-          admissionNo: studentData.admissionNo || '',
+          admissionNo: admissionNo,
           fatherName: studentData.fatherName || studentData.fayerName || studentData.studentFatherName || studentData.studentFayerName || '',
           motherName: studentData.motherName || studentData.studentMotherName || '',
-          classId: studentData.classId || 0,
+          classId: resolvedClassId,
           gender: studentData.gender || studentData.studentGender || '',
           category: studentData.category || studentData.studentCategory || ''
         });
 
         setOriginalEmail(email);
+        setOriginalUsername(username);
+        setOriginalAdmissionNo(admissionNo);
+        setUsernameError('');
+        setAdmissionNoError('');
         setEditMode(true);
         setShowModal(true);
       }
@@ -172,17 +267,27 @@ export default function Students() {
   };
 
   const handleDelete = async (userData) => {
-    if (window.confirm(`Are you sure you want to delete ${userData.fullName}?`)) {
-      setLoading(true);
-      try {
-        await deleteUser(userData.userId);
-        toast.success('Student deleted successfully');
-        loadStudents();
-      } catch (error) {
-        toast.error('Failed to delete student');
-      } finally {
-        setLoading(false);
-      }
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `Delete student "${userData.fullName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete'
+    });
+
+    if (!result.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteUser(userData.userId);
+      toast.success('Student deleted successfully');
+      loadStudents();
+    } catch (error) {
+      toast.error('Failed to delete student');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -206,6 +311,10 @@ export default function Students() {
     });
     setEmailError('');
     setOriginalEmail('');
+    setUsernameError('');
+    setOriginalUsername('');
+    setAdmissionNoError('');
+    setOriginalAdmissionNo('');
     setEditMode(false);
   };
 
@@ -330,10 +439,33 @@ export default function Students() {
                       type="text"
                       required
                       value={form.username}
-                      onChange={(e) => setForm({...form, username: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      onChange={(e) => {
+                        const username = e.target.value;
+                        setForm({...form, username});
+                        setUsernameError('');
+                      }}
+                      onBlur={(e) => {
+                        const username = e.target.value.trim();
+                        if (!username) {
+                          setUsernameError('');
+                          return;
+                        }
+                        if (editMode && username === originalUsername) {
+                          setUsernameError('');
+                          return;
+                        }
+                        checkUsernameExists(username);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        usernameError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
                       placeholder="Enter username"
                     />
+                    {usernameError && (
+                      <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+                    )}
                   </div>
 
                   <div>
@@ -395,10 +527,33 @@ export default function Students() {
                       type="text"
                       required
                       value={form.admissionNo}
-                      onChange={(e) => setForm({...form, admissionNo: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      onChange={(e) => {
+                        const admissionNo = e.target.value;
+                        setForm({...form, admissionNo});
+                        setAdmissionNoError('');
+                      }}
+                      onBlur={(e) => {
+                        const admissionNo = e.target.value.trim();
+                        if (!admissionNo) {
+                          setAdmissionNoError('');
+                          return;
+                        }
+                        if (editMode && admissionNo === originalAdmissionNo) {
+                          setAdmissionNoError('');
+                          return;
+                        }
+                        checkAdmissionNoExists(admissionNo);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        admissionNoError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
                       placeholder="Enter admission number"
                     />
+                    {admissionNoError && (
+                      <p className="text-red-500 text-sm mt-1">{admissionNoError}</p>
+                    )}
                   </div>
 
                   <div>
@@ -499,7 +654,7 @@ export default function Students() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || (form.email && emailError)}
+                    disabled={loading || !!usernameError || !!admissionNoError || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update Student' : 'Create Student')}
                   </button>

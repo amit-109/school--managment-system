@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
+import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
-import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById, checkEmailExists as checkEmailExistsAPI } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
@@ -18,6 +19,8 @@ export default function Teachers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [originalUsername, setOriginalUsername] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Teacher',
@@ -79,9 +82,48 @@ export default function Teachers() {
     }
   };
 
+  const checkUsernameExists = async (username) => {
+    if (!username) return;
+
+    try {
+      const response = await checkUsernameExistsAPI(username);
+      const message = String(response?.message || response?.data?.message || '').toLowerCase();
+      const hasExistsMessage = message.includes('exist') || message.includes('already') || message.includes('taken');
+      const hasAvailableMessage = message.includes('available') || message.includes('not exist');
+      const isTakenByFlag =
+        response?.success === true ||
+        response?.exists === true ||
+        response?.data?.exists === true ||
+        response?.isAvailable === false ||
+        response?.available === false;
+      const isAvailableByFlag =
+        response?.success === false ||
+        response?.exists === false ||
+        response?.data?.exists === false ||
+        response?.isAvailable === true ||
+        response?.available === true;
+
+      if (hasExistsMessage || (isTakenByFlag && !hasAvailableMessage)) {
+        setUsernameError('Username already exists in system');
+      } else if (hasAvailableMessage || isAvailableByFlag) {
+        setUsernameError('');
+      } else {
+        setUsernameError('');
+      }
+    } catch (error) {
+      console.error('Username check failed:', error);
+      setUsernameError('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (usernameError) {
+      toast.error('Please fix username errors before submitting');
+      return;
+    }
+
     // Only check email errors if user has entered an email
     if (form.email && emailError) {
       toast.error('Please fix email errors before submitting');
@@ -126,12 +168,13 @@ export default function Teachers() {
       if (response.success) {
         const teacherData = response.data;
         const email = teacherData.teacherEmail || '';
+        const username = teacherData.teacherUsername || userData.username || '';
         setForm({
           userId: teacherData.teacherUserId,
           roleName: 'Teacher',
           firstName: teacherData.teacherFirstName || '',
           lastName: teacherData.teacherLastName || '',
-          username: teacherData.teacherUsername || '',
+          username: username,
           email: email,
           password: '',
           phoneNumber: teacherData.teacherPhoneNumber || '',
@@ -143,6 +186,8 @@ export default function Teachers() {
           category: teacherData.category || teacherData.teacherCategory || ''
         });
         setOriginalEmail(email);
+        setOriginalUsername(username);
+        setUsernameError('');
         setEditMode(true);
         setShowModal(true);
       }
@@ -155,17 +200,27 @@ export default function Teachers() {
   };
 
   const handleDelete = async (userData) => {
-    if (window.confirm(`Are you sure you want to delete ${userData.fullName}?`)) {
-      setLoading(true);
-      try {
-        await deleteUser(userData.userId);
-        toast.success('Teacher deleted successfully');
-        loadTeachers();
-      } catch (error) {
-        toast.error('Failed to delete teacher');
-      } finally {
-        setLoading(false);
-      }
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `Delete teacher "${userData.fullName}"? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete'
+    });
+
+    if (!result.isConfirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteUser(userData.userId);
+      toast.success('Teacher deleted successfully');
+      loadTeachers();
+    } catch (error) {
+      toast.error('Failed to delete teacher');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -188,6 +243,8 @@ export default function Teachers() {
     });
     setEmailError('');
     setOriginalEmail('');
+    setUsernameError('');
+    setOriginalUsername('');
     setEditMode(false);
   };
 
@@ -316,10 +373,33 @@ export default function Teachers() {
                       type="text"
                       required
                       value={form.username}
-                      onChange={(e) => setForm({...form, username: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      onChange={(e) => {
+                        const username = e.target.value;
+                        setForm({...form, username});
+                        setUsernameError('');
+                      }}
+                      onBlur={(e) => {
+                        const username = e.target.value.trim();
+                        if (!username) {
+                          setUsernameError('');
+                          return;
+                        }
+                        if (editMode && username === originalUsername) {
+                          setUsernameError('');
+                          return;
+                        }
+                        checkUsernameExists(username);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+                        usernameError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
+                      }`}
                       placeholder="Enter username"
                     />
+                    {usernameError && (
+                      <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -470,7 +550,7 @@ export default function Teachers() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || (form.email && emailError)}
+                    disabled={loading || !!usernameError || (form.email && emailError)}
                   >
                     {loading ? 'Saving...' : (editMode ? 'Update Teacher' : 'Create Teacher')}
                   </button>

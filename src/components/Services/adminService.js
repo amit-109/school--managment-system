@@ -400,3 +400,15 @@ export const checkEmailExists = async (email) => {
   const response = await apiClient.get(`/admin/email-check?email=${encodeURIComponent(email)}`);
   return response.data;
 };
+
+// Username Check API
+export const checkUsernameExists = async (username) => {
+  const response = await apiClient.get(`/admin/username-check?userName=${encodeURIComponent(username)}`);
+  return response.data;
+};
+
+// Admission Number Check API
+export const checkAdmissionNoExists = async (admissionNo) => {
+  const response = await apiClient.get(`/admin/admissionno-check?admissionNo=${encodeURIComponent(admissionNo)}`);
+  return response.data;
+};
