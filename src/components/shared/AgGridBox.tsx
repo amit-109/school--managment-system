@@ -157,9 +157,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   const autoSizeAll = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
-    const allIds: string[] = [];
-    api.getColumns()?.forEach(c => allIds.push(c.getId()));
-    api.autoSizeColumns(allIds, false);
+    api.sizeColumnsToFit();
   }, []);
 
   return (
@@ -176,16 +174,6 @@ const AgGridBox: FC<AgGridBoxProps> = ({
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {toolbar}
-          <button
-            onClick={autoSizeAll}
-            className="px-3 sm:px-4 py-2 text-sm btn-secondary font-medium flex items-center gap-2 min-h-[40px] sm:min-h-[44px]"
-            title="Auto-resize columns"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            <span className="hidden sm:inline">Auto-fit</span>
-          </button>
         </div>
       </header>
       <div className="p-3 sm:p-6">
