@@ -32,12 +32,6 @@ class TokenManager {
     if (!this.tokens) {
       this.loadFromStorage();
     }
-
-    if (this.tokens && this.isTokenExpired()) {
-      this.refreshAccessToken();
-      return null; // will be available after refresh
-    }
-
     return this.tokens?.accessToken || null;
   }
 
