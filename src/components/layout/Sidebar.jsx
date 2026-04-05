@@ -8,6 +8,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   const [expandedModules, setExpandedModules] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const disabledSubmoduleIds = new Set(['parents', 'parent']);
+  const hiddenModuleIds = new Set(['subject-management']);
 
   // Update local role state when Redux userRole changes
   useEffect(() => {
@@ -109,6 +110,11 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     // Process permissions to create module structure
     if (permissions && Array.isArray(permissions)) {
       permissions.forEach(module => {
+        const moduleId = module.moduleName.toLowerCase().replace(/\s+/g, '-');
+        if (hiddenModuleIds.has(moduleId)) {
+          return;
+        }
+
         // Filter submodules that have at least one permission granted
         const accessibleSubmodules = module.subModules.filter(subModule => {
           return subModule.permissions.some(permission => 
@@ -124,7 +130,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
         // Add module if it has accessible submodules OR if it has no submodules (direct module)
         if (accessibleSubmodules.length > 0) {
           const moduleItem = {
-            id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
+            id: moduleId,
             label: module.moduleName,
             icon: moduleIcons[module.moduleName] || '📁',
             hasSubmodules: true,
@@ -134,7 +140,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
         } else if (module.subModules.length === 0) {
           // Module with no submodules - add as direct menu item
           const moduleItem = {
-            id: module.moduleName.toLowerCase().replace(/\s+/g, '-'),
+            id: moduleId,
             label: module.moduleName,
             icon: moduleIcons[module.moduleName] || '📁',
             hasSubmodules: false
