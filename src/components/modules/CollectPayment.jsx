@@ -22,6 +22,8 @@ export default function CollectPayment() {
   const [paymentMethods, setPaymentMethods] = useState([])
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
   const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
+  const [invoices, setInvoices] = useState([])
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
   
   const [form, setForm] = useState({
     studentId: 0,
@@ -64,7 +66,7 @@ export default function CollectPayment() {
 
   const loadStudents = async () => {
     try {
-      const response = await apiClient.get('/admin/fees/students?page=1&pageSize=1000')
+      const response = await apiClient.get('/admin/fees/students')
       if (response.data.success) {
         const studentData = response.data.data.data || []
         setStudents(studentData)
@@ -72,6 +74,21 @@ export default function CollectPayment() {
       }
     } catch (error) {
       console.error('Failed to load students:', error)
+    }
+  }
+
+  const loadStudentInvoices = async (userId) => {
+    setLoadingInvoices(true)
+    setInvoices([])
+    try {
+      const response = await apiClient.get(`/admin/fees/invoice/${userId}`)
+      if (response.data.success) {
+        setInvoices(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load invoices:', error)
+    } finally {
+      setLoadingInvoices(false)
     }
   }
 
@@ -136,6 +153,7 @@ export default function CollectPayment() {
     setFilteredStudents([])
     setStudentDropdownOpen(false)
     setSelectedPaymentMethod(null)
+    setInvoices([])
     setErrors({})
   }
 
@@ -280,6 +298,7 @@ export default function CollectPayment() {
                               setForm(f => ({...f, studentId: student.studentId}))
                               setSearchTerm(student.studentName)
                               setStudentDropdownOpen(false)
+                              loadStudentInvoices(student.userId)
                             }}
                             className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
                           >
@@ -295,7 +314,53 @@ export default function CollectPayment() {
                   {errors.studentId && <p className="text-red-500 text-xs mt-1">{errors.studentId}</p>}
                 </div>
 
-
+                {/* Invoices */}
+                {form.studentId > 0 && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Available Invoices</label>
+                    {loadingInvoices ? (
+                      <div className="flex items-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
+                        <span className="text-sm text-slate-500">Loading invoices...</span>
+                      </div>
+                    ) : invoices.length > 0 ? (
+                      <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50 dark:bg-slate-700">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Invoice No</th>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Due Date</th>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Net Payable</th>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Paid</th>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Balance</th>
+                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {invoices.map((inv, i) => (
+                              <tr key={inv.InvoiceId || i} className="border-t border-slate-200 dark:border-slate-600">
+                                <td className="px-3 py-2">{inv.InvoiceNo}</td>
+                                <td className="px-3 py-2">{new Date(inv.DueDate).toLocaleDateString()}</td>
+                                <td className="px-3 py-2">₹{inv.NetPayable}</td>
+                                <td className="px-3 py-2">₹{inv.PaidAmount}</td>
+                                <td className="px-3 py-2">₹{inv.BalanceAmount}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-xs ${
+                                    inv.Status === 'Paid' ? 'bg-green-100 text-green-700' :
+                                    inv.Status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-700'
+                                  }`}>{inv.Status}</span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="px-3 py-3 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-500">No invoices found for this student</div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Payment Mode</label>
@@ -433,8 +498,8 @@ export default function CollectPayment() {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium min-h-[44px]"
-                  disabled={loading}
+                  className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || invoices.length === 0}
                 >
                   {loading ? 'Processing...' : 'Collect Payment'}
                 </button>

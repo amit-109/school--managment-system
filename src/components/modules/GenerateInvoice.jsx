@@ -34,14 +34,12 @@ export default function GenerateInvoice() {
   const loadDropdownData = async () => {
     try {
       const [studentsRes, dropdownsRes] = await Promise.all([
-        apiClient.get('/admin/fees/students?page=1&pageSize=1000'),
+        apiClient.get('/admin/fees/students'),
         apiClient.get('/admin/fees/dropdowns')
       ])
       
       if (studentsRes.data.success) {
-        const studentData = studentsRes.data.data.data || []
-        setStudents(studentData)
-        setFilteredStudents(studentData)
+        setStudents(studentsRes.data.data.data || [])
       }
       
       if (dropdownsRes.data.success) {
@@ -78,6 +76,7 @@ export default function GenerateInvoice() {
     })
     setErrors({})
     setSearchTerm('')
+    setFilteredStudents([])
     setStudentDropdownOpen(false)
   }
 
@@ -124,36 +123,62 @@ export default function GenerateInvoice() {
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium mb-2">Class *</label>
+              <select
+                value={form.classId}
+                onChange={(e) => {
+                  const classId = parseInt(e.target.value) || 0
+                  setForm(f => ({...f, classId, studentId: 0}))
+                  setSearchTerm('')
+                  const classStudents = classId
+                    ? students.filter(s => s.currentClassId === classId)
+                    : []
+                  setFilteredStudents(classStudents)
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                  errors.classId ? 'border-red-500' : 'border-slate-300'
+                }`}
+              >
+                <option value="">Select Class</option>
+                {classes.map(cls => (
+                  <option key={cls.classId} value={cls.classId}>
+                    {cls.className}
+                  </option>
+                ))}
+              </select>
+              {errors.classId && <p className="text-red-500 text-xs mt-1">{errors.classId}</p>}
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-2">Student *</label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search and select student..."
+                  placeholder={form.classId ? 'Search and select student...' : 'Select class first'}
+                  disabled={!form.classId}
                   value={searchTerm}
-                  onFocus={() => {
-                    setFilteredStudents(students)
-                    setStudentDropdownOpen(true)
-                  }}
+                  onFocus={() => setStudentDropdownOpen(true)}
                   onBlur={() => setTimeout(() => setStudentDropdownOpen(false), 150)}
                   onChange={(e) => {
                     const value = e.target.value
                     setSearchTerm(value)
                     setForm(f => ({...f, studentId: 0}))
+                    const classStudents = students.filter(s => s.currentClassId === form.classId)
                     setFilteredStudents(
                       value
-                        ? students.filter(s =>
+                        ? classStudents.filter(s =>
                             s.studentName.toLowerCase().includes(value.toLowerCase()) ||
                             s.admissionNo.toLowerCase().includes(value.toLowerCase())
                           )
-                        : students
+                        : classStudents
                     )
                     setStudentDropdownOpen(true)
                   }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.studentId ? 'border-red-500' : 'border-slate-300'
                   }`}
                 />
-                {studentDropdownOpen && (
+                {studentDropdownOpen && form.classId > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {filteredStudents.length > 0 ? filteredStudents.map(student => (
                       <button
@@ -171,7 +196,7 @@ export default function GenerateInvoice() {
                         <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
                       </button>
                     )) : (
-                      <div className="p-3"><p className="text-sm text-slate-500">No students found</p></div>
+                      <div className="p-3"><p className="text-sm text-slate-500">No students found for this class</p></div>
                     )}
                   </div>
                 )}
@@ -180,29 +205,20 @@ export default function GenerateInvoice() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Class *</label>
-              <select
-                value={form.classId}
-                onChange={(e) => setForm(f => ({...f, classId: parseInt(e.target.value) || 0}))}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.classId ? 'border-red-500' : 'border-slate-300'
-                }`}
-              >
-                <option value="">Select Class</option>
-                {classes.map(cls => (
-                  <option key={cls.classId} value={cls.classId}>
-                    {cls.className}
-                  </option>
-                ))}
-              </select>
-              {errors.classId && <p className="text-red-500 text-xs mt-1">{errors.classId}</p>}
-            </div>
-
-            <div>
               <label className="block text-sm font-medium mb-2">Term *</label>
               <select
                 value={form.termId}
-                onChange={(e) => setForm(f => ({...f, termId: parseInt(e.target.value) || 0}))}
+                onChange={(e) => {
+                  const termId = parseInt(e.target.value) || 0
+                  const term = terms.find(t => t.termId === termId)
+                  let dueDate = ''
+                  if (term?.startMonth) {
+                    const year = new Date().getFullYear()
+                    const d = new Date(year, term.startMonth, 0)
+                    dueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                  }
+                  setForm(f => ({...f, termId, dueDate}))
+                }}
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                   errors.termId ? 'border-red-500' : 'border-slate-300'
                 }`}
@@ -237,16 +253,13 @@ export default function GenerateInvoice() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Invoice Date *</label>
+              <label className="block text-sm font-medium mb-2">Invoice Date</label>
               <input
                 type="date"
                 value={form.invoiceDate}
-                onChange={(e) => setForm(f => ({...f, invoiceDate: e.target.value}))}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.invoiceDate ? 'border-red-500' : 'border-slate-300'
-                }`}
+                readOnly
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-600 cursor-not-allowed text-slate-500 dark:text-slate-400"
               />
-              {errors.invoiceDate && <p className="text-red-500 text-xs mt-1">{errors.invoiceDate}</p>}
             </div>
 
             <div>
@@ -254,9 +267,9 @@ export default function GenerateInvoice() {
               <input
                 type="date"
                 value={form.dueDate}
-                onChange={(e) => setForm(f => ({...f, dueDate: e.target.value}))}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.dueDate ? 'border-red-500' : 'border-slate-300'
+                readOnly
+                className={`w-full px-3 py-2 border rounded-lg bg-slate-100 dark:bg-slate-600 cursor-not-allowed text-slate-500 dark:text-slate-400 ${
+                  errors.dueDate ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'
                 }`}
               />
               {errors.dueDate && <p className="text-red-500 text-xs mt-1">{errors.dueDate}</p>}
