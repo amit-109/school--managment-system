@@ -46,7 +46,7 @@ export default function GenerateInvoice() {
         const data = dropdownsRes.data.data
         setClasses(data.classes || [])
         setTerms(data.terms || [])
-        setSessions(data.sessions || [])
+        setSessions((data.sessions || []).filter(s => s.isActive))
       }
     } catch (error) {
       console.error('Failed to load dropdown data:', error)

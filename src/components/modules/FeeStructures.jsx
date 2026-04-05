@@ -73,7 +73,7 @@ export default function FeeStructures() {
         const data = response.data.data
         setFeeTypes(data.feeTypes || [])
         setTerms(data.terms || [])
-        setSessions(data.sessions || [])
+        setSessions((data.sessions || []).filter(s => s.isActive))
         setClasses(data.classes || [])
       }
     } catch (error) {

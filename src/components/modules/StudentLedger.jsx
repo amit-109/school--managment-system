@@ -24,7 +24,7 @@ export default function StudentLedger() {
 
   const loadStudents = async () => {
     try {
-      const response = await apiClient.get('/admin/fees/students?page=1&pageSize=10000');
+      const response = await apiClient.get('/admin/fees/students');
       if (response.data.success) {
         const studentData = response.data.data.data || [];
         setStudents(studentData);
