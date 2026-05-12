@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -15,6 +15,18 @@ export default function DailyCollection() {
   const [exportLoading, setExportLoading] = useState(false);
 
   const paymentModes = ['All', 'Cash', 'QR', 'UPI', 'Bank', 'Cheque', 'Card'];
+
+  const summary = useMemo(() => {
+    const totalRow = data.find(item => item.id === 'total');
+
+    return {
+      paymentsCount: totalRow?.paymentsCount || 0,
+      totalCollected: totalRow?.totalCollectedValue || 0,
+      allocatedAmount: totalRow?.allocatedAmountValue || 0,
+      unallocatedAmount: totalRow?.unallocatedAmountValue || 0,
+      recordsCount: data.filter(item => item.id !== 'total').length
+    };
+  }, [data]);
 
   useEffect(() => {
     handleSearch();
@@ -191,6 +203,29 @@ export default function DailyCollection() {
               </>
             )}
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Collection</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(summary.totalCollected)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filters.dateFrom} to {filters.dateTo}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Allocated Amount</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(summary.allocatedAmount)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{summary.recordsCount} collection records</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Unallocated Amount</p>
+            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(summary.unallocatedAmount)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Balance for selected range</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Payments Count</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.paymentsCount.toLocaleString('en-IN')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filters.paymentMode === 'All' ? 'All payment modes' : filters.paymentMode}</p>
+          </div>
         </div>
         
         {/* Filters Section */}
