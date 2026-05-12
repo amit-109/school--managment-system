@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
+const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+
 export default function DailyCollection() {
   const [filters, setFilters] = useState({
     dateFrom: new Date().toISOString().split('T')[0],
@@ -40,12 +42,41 @@ export default function DailyCollection() {
         const formattedData = response.data.data.map((item, index) => ({
           id: index + 1,
           collectionDate: new Date(item.collectionDate).toLocaleDateString(),
-          paymentsCount: item.paymentsCount,
-          totalCollected: `₹${item.totalCollected.toLocaleString()}`,
-          allocatedAmount: `₹${item.allocatedAmount.toLocaleString()}`,
-          unallocatedAmount: `₹${item.unallocatedAmount.toLocaleString()}`
+          paymentsCount: Number(item.paymentsCount || 0),
+          totalCollectedValue: Number(item.totalCollected || 0),
+          allocatedAmountValue: Number(item.allocatedAmount || 0),
+          unallocatedAmountValue: Number(item.unallocatedAmount || 0),
+          totalCollected: formatCurrency(item.totalCollected),
+          allocatedAmount: formatCurrency(item.allocatedAmount),
+          unallocatedAmount: formatCurrency(item.unallocatedAmount)
         }));
-        setData(formattedData);
+
+        const totals = formattedData.reduce((sum, item) => ({
+          paymentsCount: sum.paymentsCount + item.paymentsCount,
+          totalCollectedValue: sum.totalCollectedValue + item.totalCollectedValue,
+          allocatedAmountValue: sum.allocatedAmountValue + item.allocatedAmountValue,
+          unallocatedAmountValue: sum.unallocatedAmountValue + item.unallocatedAmountValue
+        }), {
+          paymentsCount: 0,
+          totalCollectedValue: 0,
+          allocatedAmountValue: 0,
+          unallocatedAmountValue: 0
+        });
+
+        setData([
+          ...formattedData,
+          {
+            id: 'total',
+            collectionDate: 'Total',
+            paymentsCount: totals.paymentsCount,
+            totalCollectedValue: totals.totalCollectedValue,
+            allocatedAmountValue: totals.allocatedAmountValue,
+            unallocatedAmountValue: totals.unallocatedAmountValue,
+            totalCollected: formatCurrency(totals.totalCollectedValue),
+            allocatedAmount: formatCurrency(totals.allocatedAmountValue),
+            unallocatedAmount: formatCurrency(totals.unallocatedAmountValue)
+          }
+        ]);
       }
     } catch (error) {
       console.error('Error fetching daily collection:', error);
@@ -89,11 +120,41 @@ export default function DailyCollection() {
   };
 
   const columnDefs = [
-    { headerName: 'Collection Date', field: 'collectionDate', sortable: true, filter: true },
-    { headerName: 'Payments Count', field: 'paymentsCount', sortable: true, filter: true },
-    { headerName: 'Total Collected', field: 'totalCollected', sortable: true, filter: true },
-    { headerName: 'Allocated Amount', field: 'allocatedAmount', sortable: true, filter: true },
-    { headerName: 'Unallocated Amount', field: 'unallocatedAmount', sortable: true, filter: true }
+    {
+      headerName: 'Collection Date',
+      field: 'collectionDate',
+      sortable: true,
+      filter: true,
+      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+    },
+    {
+      headerName: 'Payments Count',
+      field: 'paymentsCount',
+      sortable: true,
+      filter: true,
+      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+    },
+    {
+      headerName: 'Total Collected',
+      field: 'totalCollected',
+      sortable: true,
+      filter: true,
+      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+    },
+    {
+      headerName: 'Allocated Amount',
+      field: 'allocatedAmount',
+      sortable: true,
+      filter: true,
+      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+    },
+    {
+      headerName: 'Unallocated Amount',
+      field: 'unallocatedAmount',
+      sortable: true,
+      filter: true,
+      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+    }
   ];
 
   return (
