@@ -184,7 +184,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
             columnDefs={finalColumnDefs}
             defaultColDef={defaultColDef}
             animateRows
-            rowSelection="single"
+            rowSelection={{ mode: 'singleRow' }}
             suppressCellFocus
             pagination={!serverPagination}
             paginationPageSize={safePageSize}

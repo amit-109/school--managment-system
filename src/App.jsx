@@ -108,7 +108,7 @@ export default function App() {
       setShowRegister(false)
       setShowLanding(false)
       setShowPricing(false)
-      toast.info('You have been logged out successfully.')
+      toast('You have been logged out successfully.')
     }
   }, [])
 

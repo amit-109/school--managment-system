@@ -428,7 +428,7 @@ export default function UserManagement() {
 
   const isFieldRequired = (field, role) => {
     const requiredFields = {
-      Teacher: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber'],
+      Teacher: ['firstName', 'lastName', 'username', 'password', 'phoneNumber'],
       Student: ['firstName', 'lastName', 'username', 'password', 'admissionNo', 'classId'],
       Parent: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber']
     };
