@@ -1,19 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import { useConfirmation } from '../shared/ConfirmationContext'
+import SearchBar from '../shared/SearchBar'
+import Button from '../shared/Button'
 import apiClient from '../Auth/base'
 
 export default function Concessions() {
+  const confirm = useConfirmation()
   const { organizationId } = useSelector((state) => state.auth)
   const [students, setStudents] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [concessions, setConcessions] = useState([])
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   
   const [feeTypes, setFeeTypes] = useState([])
   
@@ -29,16 +37,22 @@ export default function Concessions() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    loadStudents()
+    loadStudents(currentPage, pageSize, '')
     loadFeeTypes()
   }, [])
 
-  const loadStudents = async (search = '') => {
+  useEffect(() => {
+    loadStudents(currentPage, pageSize, searchTerm)
+  }, [currentPage, pageSize, searchTerm])
+
+  const loadStudents = async (page = 1, size = 10, search = '') => {
     setLoading(true)
     try {
-      const response = await apiClient.get(`/admin/fees/students?page=1&pageSize=1000${search ? `&search=${search}` : ''}`)
+      const response = await apiClient.get(`/admin/fees/students?page=${page}&pageSize=${size}&isDropDown=false${search ? `&search=${search}` : ''}`)
       if (response.data.success) {
-        setStudents(response.data.data.data || [])
+        const responseData = response.data.data || {}
+        setStudents(responseData.data || [])
+        setTotalCount(responseData.totalCount || 0)
       }
     } catch (error) {
       console.error('Failed to load students:', error)
@@ -180,29 +194,30 @@ export default function Concessions() {
   }
 
   const handleDelete = async (data) => {
-    if (window.confirm(`Are you sure you want to delete this concession?`)) {
-      setLoading(true)
-      try {
-        const response = await apiClient.delete(`/admin/fees/concessions/${data.ConcessionId}`)
+    const confirmed = await confirm({
+      title: 'Delete Concession',
+      message: 'Are you sure you want to delete this concession?',
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
 
-        if (response.data.success) {
-          toast.success('Concession deleted successfully')
-          loadConcessions(selectedStudent.studentId)
-        } else {
-          toast.error(response.data.message || 'Failed to delete concession')
-        }
-      } catch (error) {
-        toast.error(`Network error: ${error.message}`)
-      } finally {
-        setLoading(false)
+    setLoading(true)
+    try {
+      const response = await apiClient.delete(`/admin/fees/concessions/${data.ConcessionId}`)
+
+      if (response.data.success) {
+        toast.success('Concession deleted successfully')
+        loadConcessions(selectedStudent.studentId)
+      } else {
+        toast.error(response.data.message || 'Failed to delete concession')
       }
+    } catch (error) {
+      toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
-  }
-
-  const handleSearch = (e) => {
-    const value = e.target.value
-    setSearchTerm(value)
-    loadStudents(value)
   }
 
   const handleStudentSelect = (student) => {
@@ -216,40 +231,47 @@ export default function Concessions() {
   }
 
   const studentToolbar = (
-    <div className="relative">
-      <input
-        type="text"
-        placeholder="Search students..."
-        value={searchTerm}
-        onChange={handleSearch}
-        className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64"
+    <div className="toolbar-row">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={(value) => {
+          setSearchTerm(value)
+          setCurrentPage(1)
+        }}
+        onClear={() => {
+          setSearchInput('')
+          setSearchTerm('')
+          setCurrentPage(1)
+        }}
+        placeholder="Search by Name, Admission No, Phone"
       />
-      <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
     </div>
   )
 
   const concessionToolbar = (
-    <div className="flex gap-3 items-center">
-      <button
+    <div className="toolbar-actions">
+      <Button
+        variant="secondary"
         onClick={handleBackToStudents}
-        className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
         Back to Students
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={() => { resetForm(); setShowModal(true) }}
-        className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
         Add Concession
-      </button>
+      </Button>
     </div>
   )
 
@@ -275,6 +297,12 @@ export default function Concessions() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               }
+              serverPagination
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalRecords={totalCount}
+              onPageChange={(page) => setCurrentPage(page)}
+              onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
             />
           </>
         ) : (
@@ -417,7 +445,6 @@ export default function Concessions() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

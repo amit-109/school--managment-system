@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import { useConfirmation } from '../shared/ConfirmationContext'
 import apiClient from '../Auth/base'
 
 export default function Feetype() {
+  const confirm = useConfirmation()
   const { accessToken, organizationId } = useSelector((state) => state.auth)
   const [feetypes, setFeetypes] = useState([])
   const [loading, setLoading] = useState(false)
@@ -117,22 +119,29 @@ export default function Feetype() {
   }
 
   const handleDelete = async (data) => {
-    if (window.confirm(`Are you sure you want to delete fee type "${data.feeTypeName}"?`)) {
-      setLoading(true)
-      try {
-        const response = await apiClient.delete(`/admin/feemasters/feetype/${data.feeTypeId}`)
+    const confirmed = await confirm({
+      title: 'Delete Fee Type',
+      message: `Are you sure you want to delete "${data.feeTypeName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
 
-        if (response.data.success) {
-          toast.success('Fee type deleted successfully')
-          loadFeetypes()
-        } else {
-          toast.error(response.data.message || 'Failed to delete fee type')
-        }
-      } catch (error) {
-        toast.error(`Network error: ${error.message}`)
-      } finally {
-        setLoading(false)
+    setLoading(true)
+    try {
+      const response = await apiClient.delete(`/admin/feemasters/feetype/${data.feeTypeId}`)
+
+      if (response.data.success) {
+        toast.success('Fee type deleted successfully')
+        loadFeetypes()
+      } else {
+        toast.error(response.data.message || 'Failed to delete fee type')
       }
+    } catch (error) {
+      toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -240,7 +249,6 @@ export default function Feetype() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

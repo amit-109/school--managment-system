@@ -4,9 +4,11 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
+import { useConfirmation } from '../shared/ConfirmationContext';
 import { getTeachers, getClasses, getSections, getClassSubjects, getTeacherSubjects, assignSubjectToTeacher, removeSubjectFromTeacher } from '../Services/adminService';
 
 export default function TeacherSubjects() {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -147,17 +149,24 @@ export default function TeacherSubjects() {
   };
 
   const handleRemoveAssignment = async (assignmentData) => {
-    if (window.confirm(`Remove this subject assignment?`)) {
-      setLoading(true);
-      try {
-        await removeSubjectFromTeacher(selectedTeacherId, assignmentData.teacherSubjectId);
-        toast.success('Assignment removed successfully');
-        loadTeacherSubjects(selectedTeacherId);
-      } catch (error) {
-        toast.error('Failed to remove assignment');
-      } finally {
-        setLoading(false);
-      }
+    const confirmed = await confirm({
+      title: 'Remove Assignment',
+      message: 'Are you sure you want to remove this subject assignment?',
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Remove',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      await removeSubjectFromTeacher(selectedTeacherId, assignmentData.teacherSubjectId);
+      toast.success('Assignment removed successfully');
+      loadTeacherSubjects(selectedTeacherId);
+    } catch (error) {
+      toast.error('Failed to remove assignment');
+    } finally {
+      setLoading(false);
     }
   };
 

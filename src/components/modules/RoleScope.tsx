@@ -1,6 +1,6 @@
 import React, { useEffect, useState, FC } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import {
   fetchTenantAdminsAsync,
@@ -183,7 +183,6 @@ const RoleScope: FC = () => {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
+import Button from '../shared/Button';
 import {
   createUser,
   updateUser,
   deleteUser,
   getClasses,
+  getSections,
   getStudentUsers,
   getStudentById,
   checkEmailExists as checkEmailExistsAPI,
@@ -20,12 +23,14 @@ const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
 
 export default function Students() {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
@@ -36,6 +41,9 @@ export default function Students() {
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sections, setSections] = useState([]);
+  const [selectedClassHasSections, setSelectedClassHasSections] = useState(false);
+  const [sectionHelperText, setSectionHelperText] = useState('');
   const [form, setForm] = useState({
     userId: 0,
     roleName: 'Student',
@@ -50,6 +58,7 @@ export default function Students() {
     fatherName: '',
     motherName: '',
     classId: 0,
+    sectionId: null,
     gender: '',
     category: ''
   });
@@ -86,6 +95,46 @@ export default function Students() {
     } catch (error) {
       console.error('Failed to load classes:', error);
     }
+  };
+
+  const loadSectionsForClass = async (classId) => {
+    if (!classId) {
+      setSections([]);
+      return;
+    }
+    try {
+      const response = await getSections(classId);
+      if (response.success) {
+        setSections((response.data || []).filter(s => s.isActive));
+      } else {
+        setSections([]);
+      }
+    } catch (error) {
+      console.error('Failed to load sections:', error);
+      setSections([]);
+    }
+  };
+
+  const handleClassChange = async (e) => {
+    const classId = parseInt(e.target.value, 10) || 0;
+    const selectedClass = classes.find(c => c.classId === classId);
+    const hasSections = selectedClass?.hasSections || false;
+
+    setSelectedClassHasSections(hasSections);
+
+    if (hasSections) {
+      setSectionHelperText('This class uses sections. Please select a section.');
+      await loadSectionsForClass(classId);
+    } else {
+      setSectionHelperText('This class does not use sections.');
+      setSections([]);
+    }
+
+    setForm(prev => ({
+      ...prev,
+      classId,
+      sectionId: null
+    }));
   };
 
   const validateEmail = (email) => {
@@ -196,13 +245,19 @@ export default function Students() {
       return;
     }
 
+    if (selectedClassHasSections && !form.sectionId) {
+      toast.error('Section is required for the selected class.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const userData = {
         ...form,
         roleName: 'Student',
-        phone: form.phoneNumber
+        phone: form.phoneNumber,
+        sectionId: selectedClassHasSections ? form.sectionId : null
       };
 
       if (editMode) {
@@ -239,6 +294,11 @@ export default function Students() {
           10
         ) || 0;
 
+        const resolvedSectionId = parseInt(
+          studentData.sectionId ?? 0,
+          10
+        ) || null;
+
         setForm({
           userId: studentData.studentUserId || studentData.userId || userData.userId,
           roleName: 'Student',
@@ -253,9 +313,24 @@ export default function Students() {
           fatherName: studentData.fatherName || studentData.fayerName || studentData.studentFatherName || studentData.studentFayerName || '',
           motherName: studentData.motherName || studentData.studentMotherName || '',
           classId: resolvedClassId,
+          sectionId: resolvedSectionId,
           gender: studentData.gender || studentData.studentGender || '',
           category: studentData.category || studentData.studentCategory || ''
         });
+
+        // Determine if selected class has sections
+        const selectedClass = classes.find(c => c.classId === resolvedClassId);
+        const hasSections = selectedClass?.hasSections || false;
+        setSelectedClassHasSections(hasSections);
+
+        if (hasSections) {
+          setSectionHelperText('This class uses sections. Please select a section.');
+          // Load sections for the class and pre-select if sectionId exists
+          await loadSectionsForClass(resolvedClassId);
+        } else {
+          setSectionHelperText('This class does not use sections.');
+          setSections([]);
+        }
 
         setOriginalEmail(email);
         setOriginalUsername(username);
@@ -274,17 +349,15 @@ export default function Students() {
   };
 
   const handleDelete = async (userData) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete student "${userData.fullName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete'
+    const confirmed = await confirm({
+      title: 'Delete Student',
+      message: `Are you sure you want to delete "${userData.fullName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
     });
 
-    if (!result.isConfirmed) return;
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -313,6 +386,7 @@ export default function Students() {
       fatherName: '',
       motherName: '',
       classId: 0,
+      sectionId: null,
       gender: '',
       category: ''
     });
@@ -323,6 +397,9 @@ export default function Students() {
     setAdmissionNoError('');
     setOriginalAdmissionNo('');
     setEditMode(false);
+    setSections([]);
+    setSelectedClassHasSections(false);
+    setSectionHelperText('');
   };
 
   const filteredStudents = students;
@@ -331,6 +408,15 @@ export default function Students() {
     { headerName: 'Name', field: 'fullName', sortable: true },
     { headerName: 'Username', field: 'username', sortable: true },
     { headerName: 'Admission No', field: 'admissionNo', sortable: true },
+    {
+      headerName: 'Section',
+      field: 'sectionName',
+      sortable: true,
+      valueGetter: (params) => {
+        const section = params.data?.sectionName || params.data?.section?.sectionName || '';
+        return section || '-';
+      }
+    },
     { headerName: 'Gender', field: 'gender', sortable: true, valueGetter: (params) => params.data?.gender || params.data?.studentGender || '' },
     { headerName: 'Category', field: 'category', sortable: true, valueGetter: (params) => params.data?.category || params.data?.studentCategory || '' },
     { headerName: 'Father Name', field: 'fatherName', sortable: true },
@@ -352,32 +438,32 @@ export default function Students() {
   ], []);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search students..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={(query) => {
+          setSearchTerm(query);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSearchInput('');
+          setSearchTerm('');
+          setCurrentPage(1);
+        }}
+        placeholder="Search by Name, Admission No, Phone, Section"
+      />
 
-      <button
+      <Button
         onClick={() => { resetForm(); setShowModal(true); }}
-        className="btn-primary flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
         Add Student
-      </button>
+      </Button>
     </div>
   );
 
@@ -622,7 +708,7 @@ export default function Students() {
                     <select
                       required
                       value={form.classId || ''}
-                      onChange={(e) => setForm({...form, classId: parseInt(e.target.value, 10) || 0})}
+                      onChange={handleClassChange}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     >
                       <option value="">Select Class</option>
@@ -633,6 +719,37 @@ export default function Students() {
                       ))}
                     </select>
                   </div>
+
+                  {selectedClassHasSections && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Section *</label>
+                      <select
+                        required
+                        value={form.sectionId || ''}
+                        onChange={(e) => setForm({...form, sectionId: parseInt(e.target.value, 10) || null})}
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      >
+                        <option value="">Select Section</option>
+                        {sections.map((sec) => (
+                          <option key={sec.sectionId} value={sec.sectionId}>
+                            {sec.sectionName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {sectionHelperText && !selectedClassHasSections && form.classId > 0 && (
+                    <div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{sectionHelperText}</p>
+                    </div>
+                  )}
+
+                  {selectedClassHasSections && (
+                    <div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{sectionHelperText}</p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium mb-1">Phone Number</label>
@@ -681,7 +798,6 @@ export default function Students() {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 }

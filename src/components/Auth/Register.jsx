@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
+import toast from "react-hot-toast";
+import notify from "../shared/notifications";
 
 export default function Register({ onRegister, onSwitch }) {
   const { registering } = useSelector((state) => state.auth);
@@ -23,11 +25,11 @@ export default function Register({ onRegister, onSwitch }) {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size should be less than 5MB');
+        toast.error('File size should be less than 5MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        notify.warning('Please select an image file');
         return;
       }
       const reader = new FileReader();
@@ -41,7 +43,7 @@ export default function Register({ onRegister, onSwitch }) {
   const handleRegister = (e) => {
     e.preventDefault();
     if (form.password !== form.confirmPassword) {
-      alert("Passwords do not match");
+      toast.error('Passwords do not match');
       return;
     }
     if (form.schoolName && form.username && form.email && form.password && selectedPlan) {

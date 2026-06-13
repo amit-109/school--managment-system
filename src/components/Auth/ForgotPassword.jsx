@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 export default function ForgotPassword({ onBack }) {
   const [step, setStep] = useState(1); // 1: username, 2: reset password
@@ -247,7 +247,6 @@ export default function ForgotPassword({ onBack }) {
           </div>
         </div>
       </div>
-      <Toaster position="top-right" />
     </>
   );
 }

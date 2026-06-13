@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -92,7 +93,7 @@ export default function DailyCollection() {
       }
     } catch (error) {
       console.error('Error fetching daily collection:', error);
-      alert('Error fetching daily collection data');
+      toast.error('Error fetching daily collection data');
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ export default function DailyCollection() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      toast.error('Error exporting CSV file');
     } finally {
       setExportLoading(false);
     }
@@ -313,10 +314,11 @@ export default function DailyCollection() {
             </div>
           </div>
           <AgGridBox
+            title="Daily Collection Results"
             rowData={data}
             columnDefs={columnDefs}
             pagination={true}
-            paginationPageSize={20}
+            paginationPageSize={10}
           />
         </div>
       ) : (

@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, FC } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
 import {
   fetchSubModulesAsync,
   fetchModulesAsync,
@@ -26,6 +26,7 @@ interface SubModuleFormData {
 }
 
 const SubModuleManagement: FC = () => {
+  const confirm = useConfirmation();
   const dispatch = useDispatch<AppDispatch>();
   const {
     subModules,
@@ -188,24 +189,22 @@ const SubModuleManagement: FC = () => {
   };
 
   const handleDeleteSubModule = async (subModule: SubModule) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete submodule "${subModule.subModuleName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete',
+    const confirmed = await confirm({
+      title: 'Delete Submodule',
+      message: `Are you sure you want to delete "${subModule.subModuleName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deleteSubModuleAsync(subModule.subModuleId)).unwrap();
-        toast.success('SubModule deleted successfully!');
-        loadSubModules();
-      } catch (error: any) {
-        toast.error(`Failed to delete submodule: ${error}`);
-      }
+    if (!confirmed) return;
+
+    try {
+      await dispatch(deleteSubModuleAsync(subModule.subModuleId)).unwrap();
+      toast.success('SubModule deleted successfully!');
+      loadSubModules();
+    } catch (error: any) {
+      toast.error(`Failed to delete submodule: ${error}`);
     }
   };
 
@@ -639,7 +638,6 @@ const SubModuleManagement: FC = () => {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

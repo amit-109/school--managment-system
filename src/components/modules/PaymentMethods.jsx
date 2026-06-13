@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
@@ -395,7 +395,6 @@ export default function PaymentMethods() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

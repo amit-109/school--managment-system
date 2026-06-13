@@ -4,9 +4,12 @@ import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import { useLoading } from '../shared/LoadingContext'
+import { useConfirmation } from '../shared/ConfirmationContext'
+import SearchBar from '../shared/SearchBar'
 import { fetchSubjectsAsync, createSubjectAsync, updateSubjectAsync, deleteSubjectAsync } from '../Services/adminStore'
 
 export default function Subjects() {
+  const confirm = useConfirmation()
   const dispatch = useDispatch()
   const { setIsLoading } = useLoading()
   const {
@@ -28,6 +31,7 @@ export default function Subjects() {
   })
   const [errors, setErrors] = useState({})
   const [viewData, setViewData] = useState(null)
+  const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
 
@@ -171,12 +175,19 @@ export default function Subjects() {
   }
 
   const handleDelete = async (data) => {
-    if (window.confirm(`Are you sure you want to delete subject ${data.name}?`)) {
-      try {
-        await dispatch(deleteSubjectAsync(data.id)).unwrap()
-      } catch (error) {
-        console.error('Error deleting subject:', error)
-      }
+    const confirmed = await confirm({
+      title: 'Delete Subject',
+      message: `Are you sure you want to delete "${data.name}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
+
+    try {
+      await dispatch(deleteSubjectAsync(data.id)).unwrap()
+    } catch (error) {
+      console.error('Error deleting subject:', error)
     }
   }
 
@@ -207,18 +218,16 @@ export default function Subjects() {
 
   const toolbar = (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search subjects..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={setSearchTerm}
+        onClear={() => {
+          setSearchInput('')
+          setSearchTerm('')
+        }}
+        placeholder="Search by Subject Name, Code, Description"
+      />
       
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>

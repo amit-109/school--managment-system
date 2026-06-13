@@ -1,7 +1,9 @@
-import React, { useMemo, useRef, useCallback, FC } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
+import ActionButtons from './ActionButtons';
+import Pagination, { PAGE_SIZE_OPTIONS } from './Pagination';
 
 interface ActionRendererProps {
   data: any;
@@ -13,62 +15,28 @@ interface ActionRendererProps {
   viewIcon?: React.ReactNode;
 }
 
-const ActionRenderer: FC<ActionRendererProps> = ({ data, onEdit, onView, onDelete, onPrint, viewTitle = 'View', viewIcon }) => {
-  return (
-    <div className="flex items-center gap-1 sm:gap-2 justify-center">
-      {onView && (
-        <button
-          onClick={() => onView(data)}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-800/50 text-primary-600 dark:text-primary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-          title={viewTitle}
-        >
-          {viewIcon || (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-          )}
-        </button>
-      )}
-      {onPrint && (
-        <button
-          onClick={() => onPrint(data)}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-          title="Print"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-        </button>
-      )}
-      {onEdit && (
-        <button
-          onClick={() => onEdit(data)}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-secondary-100 dark:bg-secondary-900/30 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 text-secondary-600 dark:text-secondary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-          title="Edit"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </button>
-      )}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(data)}
-          className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-          title="Delete"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      )}
-    </div>
-  );
-};
+const ActionRenderer: FC<ActionRendererProps> = ({
+  data,
+  onEdit,
+  onView,
+  onDelete,
+  onPrint,
+  viewTitle = 'View',
+  viewIcon
+}) => (
+  <ActionButtons
+    data={data}
+    onView={onView}
+    onEdit={onEdit}
+    onPrint={onPrint}
+    onDelete={onDelete}
+    viewTitle={viewTitle}
+    viewIcon={viewIcon}
+  />
+);
 
 interface AgGridBoxProps {
-  title: string;
+  title?: string;
   columnDefs: any[];
   rowData: any[];
   toolbar?: React.ReactNode;
@@ -86,6 +54,8 @@ interface AgGridBoxProps {
   pageSizeOptions?: number[];
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  pagination?: boolean;
+  paginationPageSize?: number;
 }
 
 const AgGridBox: FC<AgGridBoxProps> = ({
@@ -104,17 +74,22 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   currentPage = 1,
   pageSize = 10,
   totalRecords = 0,
-  pageSizeOptions = [5, 10, 20, 50],
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
   onPageChange,
-  onPageSizeChange
+  onPageSizeChange,
+  pagination = true,
+  paginationPageSize
 }) => {
   const gridRef = useRef<AgGridReact>(null);
-  const safePageSize = pageSize > 0 ? pageSize : 10;
-  const safeCurrentPage = currentPage > 0 ? currentPage : 1;
-  const effectiveTotalRecords = serverPagination ? totalRecords : (rowData?.length || 0);
-  const totalPages = Math.max(1, Math.ceil((effectiveTotalRecords || 0) / safePageSize));
-  const startRecord = effectiveTotalRecords === 0 ? 0 : ((safeCurrentPage - 1) * safePageSize) + 1;
-  const endRecord = effectiveTotalRecords === 0 ? 0 : Math.min(safeCurrentPage * safePageSize, effectiveTotalRecords);
+  const initialPageSize = paginationPageSize || pageSize;
+  const [clientPage, setClientPage] = useState(1);
+  const [clientPageSize, setClientPageSize] = useState(initialPageSize > 0 ? initialPageSize : 10);
+  const [clientTotalRecords, setClientTotalRecords] = useState(rowData?.length || 0);
+
+  const safeServerPage = currentPage > 0 ? currentPage : 1;
+  const effectivePageSize = serverPagination ? (pageSize > 0 ? pageSize : 10) : clientPageSize;
+  const effectiveCurrentPage = serverPagination ? safeServerPage : clientPage;
+  const effectiveTotalRecords = serverPagination ? totalRecords : clientTotalRecords;
 
   const defaultColDef = useMemo(() => ({
     sortable: true,
@@ -125,14 +100,14 @@ const AgGridBox: FC<AgGridBoxProps> = ({
   }), []);
 
   const finalColumnDefs = useMemo(() => {
-    const cols = [...columnDefs];
+    const columns = [...columnDefs];
     if (showActions && (onEdit || onView || onDelete || onPrint)) {
-      cols.push({
+      columns.push({
         headerName: 'Actions',
         field: 'actions',
-        width: 120,
+        width: 150,
         minWidth: 120,
-        maxWidth: 160,
+        maxWidth: 180,
         cellRenderer: (params: any) => (
           <ActionRenderer
             data={params.data}
@@ -151,33 +126,67 @@ const AgGridBox: FC<AgGridBoxProps> = ({
         resizable: false,
       });
     }
-    return cols;
-  }, [columnDefs, onEdit, onView, onDelete, onPrint, showActions]);
+    return columns;
+  }, [columnDefs, onEdit, onView, onDelete, onPrint, showActions, viewTitle, viewIcon]);
 
   const autoSizeAll = useCallback(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.sizeColumnsToFit();
+    gridRef.current?.api.sizeColumnsToFit();
   }, []);
 
+  const syncClientPagination = useCallback(() => {
+    if (serverPagination) return;
+    const api = gridRef.current?.api;
+    if (!api) return;
+    setClientPage(api.paginationGetCurrentPage() + 1);
+    setClientTotalRecords(api.paginationGetRowCount());
+  }, [serverPagination]);
+
+  useEffect(() => {
+    if (serverPagination) return;
+    setClientTotalRecords(rowData?.length || 0);
+    setClientPage(1);
+    gridRef.current?.api?.paginationGoToFirstPage();
+  }, [rowData, serverPagination]);
+
+  const handlePageChange = useCallback((nextPage: number) => {
+    if (serverPagination) {
+      onPageChange?.(nextPage);
+      return;
+    }
+    gridRef.current?.api?.paginationGoToPage(nextPage - 1);
+    setClientPage(nextPage);
+  }, [onPageChange, serverPagination]);
+
+  const handlePageSizeChange = useCallback((nextSize: number) => {
+    if (serverPagination) {
+      onPageSizeChange?.(nextSize);
+      return;
+    }
+    gridRef.current?.api?.setGridOption('paginationPageSize', nextSize);
+    gridRef.current?.api?.paginationGoToFirstPage();
+    setClientPageSize(nextSize);
+    setClientPage(1);
+  }, [onPageSizeChange, serverPagination]);
+
   return (
-    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
-      <header className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-b border-slate-200 dark:border-slate-600 flex items-center justify-between">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl transition-shadow duration-300 hover:shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-3xl">
+      <header className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-primary-50 to-secondary-50 px-4 py-4 dark:border-slate-600 dark:from-primary-900/20 dark:to-secondary-900/20 sm:px-6 sm:py-5">
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-xl shadow-lg">
-            📊
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-secondary-600 text-white shadow-lg sm:h-12 sm:w-12 sm:rounded-2xl">
+            <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19V9m5 10V5m5 14v-7m5 7V3" />
+            </svg>
           </div>
           <div>
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{effectiveTotalRecords || 0} total records</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">{title || 'Results'}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 sm:text-sm">{effectiveTotalRecords} total records</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {toolbar}
-        </div>
+        <div className="flex items-center gap-2 sm:gap-3">{toolbar}</div>
       </header>
+
       <div className="p-3 sm:p-6">
-        <div className="ag-theme-quartz w-full overflow-x-auto border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl shadow-inner">
+        <div className="ag-theme-quartz w-full overflow-x-auto rounded-xl border border-slate-200 shadow-inner dark:border-slate-600 sm:rounded-2xl">
           <AgGridReact
             ref={gridRef}
             rowData={rowData}
@@ -186,61 +195,32 @@ const AgGridBox: FC<AgGridBoxProps> = ({
             animateRows
             rowSelection={{ mode: 'singleRow' }}
             suppressCellFocus
-            pagination={!serverPagination}
-            paginationPageSize={safePageSize}
+            pagination={pagination}
+            paginationPageSize={effectivePageSize}
             paginationPageSizeSelector={pageSizeOptions}
+            suppressPaginationPanel
             domLayout="autoHeight"
-            onGridReady={(params) => {
+            onGridReady={() => {
               setTimeout(() => {
                 autoSizeAll();
+                syncClientPagination();
               }, 100);
             }}
+            onPaginationChanged={syncClientPagination}
+            onFilterChanged={syncClientPagination}
           />
         </div>
       </div>
-      {serverPagination && (
-        <div className="px-3 sm:px-6 pb-4 sm:pb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
-            <div>
-              Showing {startRecord} to {endRecord} of {effectiveTotalRecords} entries
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm">Page Size:</span>
-                <select
-                  value={safePageSize}
-                  onChange={(e) => onPageSizeChange?.(parseInt(e.target.value, 10))}
-                  className="px-2 py-1 text-xs sm:text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700"
-                >
-                  {pageSizeOptions.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => onPageChange?.(safeCurrentPage - 1)}
-                disabled={safeCurrentPage <= 1 || effectiveTotalRecords === 0}
-                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
-              >
-                Prev
-              </button>
-              <span className="text-xs sm:text-sm">
-                Page {effectiveTotalRecords === 0 ? 0 : safeCurrentPage} of {effectiveTotalRecords === 0 ? 0 : totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => onPageChange?.(safeCurrentPage + 1)}
-                disabled={safeCurrentPage >= totalPages || effectiveTotalRecords === 0}
-                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </div>
+
+      {pagination && (
+        <Pagination
+          currentPage={effectiveCurrentPage}
+          pageSize={effectivePageSize}
+          totalRecords={effectiveTotalRecords}
+          pageSizeOptions={pageSizeOptions}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       )}
     </section>
   );

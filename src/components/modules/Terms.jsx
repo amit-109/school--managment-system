@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import { useConfirmation } from '../shared/ConfirmationContext'
 import apiClient from '../Auth/base'
 
 export default function Terms() {
+  const confirm = useConfirmation()
   const { accessToken, organizationId } = useSelector((state) => state.auth)
   const [terms, setTerms] = useState([])
   const [loading, setLoading] = useState(false)
@@ -145,22 +147,29 @@ export default function Terms() {
   }
 
   const handleDelete = async (data) => {
-    if (window.confirm(`Are you sure you want to delete term "${data.termName}"?`)) {
-      setLoading(true)
-      try {
-        const response = await apiClient.delete(`/admin/feemasters/term/${data.termId}`)
+    const confirmed = await confirm({
+      title: 'Delete Term',
+      message: `Are you sure you want to delete "${data.termName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
 
-        if (response.data.success) {
-          toast.success('Term deleted successfully')
-          loadTerms()
-        } else {
-          toast.error(response.data.message || 'Failed to delete term')
-        }
-      } catch (error) {
-        toast.error(`Network error: ${error.message}`)
-      } finally {
-        setLoading(false)
+    setLoading(true)
+    try {
+      const response = await apiClient.delete(`/admin/feemasters/term/${data.termId}`)
+
+      if (response.data.success) {
+        toast.success('Term deleted successfully')
+        loadTerms()
+      } else {
+        toast.error(response.data.message || 'Failed to delete term')
       }
+    } catch (error) {
+      toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -288,7 +297,6 @@ export default function Terms() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

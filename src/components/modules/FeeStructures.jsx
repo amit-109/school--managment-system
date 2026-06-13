@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import { useConfirmation } from '../shared/ConfirmationContext'
+import Button from '../shared/Button'
 import apiClient from '../Auth/base'
-import Swal from 'sweetalert2'
 
 const getLastDayOfMonth = (month, year = new Date().getFullYear()) => {
   const date = new Date(year, month, 0)
@@ -16,6 +17,7 @@ const getLastDayOfMonth = (month, year = new Date().getFullYear()) => {
 }
 
 export default function FeeStructures() {
+  const confirm = useConfirmation()
   const { organizationId } = useSelector((state) => state.auth)
   const [feeStructures, setFeeStructures] = useState([])
   const [loading, setLoading] = useState(false)
@@ -420,17 +422,14 @@ export default function FeeStructures() {
   }
 
   const handleDelete = async (data) => {
-    const result = await Swal.fire({
-      title: 'Delete Fee Structure?',
-      text: `Are you sure you want to delete "${data.FeeTypeName}"?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel'
+    const confirmed = await confirm({
+      title: 'Delete Fee Structure',
+      message: `Are you sure you want to delete "${data.FeeTypeName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
     })
-    if (!result.isConfirmed) return
+    if (!confirmed) return
     setLoading(true)
     try {
       const response = await apiClient.delete(`/admin/fees/class-fees/${data.ClassFeeId}`)
@@ -449,25 +448,27 @@ export default function FeeStructures() {
   }
 
   const toolbar = (
-    <div className="flex items-center gap-2">
-      <button
+    <div className="toolbar-actions">
+      <Button
         onClick={() => { resetForm(); setShowModal(true) }}
-        className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
         Add Fee Structure
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={handleEdit}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
         Edit Fee Structure
-      </button>
+      </Button>
     </div>
   )
 
@@ -969,7 +970,6 @@ export default function FeeStructures() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

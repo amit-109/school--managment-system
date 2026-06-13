@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
 import { getUsers, createUser, updateUser, deleteUser, getParentUsers, getParentById, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
 
 export default function Parents() {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [parents, setParents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
@@ -195,17 +199,24 @@ export default function Parents() {
   };
 
   const handleDelete = async (userData) => {
-    if (window.confirm(`Are you sure you want to delete ${userData.fullName}?`)) {
-      setLoading(true);
-      try {
-        await deleteUser(userData.userId);
-        toast.success('Parent deleted successfully');
-        loadParents(currentPage, pageSize, searchTerm);
-      } catch (error) {
-        toast.error('Failed to delete parent');
-      } finally {
-        setLoading(false);
-      }
+    const confirmed = await confirm({
+      title: 'Delete Parent',
+      message: `Are you sure you want to delete "${userData.fullName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteUser(userData.userId);
+      toast.success('Parent deleted successfully');
+      loadParents(currentPage, pageSize, searchTerm);
+    } catch (error) {
+      toast.error('Failed to delete parent');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,22 +265,21 @@ export default function Parents() {
   ], []);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search parents..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={(query) => {
+          setSearchTerm(query);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSearchInput('');
+          setSearchTerm('');
+          setCurrentPage(1);
+        }}
+        placeholder="Search by Name, Username, Phone"
+      />
       
       <button
         onClick={() => { resetForm(); setShowModal(true); }}
@@ -521,7 +531,6 @@ export default function Parents() {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 }

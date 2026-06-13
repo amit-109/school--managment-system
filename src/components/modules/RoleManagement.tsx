@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, FC } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
 import RolePermissionAssignment from './RolePermissionAssignment';
 import {
   fetchRolesAsync,
@@ -28,6 +29,7 @@ interface RoleManagementProps {
 }
 
 const RoleManagement: FC<RoleManagementProps> = () => {
+  const confirm = useConfirmation();
   const dispatch = useDispatch<AppDispatch>();
   const {
     roles,
@@ -55,6 +57,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [searchInput, setSearchInput] = useState<string>(searchTerm || '');
 
 
   useEffect(() => {
@@ -103,24 +106,22 @@ const RoleManagement: FC<RoleManagementProps> = () => {
   };
 
   const handleDeleteRole = async (role: Role) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete role "${role.roleName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete',
+    const confirmed = await confirm({
+      title: 'Delete Role',
+      message: `Are you sure you want to delete "${role.roleName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deleteRoleAsync(role.roleId)).unwrap();
-        toast.success('Role deleted successfully!');
-        loadRoles();
-      } catch (error: any) {
-        toast.error(`Failed to delete role: ${error}`);
-      }
+    if (!confirmed) return;
+
+    try {
+      await dispatch(deleteRoleAsync(role.roleId)).unwrap();
+      toast.success('Role deleted successfully!');
+      loadRoles();
+    } catch (error: any) {
+      toast.error(`Failed to delete role: ${error}`);
     }
   };
 
@@ -138,8 +139,7 @@ const RoleManagement: FC<RoleManagementProps> = () => {
     });
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleSearch = (value: string) => {
     dispatch(setSearchTerm(value));
     setCurrentPage(0);
   };
@@ -223,15 +223,16 @@ const RoleManagement: FC<RoleManagementProps> = () => {
         </svg>
         Add Role
       </button>
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Search roles..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-      </div>
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearch}
+        onClear={() => {
+          setSearchInput('');
+          handleSearch('');
+        }}
+        placeholder="Search by Role Name, Description"
+      />
     </div>
   );
 
@@ -261,6 +262,15 @@ const RoleManagement: FC<RoleManagementProps> = () => {
           rowData={Array.isArray(roles) ? roles : []}
           toolbar={toolbarButtons}
           showActions={false}
+          serverPagination
+          currentPage={currentPage + 1}
+          pageSize={pageSize}
+          totalRecords={rolesPagination.totalElements}
+          onPageChange={(page) => setCurrentPage(page - 1)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(0);
+          }}
         />
 
         {/* Create Role Modal */}
@@ -449,7 +459,6 @@ const RoleManagement: FC<RoleManagementProps> = () => {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

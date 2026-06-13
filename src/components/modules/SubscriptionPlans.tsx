@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, FC, ChangeEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
 import {
   fetchSubscriptionPlansAsync,
   fetchSubscriptionPlanByIdAsync,
@@ -15,6 +15,7 @@ import { SubscriptionPlan, SubscriptionPlanCreateData, SubscriptionPlanUpdateDat
 import { AppDispatch, RootState } from '../../store';
 
 const SubscriptionPlans: FC = () => {
+  const confirm = useConfirmation();
   const dispatch = useDispatch<AppDispatch>();
   const { subscriptionPlans, subscriptionPlansLoading } = useSelector(
     (state: RootState) => state.superAdmin
@@ -86,24 +87,22 @@ const SubscriptionPlans: FC = () => {
   };
 
   const handleDeletePlan = async (plan: SubscriptionPlan) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete subscription plan "${plan.planName}"?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!',
+    const confirmed = await confirm({
+      title: 'Delete Subscription Plan',
+      message: `Are you sure you want to delete "${plan.planName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deleteSubscriptionPlanAsync(plan.planId)).unwrap();
-        toast.success('Subscription plan deleted successfully!');
-        loadSubscriptionPlans();
-      } catch (error: any) {
-        toast.error(`Failed to delete plan: ${error}`);
-      }
+    if (!confirmed) return;
+
+    try {
+      await dispatch(deleteSubscriptionPlanAsync(plan.planId)).unwrap();
+      toast.success('Subscription plan deleted successfully!');
+      loadSubscriptionPlans();
+    } catch (error: any) {
+      toast.error(`Failed to delete plan: ${error}`);
     }
   };
 
@@ -608,7 +607,6 @@ const SubscriptionPlans: FC = () => {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

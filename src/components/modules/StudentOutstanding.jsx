@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import notify from '../shared/notifications';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -61,7 +63,7 @@ export default function StudentOutstanding() {
 
   const handleSearch = async () => {
     if (!filters.classId) {
-      alert('Please select a class');
+      notify.warning('Please select a class');
       return;
     }
 
@@ -100,7 +102,7 @@ export default function StudentOutstanding() {
       }
     } catch (error) {
       console.error('Error fetching student outstanding:', error);
-      alert('Error fetching student outstanding data');
+      toast.error('Error fetching student outstanding data');
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export default function StudentOutstanding() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      toast.error('Error exporting CSV file');
     } finally {
       setExportLoading(false);
     }

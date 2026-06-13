@@ -1,20 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
-import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI } from '../Services/adminService';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
+import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, getSections, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
 
 export default function UserManagement() {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [selectedClassHasSections, setSelectedClassHasSections] = useState(false);
+  const [sectionHelperText, setSectionHelperText] = useState('');
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -22,6 +27,7 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewUser, setViewUser] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
@@ -51,6 +57,7 @@ export default function UserManagement() {
     fatherName: '',
     motherName: '',
     classId: 0,
+    sectionId: null,
     gender: '',
     category: ''
   });
@@ -66,8 +73,8 @@ export default function UserManagement() {
 
   // Note: We use client-side filtering with filteredUsers instead of API calls
 
-  const handleSearchChange = (value) => {
-    setSearchTerm(value);
+  const handleSearch = (value) => {
+    setSearchTerm(value.trim());
     setCurrentPage(1);
   };
 
@@ -124,6 +131,46 @@ export default function UserManagement() {
         { classId: 3, className: 'Grade 3' }
       ]);
     }
+  };
+
+  const loadSectionsForClass = async (classId) => {
+    if (!classId) {
+      setSections([]);
+      return;
+    }
+    try {
+      const response = await getSections(classId);
+      if (response.success) {
+        setSections((response.data || []).filter(s => s.isActive));
+      } else {
+        setSections([]);
+      }
+    } catch (error) {
+      console.error('Failed to load sections:', error);
+      setSections([]);
+    }
+  };
+
+  const handleClassChange = async (e) => {
+    const classId = parseInt(e.target.value, 10) || 0;
+    const selectedClass = classes.find(c => c.classId === classId);
+    const hasSections = selectedClass?.hasSections || false;
+
+    setSelectedClassHasSections(hasSections);
+
+    if (hasSections) {
+      setSectionHelperText('This class uses sections. Please select a section.');
+      await loadSectionsForClass(classId);
+    } else {
+      setSectionHelperText('This class does not use sections.');
+      setSections([]);
+    }
+
+    setForm(prev => ({
+      ...prev,
+      classId,
+      sectionId: null
+    }));
   };
 
   const validateEmail = (email) => {
@@ -235,13 +282,19 @@ export default function UserManagement() {
       toast.error('Please fix email errors before submitting');
       return;
     }
+
+    if (selectedRole === 'Student' && selectedClassHasSections && !form.sectionId) {
+      toast.error('Section is required for the selected class.');
+      return;
+    }
     
     setLoading(true);
     
     try {
       const userData = {
         ...form,
-        roleName: selectedRole
+        roleName: selectedRole,
+        sectionId: selectedRole === 'Student' && selectedClassHasSections ? form.sectionId : null
       };
 
       if (editMode) {
@@ -263,7 +316,7 @@ export default function UserManagement() {
     }
   };
 
-  const handleEdit = (userData) => {
+  const handleEdit = async (userData) => {
     const email = userData.email || '';
     const username = userData.username || '';
     const admissionNo = userData.admissionNo || userData.studentAdmissionNo || '';
@@ -271,6 +324,11 @@ export default function UserManagement() {
       userData.classId ?? userData.currentClassId ?? userData.studentClassId ?? 0,
       10
     ) || 0;
+
+    const resolvedSectionId = parseInt(
+      userData.sectionId ?? 0,
+      10
+    ) || null;
 
     setForm({
       userId: userData.userId,
@@ -290,10 +348,30 @@ export default function UserManagement() {
       fatherName: userData.fatherName || '',
       motherName: userData.motherName || '',
       classId: resolvedClassId,
+      sectionId: resolvedSectionId,
       gender: userData.gender || '',
       category: userData.category || ''
     });
     setSelectedRole(userData.roleName);
+
+    // Determine if selected class has sections
+    if (resolvedClassId && userData.roleName === 'Student') {
+      const selectedClass = classes.find(c => c.classId === resolvedClassId);
+      const hasSections = selectedClass?.hasSections || false;
+      setSelectedClassHasSections(hasSections);
+      if (hasSections) {
+        setSectionHelperText('This class uses sections. Please select a section.');
+        await loadSectionsForClass(resolvedClassId);
+      } else {
+        setSectionHelperText('This class does not use sections.');
+        setSections([]);
+      }
+    } else {
+      setSelectedClassHasSections(false);
+      setSectionHelperText('');
+      setSections([]);
+    }
+
     setOriginalEmail(email);
     setOriginalUsername(username);
     setUsernameError('');
@@ -304,17 +382,15 @@ export default function UserManagement() {
   };
 
   const handleDelete = async (userData) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete user "${userData.fullName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete'
+    const confirmed = await confirm({
+      title: 'Delete User',
+      message: `Are you sure you want to delete "${userData.fullName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
     });
 
-    if (!result.isConfirmed) return;
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -347,6 +423,7 @@ export default function UserManagement() {
       fatherName: '',
       motherName: '',
       classId: 0,
+      sectionId: null,
       gender: '',
       category: ''
     });
@@ -358,6 +435,9 @@ export default function UserManagement() {
     setAdmissionNoError('');
     setOriginalAdmissionNo('');
     setEditMode(false);
+    setSections([]);
+    setSelectedClassHasSections(false);
+    setSectionHelperText('');
   };
 
   const handleView = (userData) => {
@@ -417,8 +497,8 @@ export default function UserManagement() {
     switch (role) {
       case 'Teacher':
         return [...baseFields, 'phoneNumber', 'gender', 'category', 'qualification', 'designation', 'salary', 'address'];
-      case 'Student':
-        return [...baseFields, 'admissionNo', 'fatherName', 'motherName', 'gender', 'category', 'classId', 'phoneNumber', 'address'];
+    case 'Student':
+        return [...baseFields, 'admissionNo', 'fatherName', 'motherName', 'gender', 'category', 'classId', 'sectionId', 'phoneNumber', 'address'];
       case 'Parent':
         return [...baseFields, 'phoneNumber', 'gender', 'category', 'occupation', 'address'];
       default:
@@ -429,7 +509,7 @@ export default function UserManagement() {
   const isFieldRequired = (field, role) => {
     const requiredFields = {
       Teacher: ['firstName', 'lastName', 'username', 'password', 'phoneNumber'],
-      Student: ['firstName', 'lastName', 'username', 'password', 'admissionNo', 'classId'],
+      Student: ['firstName', 'lastName', 'username', 'password', 'admissionNo', 'classId', 'sectionId'],
       Parent: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber']
     };
     return requiredFields[role]?.includes(field) || false;
@@ -482,53 +562,53 @@ export default function UserManagement() {
   ], []);
 
   const toolbar = (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-      {/* Search Bar */}
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search users..."
-          value={searchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-
-      {/* Role Filter */}
-      <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Role:</label>
-        <select
-          value={roleFilter}
-          onChange={(e) => handleRoleFilterChange(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        >
-          <option value="All">All</option>
-          {selectableRoles.map(role => (
-            <option key={role.roleName} value={role.roleName}>
-              {role.roleName}
-            </option>
-          ))}
-        </select>
-      </div>
-      
-      <PermissionButton
-        moduleName="User Management"
-        subModuleName="Users"
-        action="create"
-        onClick={() => {
-          resetForm();
-          setShowModal(true);
+    <div className="toolbar-row">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearch}
+        onClear={() => {
+          setSearchInput('');
+          setSearchTerm('');
+          setCurrentPage(1);
         }}
-        className="btn-primary flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-        Add User
-      </PermissionButton>
+        placeholder="Search by Name, Username, Email"
+      />
+
+      <div className="toolbar-actions">
+        {/* Role Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Role:</label>
+          <select
+            value={roleFilter}
+            onChange={(e) => handleRoleFilterChange(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          >
+            <option value="All">All</option>
+            {selectableRoles.map(role => (
+              <option key={role.roleName} value={role.roleName}>
+                {role.roleName}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <PermissionButton
+          moduleName="User Management"
+          subModuleName="Users"
+          action="create"
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+          className="btn-primary"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Add User
+        </PermissionButton>
+      </div>
     </div>
   );
 
@@ -553,6 +633,7 @@ export default function UserManagement() {
       fatherName: { label: 'Father Name', type: 'text', placeholder: 'Enter father name (optional)' },
       motherName: { label: 'Mother Name', type: 'text', placeholder: 'Enter mother name (optional)' },
       classId: { label: 'Class', type: 'select-class' },
+      sectionId: { label: 'Section', type: 'select-section' },
       address: { label: 'Address', type: 'textarea', placeholder: 'Enter address' },
       admissionNo: { label: 'Admission Number', type: 'text', placeholder: 'Enter admission number' }
     };
@@ -569,7 +650,7 @@ export default function UserManagement() {
           <select
             required={isRequired}
             value={form.classId || ''}
-            onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
+            onChange={selectedRole === 'Student' ? handleClassChange : (e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
           >
             <option value="">Select Class</option>
@@ -580,6 +661,44 @@ export default function UserManagement() {
             ))}
           </select>
         </div>
+      );
+    }
+
+    if (fieldName === 'sectionId') {
+      if (selectedRole !== 'Student') return null;
+      return (
+        <React.Fragment key={fieldName}>
+          {selectedClassHasSections && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Section *
+              </label>
+              <select
+                required
+                value={form.sectionId || ''}
+                onChange={(e) => setForm({...form, sectionId: parseInt(e.target.value, 10) || null})}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+              >
+                <option value="">Select Section</option>
+                {sections.map((sec) => (
+                  <option key={sec.sectionId} value={sec.sectionId}>
+                    {sec.sectionName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {sectionHelperText && !selectedClassHasSections && form.classId > 0 && (
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{sectionHelperText}</p>
+            </div>
+          )}
+          {selectedClassHasSections && sectionHelperText && (
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic mt-2">{sectionHelperText}</p>
+            </div>
+          )}
+        </React.Fragment>
       );
     }
 
@@ -802,7 +921,7 @@ export default function UserManagement() {
           </div>
           <button
             onClick={handleExport}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-success flex items-center gap-2"
             disabled={users.length === 0}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

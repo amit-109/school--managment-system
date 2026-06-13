@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import notify from '../shared/notifications';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -37,7 +39,7 @@ export default function StudentLedger() {
 
   const handleSearch = async () => {
     if (!filters.studentId || !filters.from || !filters.to) {
-      alert('Please select student and date range');
+      notify.warning('Please select student and date range');
       return;
     }
 
@@ -65,7 +67,7 @@ export default function StudentLedger() {
       }
     } catch (error) {
       console.error('Error fetching student ledger:', error);
-      alert('Error fetching student ledger data');
+      toast.error('Error fetching student ledger data');
     } finally {
       setLoading(false);
     }
@@ -73,7 +75,7 @@ export default function StudentLedger() {
 
   const handleExportCSV = async () => {
     if (!filters.studentId || !filters.from || !filters.to) {
-      alert('Please select student and date range before exporting');
+      notify.warning('Please select student and date range before exporting');
       return;
     }
 
@@ -100,7 +102,7 @@ export default function StudentLedger() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      toast.error('Error exporting CSV file');
     } finally {
       setExportLoading(false);
     }
@@ -281,10 +283,11 @@ export default function StudentLedger() {
             </div>
           </div>
           <AgGridBox
+            title="Student Ledger Results"
             rowData={data}
             columnDefs={columnDefs}
             pagination={true}
-            paginationPageSize={20}
+            paginationPageSize={10}
           />
         </div>
       ) : (

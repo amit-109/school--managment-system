@@ -4,9 +4,11 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
+import { useConfirmation } from '../shared/ConfirmationContext';
 import { getClasses, getSubjects, getClassSubjects, assignSubjectToClass, removeSubjectFromClass } from '../Services/adminService';
 
 export default function ClassSubjects() {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -90,17 +92,24 @@ export default function ClassSubjects() {
   };
 
   const handleRemoveSubject = async (classSubjectData) => {
-    if (window.confirm(`Remove ${classSubjectData.subjectName} from this class?`)) {
-      setLoading(true);
-      try {
-        await removeSubjectFromClass(selectedClassId, classSubjectData.classSubjectId);
-        toast.success('Subject removed successfully');
-        loadClassSubjects(selectedClassId);
-      } catch (error) {
-        toast.error('Failed to remove subject');
-      } finally {
-        setLoading(false);
-      }
+    const confirmed = await confirm({
+      title: 'Remove Subject',
+      message: `Remove "${classSubjectData.subjectName}" from this class?`,
+      detail: 'The subject assignment will be removed.',
+      confirmLabel: 'Remove',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      await removeSubjectFromClass(selectedClassId, classSubjectData.classSubjectId);
+      toast.success('Subject removed successfully');
+      loadClassSubjects(selectedClassId);
+    } catch (error) {
+      toast.error('Failed to remove subject');
+    } finally {
+      setLoading(false);
     }
   };
 

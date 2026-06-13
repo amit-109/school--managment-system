@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
+import notify from '../shared/notifications';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -43,7 +45,7 @@ export default function ClassOutstanding() {
 
   const handleSearch = async () => {
     if (!filters.classId || !filters.termId || !filters.sessionId) {
-      alert('Please select Class, Term, and Session');
+      notify.warning('Please select Class, Term, and Session');
       return;
     }
 
@@ -71,7 +73,7 @@ export default function ClassOutstanding() {
       }
     } catch (error) {
       console.error('Error fetching class outstanding:', error);
-      alert('Error fetching class outstanding data');
+      toast.error('Error fetching class outstanding data');
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function ClassOutstanding() {
     };
 
     if (!currentFilters.classId || !currentFilters.termId || !currentFilters.sessionId) {
-      alert('Please select filters before exporting');
+      notify.warning('Please select filters before exporting');
       return;
     }
 
@@ -112,7 +114,7 @@ export default function ClassOutstanding() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      toast.error('Error exporting CSV file');
     } finally {
       setExportLoading(false);
     }
@@ -263,10 +265,11 @@ export default function ClassOutstanding() {
             </div>
           </div>
           <AgGridBox
+            title="Outstanding Results"
             rowData={data}
             columnDefs={columnDefs}
             pagination={true}
-            paginationPageSize={20}
+            paginationPageSize={10}
           />
         </div>
       ) : (

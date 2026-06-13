@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
 
@@ -304,7 +304,6 @@ export default function GenerateInvoice() {
           </div>
         </div>
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

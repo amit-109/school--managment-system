@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { apiClient } from '../Auth/base';
 import AgGridBox from '../shared/AgGridBox';
 
@@ -64,7 +65,7 @@ export default function FeeTypeCollection() {
       }
     } catch (error) {
       console.error('Error fetching fee type collection:', error);
-      alert('Error fetching fee type collection data');
+      toast.error('Error fetching fee type collection data');
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export default function FeeTypeCollection() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      toast.error('Error exporting CSV file');
     } finally {
       setExportLoading(false);
     }
@@ -252,10 +253,11 @@ export default function FeeTypeCollection() {
             </div>
           </div>
           <AgGridBox
+            title="Fee Type Collection Results"
             rowData={data}
             columnDefs={columnDefs}
             pagination={true}
-            paginationPageSize={20}
+            paginationPageSize={10}
           />
         </div>
       ) : (

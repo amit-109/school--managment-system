@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import TopBar from './components/layout/TopBar.tsx'
 import Sidebar from './components/layout/Sidebar.jsx'
 import Dashboard from './components/modules/Dashboard.tsx'
@@ -66,6 +66,7 @@ export default function App() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [role, setRole] = useState('operator') // This will be updated based on userRole from auth state
   const [tab, setTab] = useState('dashboard')
+  const [preSelectedClassId, setPreSelectedClassId] = useState(null)
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [language, setLanguage] = useState(() => localStorage.getItem('language') || 'en')
   const { isLoading, setIsLoading } = useLoading()
@@ -348,7 +349,6 @@ export default function App() {
             onForgotPassword={() => setShowForgotPassword(true)}
           />
         )}
-        <Toaster position="top-right" />
       </LoadingOverlay>
     );
   }
@@ -382,8 +382,15 @@ export default function App() {
             {tab === 'fees' && <Fees />}
             {tab === 'fee-management' && <FeeManagement />}
             {tab === 'reports' && <Reports />}
-            {tab === 'classes' && <Classes />}
-            {tab === 'sections' && <Sections />}
+            {tab === 'classes' && (
+              <Classes 
+                onNavigateToSections={(classId) => {
+                  setPreSelectedClassId(classId);
+                  setTab('sections');
+                }}
+              />
+            )}
+            {tab === 'sections' && <Sections preSelectedClassId={preSelectedClassId} />}
             {tab === 'sessions' && <Sessions />}
             {tab === 'subjects' && <Subjects />}
             {tab === 'class-subjects' && <ClassSubjects />}
@@ -414,7 +421,6 @@ export default function App() {
         </div>
       </div>
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

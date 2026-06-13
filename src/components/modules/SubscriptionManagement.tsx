@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, FC, ChangeEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import {
@@ -279,6 +278,15 @@ const SubscriptionManagement: FC<SubscriptionManagementProps> = () => {
           rowData={Array.isArray(subscriptions) ? subscriptions : []}
           onEdit={handleEditSubscription}
           toolbar={toolbarButtons}
+          serverPagination
+          currentPage={currentPage + 1}
+          pageSize={pageSize}
+          totalRecords={subscriptionsPagination.totalElements}
+          onPageChange={(page) => setCurrentPage(page - 1)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(0);
+          }}
         />
 
         {/* Update Subscription Modal */}
@@ -383,7 +391,6 @@ const SubscriptionManagement: FC<SubscriptionManagementProps> = () => {
           </div>
         </div>
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

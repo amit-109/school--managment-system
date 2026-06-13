@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
-import Swal from 'sweetalert2'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import SearchBar from '../shared/SearchBar'
+import ActionButtons from '../shared/ActionButtons'
+import Button from '../shared/Button'
+import { useConfirmation } from '../shared/ConfirmationContext'
 import apiClient from '../Auth/base'
 
 export default function Invoices() {
+  const confirm = useConfirmation()
   const { organizationId } = useSelector((state) => state.auth)
   const [invoices, setInvoices] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -86,32 +91,20 @@ export default function Invoices() {
     // Validate notes
     const errors = {}
     if (!updateForm.notes.trim()) {
-      errors.notes = 'Update reason / notes is required'
+      errors.notes = 'Please enter update reason.'
     }
     setUpdateErrors(errors)
     if (Object.keys(errors).length > 0) return
 
-    const result = await Swal.fire({
+    const confirmed = await confirm({
       title: 'Update Invoice',
-      html: `
-        <p style="margin-bottom: 12px; text-align: left;">Are you sure you want to update this invoice?</p>
-        <p style="margin-bottom: 8px; text-align: left; font-size: 13px;">The system will:</p>
-        <ul style="text-align: left; font-size: 13px; padding-left: 20px; line-height: 1.6;">
-          <li>Refresh invoice items from the latest Fee Structure.</li>
-          <li>Apply the latest Student Concession rules.</li>
-          <li>Recalculate invoice totals and balances.</li>
-          <li>Retain all existing payments and allocations.</li>
-        </ul>
-      `,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3b82f6',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Update Invoice',
-      cancelButtonText: 'Cancel'
+      message: 'Updating this invoice will refresh fee structure and concession calculations.',
+      detail: 'Existing payments and payment allocations will remain unchanged.',
+      confirmLabel: 'Update',
+      variant: 'warning'
     })
 
-    if (!result.isConfirmed) return
+    if (!confirmed) return
 
     setLoading(true)
     try {
@@ -140,18 +133,15 @@ export default function Invoices() {
   }
 
   const handleDelete = async (data) => {
-    const result = await Swal.fire({
-      title: 'Delete Invoice?',
-      text: `Are you sure you want to delete invoice ${data.InvoiceNo}? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel'
+    const confirmed = await confirm({
+      title: 'Delete Invoice',
+      message: `Are you sure you want to delete invoice ${data.InvoiceNo}?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
     })
 
-    if (!result.isConfirmed) return
+    if (!confirmed) return
 
     setLoading(true)
     try {
@@ -209,49 +199,14 @@ export default function Invoices() {
         const isEditable = (params.data?.Status === 'Pending' || params.data?.Status === 'PartiallyPaid');
         const isDeletable = (params.data?.Status === 'Pending' && (params.data?.PaidAmount === 0 || params.data?.PaidAmount === 0.0));
         return (
-          <div className="flex items-center gap-1 justify-center" style={{ flexWrap: 'nowrap', overflow: 'visible' }}>
-            <button
-              onClick={() => handleView(params.data)}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-100 dark:bg-primary-900/30 hover:bg-primary-200 dark:hover:bg-primary-800/50 text-primary-600 dark:text-primary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-              title="View"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => handlePrint(params.data)}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-              title="Print"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-            </button>
-            {isEditable && (
-              <button
-                onClick={() => handleEdit(params.data)}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-secondary-100 dark:bg-secondary-900/30 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 text-secondary-600 dark:text-secondary-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-                title="Update Invoice"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-            )}
-            {isDeletable && (
-              <button
-                onClick={() => handleDelete(params.data)}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-600 dark:text-red-400 flex items-center justify-center transition-all duration-200 group min-w-[32px] min-h-[32px]"
-                title="Delete Invoice"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            )}
-          </div>
+          <ActionButtons
+            data={params.data}
+            onView={(invoice) => handleView(invoice)}
+            onEdit={isEditable ? (invoice) => handleEdit(invoice) : undefined}
+            onPrint={(invoice) => handlePrint(invoice)}
+            onDelete={isDeletable ? (invoice) => handleDelete(invoice) : undefined}
+            viewTitle="View Invoice"
+          />
         );
       },
       cellClass: 'flex items-center justify-center',
@@ -450,28 +405,21 @@ export default function Invoices() {
   }
 
   const toolbar = (
-    <div className="flex gap-2">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search invoices..."
-          value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
-        />
-        <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-      <button
-        onClick={() => loadInvoices(currentPage, pageSize, searchTerm)}
-        className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Refresh
-      </button>
+    <div className="toolbar-row">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={(query) => {
+          setSearchTerm(query)
+          setCurrentPage(1)
+        }}
+        onClear={() => {
+          setSearchInput('')
+          setSearchTerm('')
+          setCurrentPage(1)
+        }}
+        placeholder="Search by Invoice No, Student Name"
+      />
     </div>
   )
 
@@ -733,20 +681,20 @@ export default function Invoices() {
               {/* Editable Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="field-label">
                     Due Date <span className="text-slate-400 font-normal">(Optional)</span>
                   </label>
                   <input
                     type="date"
                     value={updateForm.dueDate}
                     onChange={(e) => setUpdateForm({...updateForm, dueDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    className="form-control"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Update Reason / Notes <span className="text-red-500">*</span>
+                  <label className="field-label">
+                    Update Reason / Notes <span className="required-mark">*</span>
                   </label>
                   <textarea
                     value={updateForm.notes}
@@ -758,42 +706,40 @@ export default function Invoices() {
                     }}
                     rows={3}
                     placeholder="Enter reason for updating this invoice..."
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
-                      updateErrors.notes
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
-                    }`}
+                    className={`form-control ${updateErrors.notes ? 'is-invalid' : ''}`}
                   />
                   {updateErrors.notes && (
-                    <p className="text-red-500 text-sm mt-1">{updateErrors.notes}</p>
+                    <p className="field-error">{updateErrors.notes}</p>
                   )}
                 </div>
               </div>
 
               <div className="flex gap-3 pt-6 mt-6 border-t border-slate-200 dark:border-slate-700">
-                <button
+                <Button
                   onClick={handleUpdateSubmit}
-                  className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  className="flex-1"
                   disabled={loading}
+                  icon={(
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
                   {loading ? 'Updating...' : 'Update Invoice'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   onClick={() => { setShowUpdateModal(false); setUpdateData(null) }}
-                  className="btn-secondary flex-1"
+                  className="flex-1"
                   disabled={loading}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, FC } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import StatCard from '../layout/StatCard';
 import {
   fetchAnalyticsDataAsync,
@@ -261,7 +261,6 @@ const SuperAdminDashboard: FC<SuperAdminDashboardProps> = () => {
           </div>
         </div>
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

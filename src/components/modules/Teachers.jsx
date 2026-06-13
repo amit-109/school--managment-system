@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
+import Button from '../shared/Button';
 import { getUsers, createUser, updateUser, deleteUser, getTeacherUsers, getTeacherById, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
 
 export default function Teachers() {
+  const confirm = useConfirmation();
   console.log('Teachers component rendering');
   const { permissions } = useSelector((state) => state.auth);
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [emailError, setEmailError] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
@@ -204,17 +208,15 @@ export default function Teachers() {
   };
 
   const handleDelete = async (userData) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete teacher "${userData.fullName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete'
+    const confirmed = await confirm({
+      title: 'Delete Teacher',
+      message: `Are you sure you want to delete "${userData.fullName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
     });
 
-    if (!result.isConfirmed) return;
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -282,32 +284,32 @@ export default function Teachers() {
   ], []);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search teachers..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-        <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={(query) => {
+          setSearchTerm(query);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSearchInput('');
+          setSearchTerm('');
+          setCurrentPage(1);
+        }}
+        placeholder="Search by Name, Username, Phone"
+      />
       
-      <button
+      <Button
         onClick={() => { resetForm(); setShowModal(true); }}
-        className="btn-primary flex items-center gap-2"
+        icon={(
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        )}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
         Add Teacher
-      </button>
+      </Button>
     </div>
   );
 
@@ -575,7 +577,6 @@ export default function Teachers() {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 }

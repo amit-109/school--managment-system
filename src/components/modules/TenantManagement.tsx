@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, FC, ChangeEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
 import {
   fetchTenantsAsync,
   createTenantAsync,
@@ -31,6 +33,7 @@ interface TenantManagementProps {
 }
 
 const TenantManagement: FC<TenantManagementProps> = () => {
+  const confirm = useConfirmation();
   const dispatch = useDispatch<AppDispatch>();
   const {
     tenants,
@@ -57,6 +60,7 @@ const TenantManagement: FC<TenantManagementProps> = () => {
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [searchInput, setSearchInput] = useState<string>(searchTerm || '');
 
   useEffect(() => {
     loadTenants();
@@ -119,24 +123,22 @@ const TenantManagement: FC<TenantManagementProps> = () => {
   };
 
   const handleDeleteTenant = async (tenant: Tenant) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete tenant "${tenant.tenantName}"? This will permanently remove all associated data.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete',
+    const confirmed = await confirm({
+      title: 'Delete Tenant',
+      message: `Are you sure you want to delete "${tenant.tenantName}"?`,
+      detail: 'This will permanently remove all associated data.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deleteTenantAsync(tenant.tenantId)).unwrap();
-        toast.success('Tenant deleted successfully!');
-        loadTenants();
-      } catch (error: any) {
-        toast.error(`Failed to delete tenant: ${error}`);
-      }
+    if (!confirmed) return;
+
+    try {
+      await dispatch(deleteTenantAsync(tenant.tenantId)).unwrap();
+      toast.success('Tenant deleted successfully!');
+      loadTenants();
+    } catch (error: any) {
+      toast.error(`Failed to delete tenant: ${error}`);
     }
   };
 
@@ -200,8 +202,7 @@ const TenantManagement: FC<TenantManagementProps> = () => {
     });
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleSearch = (value: string) => {
     dispatch(setSearchTerm(value));
     setCurrentPage(0);
   };
@@ -308,12 +309,15 @@ const TenantManagement: FC<TenantManagementProps> = () => {
           <option value="suspended">Suspended</option>
           <option value="trial">Trial</option>
         </select>
-        <input
-          type="text"
-          placeholder="Search tenants..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={handleSearch}
+          onClear={() => {
+            setSearchInput('');
+            handleSearch('');
+          }}
+          placeholder="Search by Tenant Name, Email"
         />
       </div>
     </div>
@@ -359,6 +363,15 @@ const TenantManagement: FC<TenantManagementProps> = () => {
           onEdit={handleEditTenant}
           onDelete={handleDeleteTenant}
           toolbar={toolbarButtons}
+          serverPagination
+          currentPage={currentPage + 1}
+          pageSize={pageSize}
+          totalRecords={tenantsPagination.totalElements}
+          onPageChange={(page) => setCurrentPage(page - 1)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(0);
+          }}
         />
 
         {/* Create Tenant Modal */}
@@ -597,7 +610,6 @@ const TenantManagement: FC<TenantManagementProps> = () => {
           </div>
         </div>
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

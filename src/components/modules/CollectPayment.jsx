@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import SearchBar from '../shared/SearchBar'
+import Button from '../shared/Button'
+import notify from '../shared/notifications'
 import apiClient from '../Auth/base'
 
 export default function CollectPayment() {
@@ -14,6 +17,7 @@ export default function CollectPayment() {
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [paymentSearchInput, setPaymentSearchInput] = useState('')
   const [paymentSearchTerm, setPaymentSearchTerm] = useState('')
   
   const [students, setStudents] = useState([])
@@ -42,11 +46,6 @@ export default function CollectPayment() {
     loadStudents()
     loadPaymentMethods()
   }, [])
-
-  const handlePaymentSearch = (e) => {
-    setPaymentSearchTerm(e.target.value)
-    setCurrentPage(1)
-  }
 
   const loadPayments = async (page = 1, size = 10, search = '') => {
     setLoading(true)
@@ -179,7 +178,7 @@ export default function CollectPayment() {
         const result = response.data.data
         toast.success(`Payment collected successfully! Receipt: ${result.receiptNo}`)
         if (result.unallocated > 0) {
-          toast.info(`Unallocated amount: ₹${result.unallocated}`)
+          notify.info(`Unallocated amount: ₹${result.unallocated}`)
         }
         setShowModal(false)
         resetForm()
@@ -195,28 +194,33 @@ export default function CollectPayment() {
   }
 
   const toolbar = (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      <div className="relative w-full sm:w-auto">
-        <input
-          type="text"
-          placeholder="Search payments..."
-          value={paymentSearchTerm}
-          onChange={handlePaymentSearch}
-          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-full sm:w-64 min-h-[44px]"
-        />
-        <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+    <div className="toolbar-row">
+      <SearchBar
+        value={paymentSearchInput}
+        onChange={setPaymentSearchInput}
+        onSearch={(query) => {
+          setPaymentSearchTerm(query)
+          setCurrentPage(1)
+        }}
+        onClear={() => {
+          setPaymentSearchInput('')
+          setPaymentSearchTerm('')
+          setCurrentPage(1)
+        }}
+        placeholder="Search by Receipt No, Student Name"
+      />
+      <div className="toolbar-actions">
+        <Button
+          onClick={() => { resetForm(); setShowModal(true) }}
+          icon={(
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )}
+        >
+          Collect Payment
+        </Button>
       </div>
-      <button
-        onClick={() => { resetForm(); setShowModal(true) }}
-        className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 min-h-[44px] w-full sm:w-auto justify-center"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Collect Payment
-      </button>
     </div>
   )
 
@@ -508,7 +512,6 @@ export default function CollectPayment() {
           </div>
         )}
       </div>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   )
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, FC } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import toast, { Toaster } from 'react-hot-toast';
-import Swal from 'sweetalert2';
+import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
 import {
   fetchModulesAsync,
   fetchRolesAsync,
@@ -31,6 +32,7 @@ interface ModuleManagementProps {
 }
 
 const ModuleManagement: FC<ModuleManagementProps> = () => {
+  const confirm = useConfirmation();
   const dispatch = useDispatch<AppDispatch>();
   const {
     modules,
@@ -58,6 +60,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   });
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [searchInput, setSearchInput] = useState<string>(searchTerm || '');
 
 
   useEffect(() => {
@@ -122,24 +125,22 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
   };
 
   const handleDeleteModule = async (module: Module) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete module "${module.moduleName}"? This action cannot be undone.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete',
+    const confirmed = await confirm({
+      title: 'Delete Module',
+      message: `Are you sure you want to delete "${module.moduleName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deleteModuleAsync(module.moduleId)).unwrap();
-        toast.success('Module deleted successfully!');
-        loadModules();
-      } catch (error: any) {
-        toast.error(`Failed to delete module: ${error}`);
-      }
+    if (!confirmed) return;
+
+    try {
+      await dispatch(deleteModuleAsync(module.moduleId)).unwrap();
+      toast.success('Module deleted successfully!');
+      loadModules();
+    } catch (error: any) {
+      toast.error(`Failed to delete module: ${error}`);
     }
   };
 
@@ -177,8 +178,7 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
     });
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleSearch = (value: string) => {
     dispatch(setSearchTerm(value));
     setCurrentPage(0);
   };
@@ -264,15 +264,16 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
         </svg>
         Add Module
       </button>
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Search modules..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        />
-      </div>
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearch}
+        onClear={() => {
+          setSearchInput('');
+          handleSearch('');
+        }}
+        placeholder="Search by Module Name, Code"
+      />
     </div>
   );
 
@@ -300,6 +301,15 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
           onEdit={handleEditModule}
           onDelete={handleDeleteModule}
           toolbar={toolbarButtons}
+          serverPagination
+          currentPage={currentPage + 1}
+          pageSize={pageSize}
+          totalRecords={modulesPagination.totalElements}
+          onPageChange={(page) => setCurrentPage(page - 1)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(0);
+          }}
         />
 
         {/* Create Module Modal */}
@@ -533,7 +543,6 @@ const ModuleManagement: FC<ModuleManagementProps> = () => {
           </div>
         )}
       </section>
-      <Toaster position="top-right" />
     </LoadingOverlay>
   );
 };

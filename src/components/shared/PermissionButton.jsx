@@ -46,7 +46,8 @@ const PermissionButton = ({
 
   return (
     <button
-      className={className}
+      type="button"
+      className={`btn ${className}`.trim()}
       onClick={onClick}
       {...props}
     >

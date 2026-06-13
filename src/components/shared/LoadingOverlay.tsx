@@ -10,30 +10,20 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isLoading, children }) 
     <div className="relative">
       {children}
 
-      {/* Overlay with fade and theme support */}
       <div
-        className={`fixed inset-0 flex items-center justify-center transition-all duration-300 z-[9999] ${
+        className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${
           isLoading
-            ? "opacity-100 visible bg-white/70 dark:bg-black/40 backdrop-blur-sm"
-            : "opacity-0 invisible"
+            ? "visible bg-white/75 opacity-100 backdrop-blur-sm dark:bg-slate-950/65"
+            : "invisible opacity-0"
         }`}
+        role="status"
+        aria-live="polite"
+        aria-hidden={!isLoading}
       >
-        <div className="relative flex flex-col items-center justify-center">
-          {/* Spinner */}
-          <div
-            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-[6px] border-solid animate-spin"
-            style={{
-              borderColor: "rgba(73,144,226,0.2)",
-              borderTopColor: "#4990E2",
-              boxShadow: "0 0 8px rgba(73,144,226,0.4)",
-              animationDuration: "1s",
-            }}
-          ></div>
-
-          {/* Text */}
-          <span className="absolute text-[#4990E2] dark:text-[#60A5FA] font-semibold text-sm sm:text-base tracking-wide select-none">
-            Loading
-          </span>
+        <div className="flex min-w-56 flex-col items-center rounded-2xl border border-slate-200 bg-white px-8 py-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600 dark:border-primary-900 dark:border-t-primary-400" />
+          <p className="mt-4 text-sm font-semibold text-slate-800 dark:text-slate-100">Loading data...</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Please wait...</p>
         </div>
       </div>
     </div>

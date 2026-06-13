@@ -4,9 +4,12 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
+import { useConfirmation } from '../shared/ConfirmationContext';
+import SearchBar from '../shared/SearchBar';
 import { getClasses, getSections, createSection, updateSection, deleteSection, getTeachers } from '../Services/adminService';
 
-export default function Sections() {
+export default function Sections({ preSelectedClassId }) {
+  const confirm = useConfirmation();
   const { permissions } = useSelector((state) => state.auth);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -14,7 +17,9 @@ export default function Sections() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(preSelectedClassId || '');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({
     sectionId: 0,
     classId: 0,
@@ -30,6 +35,12 @@ export default function Sections() {
     loadClasses();
     loadTeachers();
   }, []);
+
+  useEffect(() => {
+    if (preSelectedClassId) {
+      setSelectedClassId(String(preSelectedClassId));
+    }
+  }, [preSelectedClassId]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -85,6 +96,12 @@ export default function Sections() {
       return;
     }
 
+    // Section Teacher is always mandatory
+    if (!form.classTeacherId || form.classTeacherId === 0) {
+      toast.error('Section Teacher is required.');
+      return;
+    }
+
     setLoading(true);
     
     try {
@@ -93,9 +110,9 @@ export default function Sections() {
         classId: parseInt(selectedClassId),
         sectionName: form.sectionName,
         description: form.description,
-        classTeacherId: form.classTeacherId || 1, // Default teacher ID
+        classTeacherId: form.classTeacherId,
         classTeacherName: form.classTeacherName,
-        capacity: form.capacity,
+        capacity: form.capacity || 0,
         isActive: form.isActive
       };
 
@@ -111,7 +128,6 @@ export default function Sections() {
       resetForm();
       loadSections(selectedClassId);
     } catch (error) {
-      // Handle API bug where success response shows as error
       console.warn('API response:', error);
       toast.success(editMode ? 'Section updated successfully' : 'Section created successfully');
       setShowModal(false);
@@ -127,10 +143,10 @@ export default function Sections() {
       sectionId: sectionData.sectionId,
       classId: sectionData.classId,
       sectionName: sectionData.sectionName,
-      description: sectionData.description,
+      description: sectionData.description || '',
       classTeacherId: sectionData.classTeacherId,
       classTeacherName: sectionData.classTeacherName,
-      capacity: sectionData.capacity,
+      capacity: sectionData.capacity || 0,
       isActive: sectionData.isActive
     });
     setEditMode(true);
@@ -138,17 +154,24 @@ export default function Sections() {
   };
 
   const handleDelete = async (sectionData) => {
-    if (window.confirm(`Are you sure you want to delete ${sectionData.sectionName}?`)) {
-      setLoading(true);
-      try {
-        await deleteSection(sectionData.sectionId);
-        toast.success('Section deleted successfully');
-        loadSections(selectedClassId);
-      } catch (error) {
-        toast.error('Failed to delete section');
-      } finally {
-        setLoading(false);
-      }
+    const confirmed = await confirm({
+      title: 'Delete Section',
+      message: `Are you sure you want to delete "${sectionData.sectionName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      await deleteSection(sectionData.sectionId);
+      toast.success('Section deleted successfully');
+      loadSections(selectedClassId);
+    } catch (error) {
+      toast.error('Failed to delete section');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -166,22 +189,68 @@ export default function Sections() {
     setEditMode(false);
   };
 
+  const handleExport = () => {
+    const className = classes.find(c => c.classId.toString() === selectedClassId)?.className || '';
+    const csvData = filteredSections.map(sec => ({
+      'Class': className,
+      'Section': sec.sectionName,
+      'Section Teacher': sec.classTeacherName || '',
+      'Capacity': sec.capacity,
+      'Status': sec.isActive ? 'Active' : 'Inactive'
+    }))
+
+    const csvContent = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `sections_${selectedClassId}_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  };
+
+  const filteredSections = useMemo(() => {
+    if (!searchTerm) return sections;
+    return sections.filter(sec => 
+      sec.sectionName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      sec.classTeacherName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [sections, searchTerm]);
+
+  const selectedClassName = classes.find(c => c.classId.toString() === selectedClassId)?.className || '';
+
   const columns = useMemo(() => [
     {
-      headerName: 'ID',
-      field: 'sectionId',
-      width: 80,
-      sortable: true
+      headerName: 'Class',
+      field: 'className',
+      sortable: true,
+      flex: 1,
+      minWidth: 120,
+      valueGetter: (params) => selectedClassName
     },
     {
-      headerName: 'Section Name',
+      headerName: 'Section',
       field: 'sectionName',
-      sortable: true
+      sortable: true,
+      flex: 1,
+      minWidth: 120
     },
     {
-      headerName: 'Teacher',
+      headerName: 'Section Teacher',
       field: 'classTeacherName',
-      sortable: true
+      sortable: true,
+      flex: 1,
+      minWidth: 150,
+      cellRenderer: (params) => {
+        const name = params.value;
+        return name || <span className="text-slate-400">—</span>;
+      }
     },
     {
       headerName: 'Capacity',
@@ -201,16 +270,16 @@ export default function Sections() {
         </span>
       )
     }
-  ], []);
-
-  const selectedClassName = classes.find(c => c.classId.toString() === selectedClassId)?.className || '';
+  ], [selectedClassName]);
 
   const toolbar = (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
       <select
         value={selectedClassId}
         onChange={(e) => {
           setSelectedClassId(e.target.value);
+          setSearchInput('');
+          setSearchTerm('');
           resetForm();
         }}
         className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
@@ -222,6 +291,19 @@ export default function Sections() {
           </option>
         ))}
       </select>
+
+      {selectedClassId && (
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          onSearch={setSearchTerm}
+          onClear={() => {
+            setSearchInput('');
+            setSearchTerm('');
+          }}
+          placeholder="Search by Section, Teacher"
+        />
+      )}
       
       {selectedClassId && (
         <PermissionButton
@@ -246,15 +328,29 @@ export default function Sections() {
   return (
     <LoadingOverlay isLoading={loading}>
       <section className="space-y-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Sections Management</h1>
-          <p className="text-sm text-slate-600">Manage sections within classes</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Sections Management</h1>
+            <p className="text-sm text-slate-600">Manage sections within classes</p>
+          </div>
+          {selectedClassId && (
+            <button
+              onClick={handleExport}
+              className="btn-success flex items-center gap-2"
+              disabled={filteredSections.length === 0}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export CSV
+            </button>
+          )}
         </div>
 
         <AgGridBox
-          title={`Sections${selectedClassName ? ` - ${selectedClassName}` : ''}`}
+          title={`Sections${selectedClassName ? ` - ${selectedClassName}` : ''} (${filteredSections.length})`}
           columnDefs={columns}
-          rowData={sections}
+          rowData={filteredSections}
           onEdit={handleEdit}
           onDelete={handleDelete}
           toolbar={toolbar}
@@ -262,86 +358,104 @@ export default function Sections() {
 
         {/* Add/Edit Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold mb-4">
-                {editMode ? 'Edit Section' : 'Add New Section'}
-              </h3>
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold">
+                  {editMode ? 'Edit Section' : 'Add New Section'}
+                </h3>
+                <button
+                  onClick={() => { setShowModal(false); resetForm(); }}
+                  className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
               
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Section Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={form.sectionName}
-                    onChange={(e) => setForm({...form, sectionName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    placeholder="e.g., Section A"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Section Name */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Section Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={form.sectionName}
+                      onChange={(e) => setForm({...form, sectionName: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="e.g., Section A"
+                    />
+                  </div>
+
+                  {/* Section Teacher - Always mandatory */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Section Teacher *</label>
+                    <select
+                      required
+                      value={form.classTeacherId}
+                      onChange={(e) => {
+                        const selectedTeacher = teachers.find(t => t.teacherId === parseInt(e.target.value));
+                        setForm({
+                          ...form, 
+                          classTeacherId: parseInt(e.target.value),
+                          classTeacherName: selectedTeacher ? selectedTeacher.teacherName : ''
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    >
+                      <option value="">Select a teacher</option>
+                      {teachers.map(teacher => (
+                        <option key={teacher.teacherId} value={teacher.teacherId}>
+                          {teacher.teacherName} - {teacher.designation}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      This teacher will be responsible for attendance, timetable, exams, and student management for this section.
+                    </p>
+                  </div>
+
+                  {/* Capacity */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Capacity</label>
+                    <input
+                      type="number"
+                      value={form.capacity}
+                      onChange={(e) => setForm({...form, capacity: parseInt(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      placeholder="e.g., 30"
+                      min="0"
+                    />
+                  </div>
+
+                  {/* Active */}
+                  <div className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      checked={form.isActive}
+                      onChange={(e) => setForm({...form, isActive: e.target.checked})}
+                      className="w-4 h-4 rounded"
+                    />
+                    <label htmlFor="isActive" className="text-sm font-medium">Active</label>
+                  </div>
+
+                  {/* Description */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1">Description</label>
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm({...form, description: e.target.value})}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                      rows={2}
+                      placeholder="Section description (optional)"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">Description *</label>
-                  <textarea
-                    required
-                    value={form.description}
-                    onChange={(e) => setForm({...form, description: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    rows={2}
-                    placeholder="Section description"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Class Teacher *</label>
-                  <select
-                    required
-                    value={form.classTeacherId}
-                    onChange={(e) => {
-                      const selectedTeacher = teachers.find(t => t.teacherId === parseInt(e.target.value));
-                      setForm({
-                        ...form, 
-                        classTeacherId: parseInt(e.target.value),
-                        classTeacherName: selectedTeacher ? selectedTeacher.teacherName : ''
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  >
-                    <option value="">Select a teacher</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher.teacherId} value={teacher.teacherId}>
-                        {teacher.teacherName} - {teacher.designation}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Capacity *</label>
-                  <input
-                    type="number"
-                    required
-                    value={form.capacity}
-                    onChange={(e) => setForm({...form, capacity: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    placeholder="e.g., 30"
-                    min="1"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isActive"
-                    checked={form.isActive}
-                    onChange={(e) => setForm({...form, isActive: e.target.checked})}
-                    className="mr-2"
-                  />
-                  <label htmlFor="isActive" className="text-sm font-medium">Active</label>
-                </div>
-
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
                   <button
                     type="submit"
                     className="btn-primary flex-1"

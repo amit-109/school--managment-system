@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import toast, { Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import { useConfirmation } from '../shared/ConfirmationContext'
 import apiClient from '../Auth/base'
 
 export default function Sessions() {
+  const confirm = useConfirmation()
   const dispatch = useDispatch()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -167,22 +169,29 @@ export default function Sessions() {
   }
 
   const handleDelete = async (data) => {
-    if (window.confirm(`Are you sure you want to delete session "${data.sessionName}"?`)) {
-      setLoading(true)
-      try {
-        const response = await apiClient.delete(`/admin/feemasters/session/${data.sessionId}`)
+    const confirmed = await confirm({
+      title: 'Delete Session',
+      message: `Are you sure you want to delete "${data.sessionName}"?`,
+      detail: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
 
-        if (response.data.success) {
-          toast.success('Session deleted successfully')
-          loadSessions()
-        } else {
-          toast.error(response.data.message || 'Failed to delete session')
-        }
-      } catch (error) {
-        toast.error(`Network error: ${error.message}`)
-      } finally {
-        setLoading(false)
+    setLoading(true)
+    try {
+      const response = await apiClient.delete(`/admin/feemasters/session/${data.sessionId}`)
+
+      if (response.data.success) {
+        toast.success('Session deleted successfully')
+        loadSessions()
+      } else {
+        toast.error(response.data.message || 'Failed to delete session')
       }
+    } catch (error) {
+      toast.error(`Network error: ${error.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -263,6 +272,5 @@ export default function Sessions() {
         </div>
       </div>
     )}
-    <Toaster position="top-right" />
   </>
 }
