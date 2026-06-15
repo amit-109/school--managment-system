@@ -6,6 +6,7 @@ import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
 import { useConfirmation } from '../shared/ConfirmationContext';
 import SearchBar from '../shared/SearchBar';
+import SearchableDropdown from '../shared/SearchableDropdown';
 import apiClient from '../Auth/base';
 import { getClasses, createClass, updateClass, deleteClass, getTeachers, getSections } from '../Services/adminService';
 
@@ -385,15 +386,19 @@ export default function Classes({ onNavigateToSections }) {
       
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
-        <select
+        <SearchableDropdown
+          options={[
+            { label: 'All', value: 'All' },
+            { label: 'Active', value: 'Active' },
+            { label: 'Inactive', value: 'Inactive' }
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        >
-          <option value="All">All</option>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+          onChange={(val) => setStatusFilter(String(val))}
+          placeholder="All"
+          allLabel="All"
+          showAllOption={false}
+          className="w-36"
+        />
       </div>
       
       <PermissionButton
@@ -479,26 +484,21 @@ export default function Classes({ onNavigateToSections }) {
                   {/* Academic Session */}
                   <div>
                     <label className="block text-sm font-medium mb-1">Academic Year *</label>
-                    <select
-                      required
+                    <SearchableDropdown
+                      options={sessions.map(session => ({ label: session.sessionName, value: session.sessionId }))}
                       value={form.sessionId}
-                      onChange={(e) => {
-                        const selectedSession = sessions.find(s => String(s.sessionId) === e.target.value);
+                      onChange={(val) => {
+                        const selectedSession = sessions.find(s => String(s.sessionId) === String(val));
                         setForm({
                           ...form,
-                          sessionId: e.target.value,
+                          sessionId: String(val),
                           academicYear: selectedSession ? selectedSession.sessionName : ''
                         });
                       }}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="">Select Academic Session</option>
-                      {sessions.map(session => (
-                        <option key={session.sessionId} value={session.sessionId}>
-                          {session.sessionName}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select Academic Session"
+                      allLabel="Select Academic Session"
+                      showAllOption={false}
+                    />
                   </div>
 
                   {/* Has Sections Toggle */}
@@ -527,26 +527,21 @@ export default function Classes({ onNavigateToSections }) {
                     <label className="block text-sm font-medium mb-1">
                       {form.hasSections ? 'Default Class Teacher (Optional)' : 'Class Teacher *'}
                     </label>
-                    <select
-                      required={!form.hasSections}
+                    <SearchableDropdown
+                      options={teachers.map(teacher => ({ label: `${teacher.teacherName} - ${teacher.designation}`, value: teacher.teacherId }))}
                       value={form.classTeacherId}
-                      onChange={(e) => {
-                        const selectedTeacher = teachers.find(t => t.teacherId === parseInt(e.target.value));
+                      onChange={(val) => {
+                        const selectedTeacher = teachers.find(t => t.teacherId === Number(val));
                         setForm({
                           ...form, 
-                          classTeacherId: parseInt(e.target.value),
+                          classTeacherId: Number(val),
                           classTeacherName: selectedTeacher ? selectedTeacher.teacherName : ''
                         });
                       }}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    >
-                      <option value="">{form.hasSections ? 'Select a teacher (optional)' : 'Select a teacher'}</option>
-                      {teachers.map(teacher => (
-                        <option key={teacher.teacherId} value={teacher.teacherId}>
-                          {teacher.teacherName} - {teacher.designation}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder={form.hasSections ? 'Select a teacher (optional)' : 'Select a teacher'}
+                      allLabel={form.hasSections ? 'Select a teacher (optional)' : 'Select a teacher'}
+                      showAllOption={false}
+                    />
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {form.hasSections
                         ? 'This teacher acts as the Class Coordinator / Grade Incharge. Section teachers can be assigned separately.'

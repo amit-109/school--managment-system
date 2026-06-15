@@ -5,6 +5,7 @@ import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import { useConfirmation } from '../shared/ConfirmationContext'
 import SearchBar from '../shared/SearchBar'
+import SearchableDropdown from '../shared/SearchableDropdown'
 import Button from '../shared/Button'
 import apiClient from '../Auth/base'
 
@@ -357,33 +358,30 @@ export default function Concessions() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Fee Type *</label>
-                  <select
+                  <SearchableDropdown
+                    options={feeTypes.map(feeType => ({ label: feeType.feeTypeName, value: feeType.feeTypeId }))}
                     value={form.feeTypeId}
-                    onChange={(e) => setForm(f => ({...f, feeTypeId: parseInt(e.target.value) || 0}))}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.feeTypeId ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                  >
-                    <option value="">Select Fee Type</option>
-                    {feeTypes.map(feeType => (
-                      <option key={feeType.feeTypeId} value={feeType.feeTypeId}>
-                        {feeType.feeTypeName}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm(f => ({...f, feeTypeId: parseInt(val) || 0}))}
+                    placeholder="Select Fee Type"
+                    allLabel="Select Fee Type"
+                    showAllOption={false}
+                  />
                   {errors.feeTypeId && <p className="text-red-500 text-xs mt-1">{errors.feeTypeId}</p>}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Discount Type</label>
-                  <select
+                  <SearchableDropdown
+                    options={[
+                      { label: 'Percent', value: 'Percent' },
+                      { label: 'Flat', value: 'Flat' }
+                    ]}
                     value={form.discountType}
-                    onChange={(e) => setForm(f => ({...f, discountType: e.target.value}))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
-                  >
-                    <option value="Percent">Percent</option>
-                    <option value="Flat">Flat</option>
-                  </select>
+                    onChange={(val) => setForm(f => ({...f, discountType: String(val)}))}
+                    placeholder="Select Discount Type"
+                    allLabel="Select Discount Type"
+                    showAllOption={false}
+                  />
                 </div>
 
                 <div>
@@ -415,14 +413,17 @@ export default function Concessions() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Status</label>
-                  <select
-                    value={form.isActive}
-                    onChange={(e) => setForm(f => ({...f, isActive: e.target.value === 'true'}))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
+                  <SearchableDropdown
+                    options={[
+                      { label: 'Active', value: 'true' },
+                      { label: 'Inactive', value: 'false' }
+                    ]}
+                    value={String(form.isActive)}
+                    onChange={(val) => setForm(f => ({...f, isActive: val === 'true'}))}
+                    placeholder="Select Status"
+                    allLabel="Select Status"
+                    showAllOption={false}
+                  />
                 </div>
               </div>
 

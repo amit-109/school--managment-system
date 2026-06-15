@@ -6,6 +6,7 @@ import LoadingOverlay from '../shared/LoadingOverlay'
 import { useLoading } from '../shared/LoadingContext'
 import { useConfirmation } from '../shared/ConfirmationContext'
 import SearchBar from '../shared/SearchBar'
+import SearchableDropdown from '../shared/SearchableDropdown'
 import { fetchSubjectsAsync, createSubjectAsync, updateSubjectAsync, deleteSubjectAsync } from '../Services/adminStore'
 
 export default function Subjects() {
@@ -231,15 +232,19 @@ export default function Subjects() {
       
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
-        <select
+        <SearchableDropdown
+          options={[
+            { label: 'All', value: 'All' },
+            { label: 'Active', value: 'Active' },
+            { label: 'Inactive', value: 'Inactive' }
+          ]}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        >
-          <option value="All">All</option>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+          onChange={(val) => setStatusFilter(String(val))}
+          placeholder="All"
+          allLabel="All"
+          showAllOption={false}
+          className="w-36"
+        />
       </div>
       
       <button

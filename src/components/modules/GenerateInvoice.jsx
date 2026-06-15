@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import LoadingOverlay from '../shared/LoadingOverlay'
+import SearchableDropdown from '../shared/SearchableDropdown'
 import apiClient from '../Auth/base'
 
 export default function GenerateInvoice() {
@@ -124,10 +125,11 @@ export default function GenerateInvoice() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Class *</label>
-              <select
+              <SearchableDropdown
+                options={classes.map(cls => ({ label: cls.className, value: cls.classId }))}
                 value={form.classId}
-                onChange={(e) => {
-                  const classId = parseInt(e.target.value) || 0
+                onChange={(val) => {
+                  const classId = parseInt(val) || 0
                   setForm(f => ({...f, classId, studentId: 0}))
                   setSearchTerm('')
                   const classStudents = classId
@@ -135,17 +137,10 @@ export default function GenerateInvoice() {
                     : []
                   setFilteredStudents(classStudents)
                 }}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.classId ? 'border-red-500' : 'border-slate-300'
-                }`}
-              >
-                <option value="">Select Class</option>
-                {classes.map(cls => (
-                  <option key={cls.classId} value={cls.classId}>
-                    {cls.className}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Class"
+                allLabel="Select Class"
+                showAllOption={false}
+              />
               {errors.classId && <p className="text-red-500 text-xs mt-1">{errors.classId}</p>}
             </div>
 
@@ -206,10 +201,11 @@ export default function GenerateInvoice() {
 
             <div>
               <label className="block text-sm font-medium mb-2">Term *</label>
-              <select
+              <SearchableDropdown
+                options={terms.map(term => ({ label: term.termName, value: term.termId }))}
                 value={form.termId}
-                onChange={(e) => {
-                  const termId = parseInt(e.target.value) || 0
+                onChange={(val) => {
+                  const termId = parseInt(val) || 0
                   const term = terms.find(t => t.termId === termId)
                   let dueDate = ''
                   if (term?.startMonth) {
@@ -219,36 +215,23 @@ export default function GenerateInvoice() {
                   }
                   setForm(f => ({...f, termId, dueDate}))
                 }}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.termId ? 'border-red-500' : 'border-slate-300'
-                }`}
-              >
-                <option value="">Select Term</option>
-                {terms.map(term => (
-                  <option key={term.termId} value={term.termId}>
-                    {term.termName}
-                  </option>
-                ))}
-              </select>
+                placeholder="Select Term"
+                allLabel="Select Term"
+                showAllOption={false}
+              />
               {errors.termId && <p className="text-red-500 text-xs mt-1">{errors.termId}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-2">Session *</label>
-              <select
+              <SearchableDropdown
+                options={sessions.map(session => ({ label: session.sessionName, value: session.sessionId }))}
                 value={form.sessionId}
-                onChange={(e) => setForm(f => ({...f, sessionId: parseInt(e.target.value) || 0}))}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                  errors.sessionId ? 'border-red-500' : 'border-slate-300'
-                }`}
-              >
-                <option value="">Select Session</option>
-                {sessions.map(session => (
-                  <option key={session.sessionId} value={session.sessionId}>
-                    {session.sessionName}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm(f => ({...f, sessionId: parseInt(val) || 0}))}
+                placeholder="Select Session"
+                allLabel="Select Session"
+                showAllOption={false}
+              />
               {errors.sessionId && <p className="text-red-500 text-xs mt-1">{errors.sessionId}</p>}
             </div>
 

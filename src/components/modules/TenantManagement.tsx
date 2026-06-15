@@ -5,6 +5,7 @@ import apiClient from '../Auth/base'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import SearchBar from '../shared/SearchBar'
+import SearchableDropdown from '../shared/SearchableDropdown'
 
 interface TenantDetail {
   organizationId: number
@@ -202,39 +203,49 @@ export default function TenantManagement() {
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-3">
-      <select
+      <SearchableDropdown
+        options={[
+          { label: 'All Subscriptions', value: '' },
+          { label: 'Active', value: 'Active' },
+          { label: 'Expired', value: 'Expired' },
+          { label: 'Cancelled', value: 'Cancelled' }
+        ]}
         value={statusFilter}
-        onChange={handleFilterChange(setStatusFilter)}
-        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
-      >
-        <option value="">All Plan Status</option>
-        <option value="Active">Active</option>
-        <option value="Expired">Expired</option>
-        <option value="Cancelled">Cancelled</option>
-      </select>
+        onChange={(val) => { setStatusFilter(String(val)); setCurrentPage(1) }}
+        placeholder="All Subscriptions"
+        allLabel="All Subscriptions"
+        showAllOption={false}
+        className="w-44"
+      />
 
-      <select
+      <SearchableDropdown
+        options={[
+          { label: 'All Tenant Status', value: '' },
+          { label: 'Pending', value: 'Pending' },
+          { label: 'Active', value: 'Active' },
+          { label: 'Blocked', value: 'Blocked' },
+          { label: 'Expired', value: 'Expired' }
+        ]}
         value={tenantStatusFilter}
-        onChange={handleFilterChange(setTenantStatusFilter)}
-        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
-      >
-        <option value="">All Tenant Status</option>
-        <option value="Pending">Pending</option>
-        <option value="Active">Active</option>
-        <option value="Blocked">Blocked</option>
-        <option value="Expired">Expired</option>
-      </select>
+        onChange={(val) => { setTenantStatusFilter(String(val)); setCurrentPage(1) }}
+        placeholder="All Tenant Status"
+        allLabel="All Tenant Status"
+        showAllOption={false}
+        className="w-44"
+      />
 
-      <select
+      <SearchableDropdown
+        options={[
+          { label: 'All Plans', value: '' },
+          ...plans.map(plan => ({ label: plan.planName, value: plan.planId }))
+        ]}
         value={planFilter}
-        onChange={handleFilterChange(setPlanFilter)}
-        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
-      >
-        <option value="">All Plans</option>
-        {plans.map(plan => (
-          <option key={plan.planId} value={plan.planId}>{plan.planName}</option>
-        ))}
-      </select>
+        onChange={(val) => { setPlanFilter(String(val)); setCurrentPage(1) }}
+        placeholder="All Plans"
+        allLabel="All Plans"
+        showAllOption={false}
+        className="w-44"
+      />
 
       <SearchBar
         value={searchInput}

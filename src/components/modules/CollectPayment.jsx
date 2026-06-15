@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import SearchBar from '../shared/SearchBar'
+import SearchableDropdown from '../shared/SearchableDropdown'
 import Button from '../shared/Button'
 import notify from '../shared/notifications'
 import apiClient from '../Auth/base'
@@ -368,14 +369,20 @@ export default function CollectPayment() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Payment Mode</label>
-                  <select
+                  <SearchableDropdown
+                    options={[
+                      { label: 'Cash', value: 'Cash' },
+                      { label: 'Cheque', value: 'Cheque' },
+                      { label: 'Online Transfer', value: 'Online' },
+                      { label: 'Card Payment', value: 'Card' },
+                      { label: 'UPI', value: 'UPI' },
+                      { label: 'QR Code', value: 'QR' }
+                    ]}
                     value={form.paymentMode}
-                    onChange={(e) => {
-                      const mode = e.target.value
+                    onChange={(val) => {
+                      const mode = String(val)
                       setForm(f => ({...f, paymentMode: mode, referenceNo: ''}))
                       setErrors({})
-                      
-                      // Load specific payment method for UPI/QR
                       if (mode === 'UPI') {
                         loadSpecificPaymentMethod('UPI')
                       } else if (mode === 'QR') {
@@ -384,15 +391,10 @@ export default function CollectPayment() {
                         setSelectedPaymentMethod(null)
                       }
                     }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
-                  >
-                    <option value="Cash">Cash</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Online">Online Transfer</option>
-                    <option value="Card">Card Payment</option>
-                    <option value="UPI">UPI</option>
-                    <option value="QR">QR Code</option>
-                  </select>
+                    placeholder="Select Payment Mode"
+                    allLabel="Select Payment Mode"
+                    showAllOption={false}
+                  />
                 </div>
 
                 {/* Show UPI ID for UPI payments */}

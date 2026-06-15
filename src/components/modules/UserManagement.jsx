@@ -6,6 +6,7 @@ import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
 import { useConfirmation } from '../shared/ConfirmationContext';
 import SearchBar from '../shared/SearchBar';
+import SearchableDropdown from '../shared/SearchableDropdown';
 import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, getSections, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
@@ -579,18 +580,18 @@ export default function UserManagement() {
         {/* Role Filter */}
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">Role:</label>
-          <select
+          <SearchableDropdown
+            options={[
+              { label: 'All', value: 'All' },
+              ...selectableRoles.map(role => ({ label: role.roleName, value: role.roleName }))
+            ]}
             value={roleFilter}
-            onChange={(e) => handleRoleFilterChange(e.target.value)}
-            className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-          >
-            <option value="All">All</option>
-            {selectableRoles.map(role => (
-              <option key={role.roleName} value={role.roleName}>
-                {role.roleName}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => handleRoleFilterChange(String(val))}
+            placeholder="All"
+            allLabel="All"
+            showAllOption={false}
+            className="w-44"
+          />
         </div>
         
         <PermissionButton
@@ -647,19 +648,14 @@ export default function UserManagement() {
           <label className="block text-sm font-medium mb-1">
             Class {isRequired && '*'}
           </label>
-          <select
-            required={isRequired}
+          <SearchableDropdown
+            options={classes.map(cls => ({ label: cls.className, value: cls.classId }))}
             value={form.classId || ''}
-            onChange={selectedRole === 'Student' ? handleClassChange : (e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-          >
-            <option value="">Select Class</option>
-            {classes.map(cls => (
-              <option key={cls.classId} value={cls.classId}>
-                {cls.className}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => selectedRole === 'Student' ? handleClassChange({ target: { value: val } }) : setForm({...form, classId: Number(val) || 0})}
+            placeholder="Select Class"
+            allLabel="Select Class"
+            showAllOption={false}
+          />
         </div>
       );
     }
@@ -673,19 +669,14 @@ export default function UserManagement() {
               <label className="block text-sm font-medium mb-1">
                 Section *
               </label>
-              <select
-                required
+              <SearchableDropdown
+                options={sections.map((sec) => ({ label: sec.sectionName, value: sec.sectionId }))}
                 value={form.sectionId || ''}
-                onChange={(e) => setForm({...form, sectionId: parseInt(e.target.value, 10) || null})}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-              >
-                <option value="">Select Section</option>
-                {sections.map((sec) => (
-                  <option key={sec.sectionId} value={sec.sectionId}>
-                    {sec.sectionName}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm({...form, sectionId: Number(val) || null})}
+                placeholder="Select Section"
+                allLabel="Select Section"
+                showAllOption={false}
+              />
             </div>
           )}
           {sectionHelperText && !selectedClassHasSections && form.classId > 0 && (
@@ -708,19 +699,14 @@ export default function UserManagement() {
           <label className="block text-sm font-medium mb-1">
             {config.label} {isRequired && '*'}
           </label>
-          <select
-            required={isRequired}
+          <SearchableDropdown
+            options={GENDER_OPTIONS.map((option) => ({ label: option, value: option }))}
             value={form.gender}
-            onChange={(e) => setForm({...form, gender: e.target.value})}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-          >
-            <option value="">Select gender</option>
-            {GENDER_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({...form, gender: String(val)})}
+            placeholder="Select gender"
+            allLabel="Select gender"
+            showAllOption={false}
+          />
         </div>
       );
     }
@@ -731,19 +717,14 @@ export default function UserManagement() {
           <label className="block text-sm font-medium mb-1">
             {config.label} {isRequired && '*'}
           </label>
-          <select
-            required={isRequired}
+          <SearchableDropdown
+            options={CATEGORY_OPTIONS.map((option) => ({ label: option, value: option }))}
             value={form.category}
-            onChange={(e) => setForm({...form, category: e.target.value})}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-          >
-            <option value="">Select category</option>
-            {CATEGORY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+            onChange={(val) => setForm({...form, category: String(val)})}
+            placeholder="Select category"
+            allLabel="Select category"
+            showAllOption={false}
+          />
         </div>
       );
     }
@@ -961,20 +942,15 @@ export default function UserManagement() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Role *</label>
-                  <select
-                    required
+                  <SearchableDropdown
+                    options={selectableRoles.map(role => ({ label: role.roleName, value: role.roleName }))}
                     value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+                    onChange={(val) => setSelectedRole(String(val))}
+                    placeholder="Select Role"
+                    allLabel="Select Role"
+                    showAllOption={false}
                     disabled={editMode}
-                  >
-                    <option value="">Select Role</option>
-                    {selectableRoles.map(role => (
-                      <option key={role.roleName} value={role.roleName}>
-                        {role.roleName}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 {selectedRole && (

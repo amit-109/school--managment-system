@@ -5,6 +5,7 @@ import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import { useConfirmation } from '../shared/ConfirmationContext'
 import apiClient from '../Auth/base'
+import SearchableDropdown from '../shared/SearchableDropdown'
 
 export default function Sessions() {
   const confirm = useConfirmation()
@@ -141,15 +142,19 @@ export default function Sessions() {
   const toolbar = (
     <div className="flex items-center gap-2 flex-wrap">
       <button onClick={() => { resetForm(); setShow(true) }} className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg">+ Add Session</button>
-      <select
+      <SearchableDropdown
+        options={[
+          { label: 'All Status', value: '' },
+          { label: 'Active', value: 'Active' },
+          { label: 'Closed', value: 'Closed' }
+        ]}
         value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value)}
-        className="border rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-slate-800"
-      >
-        <option value="">All Status</option>
-        <option value="Active">Active</option>
-        <option value="Closed">Closed</option>
-      </select>
+        onChange={(val) => setStatusFilter(String(val))}
+        placeholder="All Status"
+        allLabel="All Status"
+        showAllOption={false}
+        className="w-36"
+      />
     </div>
   )
 
