@@ -83,7 +83,6 @@ export default function Terms() {
   const validate = () => {
     const newErrors = {}
     if (!form.termName.trim()) newErrors.termName = 'Term name is required'
-    if (form.startMonth >= form.endMonth) newErrors.endMonth = 'End month must be after start month'
     return newErrors
   }
 

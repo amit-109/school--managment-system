@@ -28,6 +28,8 @@ import Subjects from './components/modules/Subjects.jsx'
 import ClassSubjects from './components/modules/ClassSubjects.jsx'
 import TeacherSubjects from './components/modules/TeacherSubjects.jsx'
 import Terms from './components/modules/Terms.jsx'
+import Attendances from './components/modules/Attendances.jsx'
+import AttendanceReports from './components/modules/AttendanceReports.jsx'
 import Feetype from './components/modules/Feetype.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
 import FeeManagement from './components/modules/FeeManagement.jsx'
@@ -409,6 +411,10 @@ export default function App() {
             {tab === 'student-outstanding' && <StudentOutstanding />}
             {tab === 'fee-type-collection' && <FeeTypeCollection />}
             {tab === 'student-ledger' && <StudentLedger />}
+            {tab === 'attendance' && <Attendances />}
+            {tab === 'mark-attendance' && <Attendances />}
+            {tab === 'mark-student-attendance' && <Attendances />}
+            {tab === 'attendance-reports' && <AttendanceReports />}
             {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
             {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 

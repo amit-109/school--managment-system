@@ -1,617 +1,398 @@
-import React, { useEffect, useState, useCallback, FC, ChangeEvent } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import toast from 'react-hot-toast';
-import Swal from 'sweetalert2';
-import AgGridBox from '../shared/AgGridBox';
-import LoadingOverlay from '../shared/LoadingOverlay';
-import { useConfirmation } from '../shared/ConfirmationContext';
-import SearchBar from '../shared/SearchBar';
-import {
-  fetchTenantsAsync,
-  createTenantAsync,
-  updateTenantAsync,
-  deleteTenantAsync,
-  suspendTenantAsync,
-  reactivateTenantAsync,
-  setSelectedTenant,
-  setSearchTerm,
-} from '../Services/superAdminStore';
-import { Tenant, TenantCreateData, TenantUpdateData } from '../Services/superAdminService';
-import { AppDispatch, RootState } from '../../store';
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import { useSelector } from 'react-redux'
+import toast from 'react-hot-toast'
+import apiClient from '../Auth/base'
+import AgGridBox from '../shared/AgGridBox'
+import LoadingOverlay from '../shared/LoadingOverlay'
+import SearchBar from '../shared/SearchBar'
 
-interface TenantFormData {
-  tenantName: string;
-  domain: string;
-  contactEmail: string;
-  contactPhone?: string;
-  subscriptionPlan: string;
-  subscriptionStatus: 'active' | 'inactive' | 'suspended' | 'trial';
+interface TenantDetail {
+  organizationId: number
+  schoolName: string
+  email: string
+  phone: string
+  planName: string
+  startedAt: string
+  expiresAt: string
+  subscriptionStatus: string
+  tenantStatus: string
+  isActive: boolean
+  userCount: number
 }
 
-interface TenantManagementProps {
-  // Props can be added here if needed in the future
+interface PlanOption {
+  planId: number
+  planName: string
 }
 
-const TenantManagement: FC<TenantManagementProps> = () => {
-  const confirm = useConfirmation();
-  const dispatch = useDispatch<AppDispatch>();
-  const {
-    tenants,
-    tenantsPagination,
-    tenantsLoading,
-    creatingTenant,
-    updatingTenant,
-    deletingTenant,
-    searchTerm,
-    selectedTenant,
-    error,
-  } = useSelector((state: RootState) => state.superAdmin);
-
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
-  const [tenantForm, setTenantForm] = useState<TenantFormData>({
-    tenantName: '',
-    domain: '',
-    contactEmail: '',
-    contactPhone: '',
-    subscriptionPlan: 'Basic',
-    subscriptionStatus: 'trial',
-  });
-  const [currentPage, setCurrentPage] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(10);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [searchInput, setSearchInput] = useState<string>(searchTerm || '');
+export default function TenantManagement() {
+  const [tenants, setTenants] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [tenantStatusFilter, setTenantStatusFilter] = useState('')
+  const [planFilter, setPlanFilter] = useState('')
+  const [plans, setPlans] = useState<PlanOption[]>([])
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailData, setDetailData] = useState<TenantDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   useEffect(() => {
-    loadTenants();
-  }, [currentPage, pageSize, statusFilter]);
+    loadTenants()
+  }, [currentPage, pageSize, searchTerm, statusFilter, tenantStatusFilter, planFilter])
 
-  const loadTenants = useCallback(() => {
-    dispatch(fetchTenantsAsync({
-      page: currentPage,
-      size: pageSize,
-      search: searchTerm,
-      status: statusFilter || undefined
-    }));
-  }, [dispatch, currentPage, pageSize, searchTerm, statusFilter]);
+  useEffect(() => {
+    loadPlans()
+  }, [])
 
-  const handleCreateTenant = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadTenants = async () => {
+    setLoading(true)
     try {
-      const tenantData: TenantCreateData = {
-        tenantName: tenantForm.tenantName,
-        domain: tenantForm.domain,
-        contactEmail: tenantForm.contactEmail,
-        contactPhone: tenantForm.contactPhone || undefined,
-        subscriptionPlan: tenantForm.subscriptionPlan,
-        subscriptionStatus: tenantForm.subscriptionStatus,
-      };
-      await dispatch(createTenantAsync(tenantData)).unwrap();
-      toast.success('Tenant created successfully!');
-      setShowCreateModal(false);
-      resetForm();
-      loadTenants();
-    } catch (error: any) {
-      toast.error(`Failed to create tenant: ${error}`);
-    }
-  };
+      const params = new URLSearchParams({
+        pageNumber: currentPage.toString(),
+        pageSize: pageSize.toString()
+      })
+      if (searchTerm) params.append('search', searchTerm)
+      if (statusFilter) params.append('subscriptionStatus', statusFilter)
+      if (tenantStatusFilter) params.append('tenantStatus', tenantStatusFilter)
+      if (planFilter) params.append('planId', planFilter)
 
-  const handleUpdateTenant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTenant) return;
-
-    try {
-      const tenantData: TenantUpdateData = {
-        tenantName: tenantForm.tenantName,
-        domain: tenantForm.domain,
-        contactEmail: tenantForm.contactEmail,
-        contactPhone: tenantForm.contactPhone || undefined,
-        subscriptionPlan: tenantForm.subscriptionPlan,
-        subscriptionStatus: tenantForm.subscriptionStatus,
-      };
-      await dispatch(updateTenantAsync({
-        tenantId: selectedTenant.tenantId,
-        tenantData
-      })).unwrap();
-      toast.success('Tenant updated successfully!');
-      setShowEditModal(false);
-      resetForm();
-      loadTenants();
-    } catch (error: any) {
-      toast.error(`Failed to update tenant: ${error}`);
-    }
-  };
-
-  const handleDeleteTenant = async (tenant: Tenant) => {
-    const confirmed = await confirm({
-      title: 'Delete Tenant',
-      message: `Are you sure you want to delete "${tenant.tenantName}"?`,
-      detail: 'This will permanently remove all associated data.',
-      confirmLabel: 'Delete',
-      variant: 'danger',
-    });
-
-    if (!confirmed) return;
-
-    try {
-      await dispatch(deleteTenantAsync(tenant.tenantId)).unwrap();
-      toast.success('Tenant deleted successfully!');
-      loadTenants();
-    } catch (error: any) {
-      toast.error(`Failed to delete tenant: ${error}`);
-    }
-  };
-
-  const handleSuspendTenant = async (tenant: Tenant) => {
-    const { value: reason } = await Swal.fire({
-      title: 'Suspension Reason',
-      input: 'textarea',
-      inputPlaceholder: 'Enter reason for suspension...',
-      inputValidator: (value) => {
-        if (!value) {
-          return 'Reason is required!';
-        }
-      },
-      showCancelButton: true,
-      confirmButtonText: 'Suspend',
-      cancelButtonText: 'Cancel',
-    });
-
-    if (reason) {
-      try {
-        await dispatch(suspendTenantAsync({ tenantId: tenant.tenantId, reason })).unwrap();
-        toast.success('Tenant suspended successfully!');
-        loadTenants();
-      } catch (error: any) {
-        toast.error(`Failed to suspend tenant: ${error}`);
+      const response = await apiClient.get(`/superadmin?${params}`)
+      if (response.data.success) {
+        setTenants(response.data.data.tenants || [])
+        setTotalCount(response.data.data.totalCount || 0)
       }
+    } catch (error) {
+      console.error('Failed to load tenants:', error)
+      toast.error('Failed to load tenants')
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  const handleReactivateTenant = async (tenant: Tenant) => {
+  const loadPlans = async () => {
     try {
-      await dispatch(reactivateTenantAsync(tenant.tenantId)).unwrap();
-      toast.success('Tenant reactivated successfully!');
-      loadTenants();
-    } catch (error: any) {
-      toast.error(`Failed to reactivate tenant: ${error}`);
+      const response = await apiClient.get('/superadmin/subscription/plans')
+      if (response.data.success) {
+        setPlans(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load plans:', error)
     }
-  };
-
-  const handleEditTenant = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
-    setTenantForm({
-      tenantName: tenant.tenantName,
-      domain: tenant.domain,
-      contactEmail: tenant.contactEmail,
-      contactPhone: tenant.contactPhone || '',
-      subscriptionPlan: tenant.subscriptionPlan,
-      subscriptionStatus: tenant.subscriptionStatus,
-    });
-    setShowEditModal(true);
-  };
-
-  const resetForm = (): void => {
-    setTenantForm({
-      tenantName: '',
-      domain: '',
-      contactEmail: '',
-      contactPhone: '',
-      subscriptionPlan: 'Basic',
-      subscriptionStatus: 'trial',
-    });
-  };
+  }
 
   const handleSearch = (value: string) => {
-    dispatch(setSearchTerm(value));
-    setCurrentPage(0);
-  };
+    setSearchTerm(value)
+    setCurrentPage(1)
+  }
 
-  const handleStatusFilter = (e: ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setStatusFilter(value);
-    setCurrentPage(0);
-  };
+  const handleFilterChange = (setter: any) => (e: any) => {
+    setter(e.target.value)
+    setCurrentPage(1)
+  }
 
-  const plans: string[] = ['Basic', 'Standard', 'Premium', 'Enterprise'];
+  const handleViewDetail = async (tenant: any) => {
+    setDetailLoading(true)
+    setShowDetailModal(true)
+    try {
+      const response = await apiClient.get(`/superadmin/tenant/${tenant.organizationId}`)
+      if (response.data.success) {
+        setDetailData(response.data.data)
+      }
+    } catch (error) {
+      console.error('Failed to load tenant detail:', error)
+      toast.error('Failed to load tenant details')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
-  const tenantColumns = [
+  const handleToggleStatus = async (tenant: any, newStatus: string) => {
+    setLoading(true)
+    try {
+      const response = await apiClient.patch(`/superadmin/tenants/${tenant.organizationId}/status`, { newStatus })
+      if (response.data.success) {
+        toast.success(`Tenant ${newStatus === 'Active' ? 'activated' : 'blocked'} successfully`)
+        setShowDetailModal(false)
+        setDetailData(null)
+        loadTenants()
+      }
+    } catch (error) {
+      console.error('Failed to update tenant status:', error)
+      toast.error('Failed to update tenant status')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getSubscriptionStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+      case 'Pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+      case 'Blocked': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+      case 'Expired': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+      default: return 'bg-slate-100 text-slate-600'
+    }
+  }
+
+  const handleView = useCallback((data: any) => {
+    handleViewDetail(data)
+  }, [])
+
+  const columns = useMemo(() => [
+    { headerName: 'School Name', field: 'schoolName', sortable: true, flex: 2, minWidth: 180 },
+    { headerName: 'Email', field: 'email', sortable: true, flex: 1.5, minWidth: 180 },
+    { headerName: 'Phone', field: 'phone', sortable: true, flex: 1, minWidth: 130 },
     {
-      headerName: 'ID',
-      field: 'tenantId',
-      width: 80,
+      headerName: 'Plan Name',
+      field: 'planName',
       sortable: true,
-    },
-    {
-      headerName: 'Tenant Name',
-      field: 'tenantName',
-      sortable: true,
-    },
-    {
-      headerName: 'Domain',
-      field: 'domain',
-      sortable: true,
-    },
-    {
-      headerName: 'Contact Email',
-      field: 'contactEmail',
-      sortable: true,
-    },
-    {
-      headerName: 'Contact Phone',
-      field: 'contactPhone',
-      sortable: true,
-    },
-    {
-      headerName: 'Plan',
-      field: 'subscriptionPlan',
-      sortable: true,
+      flex: 1,
+      minWidth: 110,
       cellRenderer: (params: any) => {
-        const plan = params.value;
-        const colorClass =
-          plan === 'Basic' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-          plan === 'Standard' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-          plan === 'Premium' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
-          'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-            {plan}
-          </span>
-        );
-      },
+        const plan = params.value || ''
+        const style = plan === 'Premium' ? 'bg-purple-100 text-purple-800' :
+                      plan === 'Enterprise' ? 'bg-blue-100 text-blue-800' :
+                      'bg-green-100 text-green-800'
+        return <span className={`px-2 py-1 rounded-full text-xs font-medium ${style}`}>{plan}</span>
+      }
     },
     {
-      headerName: 'Status',
+      headerName: 'Plan Status',
       field: 'subscriptionStatus',
       sortable: true,
+      flex: 1,
+      minWidth: 110,
       cellRenderer: (params: any) => {
-        const status = params.value;
-        const colorClass =
-          status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-          status === 'inactive' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-          status === 'suspended' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-          'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-            {status}
-          </span>
-        );
-      },
+        const status = params.value || ''
+        return <span className={`px-2 py-1 rounded-full text-xs font-medium ${getSubscriptionStatusColor(status)}`}>{status}</span>
+      }
     },
     {
-      headerName: 'Created',
-      field: 'createdAt',
-      valueFormatter: (params: any) => new Date(params.value).toLocaleDateString(),
+      headerName: 'Tenant Status',
+      field: 'tenantStatus',
       sortable: true,
+      flex: 1,
+      minWidth: 100,
+      cellRenderer: (params: any) => {
+        const s = params.value || ''
+        if (s === 'Active') return <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+        if (s === 'Pending') return <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+        if (s === 'Blocked') return <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Blocked</span>
+        return <span className="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{s}</span>
+      }
     },
-  ];
+    { headerName: 'Users', field: 'userCount', sortable: true, flex: 0.7, minWidth: 70 },
+    { headerName: 'Teachers', field: 'teacherCount', sortable: true, flex: 0.7, minWidth: 80 },
+    { headerName: 'Students', field: 'studentCount', sortable: true, flex: 0.7, minWidth: 80 },
+    { headerName: 'Parents', field: 'parentCount', sortable: true, flex: 0.7, minWidth: 70 },
+    {
+      headerName: 'Created',
+      field: 'createdOn',
+      sortable: true,
+      flex: 1,
+      minWidth: 110,
+      valueFormatter: (params: any) => params.value ? new Date(params.value).toLocaleDateString() : '-'
+    }
+  ], [])
 
-  const toolbarButtons = (
-    <div className="flex items-center gap-3">
-      <button
-        onClick={() => setShowCreateModal(true)}
-        className="btn-primary flex items-center gap-2"
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-3">
+      <select
+        value={statusFilter}
+        onChange={handleFilterChange(setStatusFilter)}
+        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-        Add Tenant
-      </button>
-      <div className="flex items-center gap-2">
-        <select
-          value={statusFilter}
-          onChange={handleStatusFilter}
-          className="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
-          <option value="trial">Trial</option>
-        </select>
-        <SearchBar
-          value={searchInput}
-          onChange={setSearchInput}
-          onSearch={handleSearch}
-          onClear={() => {
-            setSearchInput('');
-            handleSearch('');
-          }}
-          placeholder="Search by Tenant Name, Email"
-        />
-      </div>
-    </div>
-  );
+        <option value="">All Plan Status</option>
+        <option value="Active">Active</option>
+        <option value="Expired">Expired</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
 
-  // Calculate summary stats
-  const activeTenants = Array.isArray(tenants) ? tenants.filter((tenant: Tenant) => tenant.subscriptionStatus === 'active').length : 0;
-  const suspendedTenants = Array.isArray(tenants) ? tenants.filter((tenant: Tenant) => tenant.subscriptionStatus === 'suspended').length : 0;
-  const trialTenants = Array.isArray(tenants) ? tenants.filter((tenant: Tenant) => tenant.subscriptionStatus === 'trial').length : 0;
+      <select
+        value={tenantStatusFilter}
+        onChange={handleFilterChange(setTenantStatusFilter)}
+        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
+      >
+        <option value="">All Tenant Status</option>
+        <option value="Pending">Pending</option>
+        <option value="Active">Active</option>
+        <option value="Blocked">Blocked</option>
+        <option value="Expired">Expired</option>
+      </select>
+
+      <select
+        value={planFilter}
+        onChange={handleFilterChange(setPlanFilter)}
+        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-slate-100"
+      >
+        <option value="">All Plans</option>
+        {plans.map(plan => (
+          <option key={plan.planId} value={plan.planId}>{plan.planName}</option>
+        ))}
+      </select>
+
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        onSearch={handleSearch}
+        onClear={() => { setSearchInput(''); handleSearch('') }}
+        placeholder="Search by School, Email, Phone..."
+      />
+    </div>
+  )
+
+  const summaryStats = useMemo(() => {
+    const active = tenants.filter((t: any) => t.tenantStatus === 'Active').length
+    const blocked = tenants.filter((t: any) => t.tenantStatus === 'Blocked').length
+    const pending = tenants.filter((t: any) => t.tenantStatus === 'Pending').length
+    return { active, blocked, pending, total: tenants.length }
+  }, [tenants])
 
   return (
-    <LoadingOverlay isLoading={tenantsLoading || creatingTenant || updatingTenant || deletingTenant}>
+    <LoadingOverlay isLoading={loading}>
       <section className="space-y-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Tenant Management</h1>
-          <p className="text-sm text-slate-600">Manage multi-tenant operations, subscriptions, and system access</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">Manage multi-tenant operations, subscriptions, and system access</p>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-green-600 mb-2">Active Tenants</h3>
-            <div className="text-2xl font-bold">{activeTenants}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{summaryStats.active}</div>
+            <div className="text-xs text-green-700 dark:text-green-300 mt-1 font-medium">This Page Active</div>
           </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-orange-600 mb-2">Suspended Tenants</h3>
-            <div className="text-2xl font-bold">{suspendedTenants}</div>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{summaryStats.blocked}</div>
+            <div className="text-xs text-red-700 dark:text-red-300 mt-1 font-medium">This Page Blocked</div>
           </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-blue-600 mb-2">Trial Tenants</h3>
-            <div className="text-2xl font-bold">{trialTenants}</div>
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{summaryStats.pending}</div>
+            <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-1 font-medium">This Page Pending</div>
           </div>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-purple-600 mb-2">Total Tenants</h3>
-            <div className="text-2xl font-bold">{Array.isArray(tenants) ? tenants.length : 0}</div>
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xl p-4 text-center">
+            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{summaryStats.total}</div>
+            <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-1 font-medium">This Page</div>
           </div>
         </div>
 
         <AgGridBox
           title="Tenants"
-          columnDefs={tenantColumns}
-          rowData={Array.isArray(tenants) ? tenants : []}
-          onEdit={handleEditTenant}
-          onDelete={handleDeleteTenant}
-          toolbar={toolbarButtons}
+          columnDefs={columns}
+          rowData={tenants}
+          showActions
+          onView={handleView}
+          viewTitle="View Details"
+          toolbar={toolbar}
           serverPagination
-          currentPage={currentPage + 1}
+          currentPage={currentPage}
           pageSize={pageSize}
-          totalRecords={tenantsPagination.totalElements}
-          onPageChange={(page) => setCurrentPage(page - 1)}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setCurrentPage(0);
-          }}
+          totalRecords={totalCount}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
         />
 
-        {/* Create Tenant Modal */}
-        {showCreateModal && (
+        {showDetailModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold mb-4">Create New Tenant</h3>
-              <form onSubmit={handleCreateTenant} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tenant Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={tenantForm.tenantName}
-                    onChange={(e) => setTenantForm({...tenantForm, tenantName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    placeholder="School/Organization Name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Domain</label>
-                  <input
-                    type="text"
-                    required
-                    value={tenantForm.domain}
-                    onChange={(e) => setTenantForm({...tenantForm, domain: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    placeholder="tenant.domain.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contact Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={tenantForm.contactEmail}
-                    onChange={(e) => setTenantForm({...tenantForm, contactEmail: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={tenantForm.contactPhone}
-                    onChange={(e) => setTenantForm({...tenantForm, contactPhone: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Subscription Plan</label>
-                  <select
-                    value={tenantForm.subscriptionPlan}
-                    onChange={(e) => setTenantForm({...tenantForm, subscriptionPlan: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  >
-                    {plans.map(plan => (
-                      <option key={plan} value={plan}>{plan}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <select
-                    value={tenantForm.subscriptionStatus}
-                    onChange={(e) => setTenantForm({...tenantForm, subscriptionStatus: e.target.value as 'active' | 'inactive' | 'suspended' | 'trial'})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  >
-                    <option value="trial">Trial</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button type="submit" className="btn-primary flex-1">
-                    Create Tenant
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                    className="btn-secondary flex-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Tenant Details</h3>
+                <button onClick={() => { setShowDetailModal(false); setDetailData(null) }} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-        {/* Edit Tenant Modal */}
-        {showEditModal && selectedTenant && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold mb-4">Edit Tenant</h3>
-              <form onSubmit={handleUpdateTenant} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tenant Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={tenantForm.tenantName}
-                    onChange={(e) => setTenantForm({...tenantForm, tenantName: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
+              {detailLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Domain</label>
-                  <input
-                    type="text"
-                    required
-                    value={tenantForm.domain}
-                    onChange={(e) => setTenantForm({...tenantForm, domain: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contact Email</label>
-                  <input
-                    type="email"
-                    required
-                    value={tenantForm.contactEmail}
-                    onChange={(e) => setTenantForm({...tenantForm, contactEmail: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contact Phone</label>
-                  <input
-                    type="text"
-                    value={tenantForm.contactPhone}
-                    onChange={(e) => setTenantForm({...tenantForm, contactPhone: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Subscription Plan</label>
-                  <select
-                    value={tenantForm.subscriptionPlan}
-                    onChange={(e) => setTenantForm({...tenantForm, subscriptionPlan: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  >
-                    {plans.map(plan => (
-                      <option key={plan} value={plan}>{plan}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <select
-                    value={tenantForm.subscriptionStatus}
-                    onChange={(e) => setTenantForm({...tenantForm, subscriptionStatus: e.target.value as 'active' | 'inactive' | 'suspended' | 'trial'})}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                  >
-                    <option value="trial">Trial</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="suspended">Suspended</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <button type="submit" className="btn-primary flex-1">
-                    Update Tenant
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      resetForm();
-                    }}
-                    className="btn-secondary flex-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+              ) : detailData ? (
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4">
+                    <h4 className="text-xl font-bold text-slate-900 dark:text-slate-100">{detailData.schoolName}</h4>
+                    <p className="text-sm text-slate-500 mt-1">Organization ID: {detailData.organizationId}</p>
+                  </div>
 
-              {/* Tenant Actions */}
-              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600 space-y-3">
-                {selectedTenant.subscriptionStatus !== 'suspended' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Email</label>
+                      <p className="font-medium text-sm">{detailData.email}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Phone</label>
+                      <p className="font-medium text-sm">{detailData.phone || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Plan</label>
+                      <p className="font-medium text-sm">{detailData.planName}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Users</label>
+                      <p className="font-medium text-sm">{detailData.userCount}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Started</label>
+                      <p className="font-medium text-sm">{detailData.startedAt ? new Date(detailData.startedAt).toLocaleDateString() : '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Expires</label>
+                      <p className="font-medium text-sm">{detailData.expiresAt ? new Date(detailData.expiresAt).toLocaleDateString() : '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Subscription Status</label>
+                      <p><span className={`px-2 py-1 rounded-full text-xs font-medium ${getSubscriptionStatusColor(detailData.subscriptionStatus)}`}>{detailData.subscriptionStatus}</span></p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wider">Tenant Status</label>
+                      <p><span className={`px-2 py-1 rounded-full text-xs font-medium ${getSubscriptionStatusColor(detailData.tenantStatus || 'Pending')}`}>{detailData.tenantStatus || 'Pending'}</span></p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-center text-slate-500 py-4">No details available</p>
+              )}
+
+              <div className="flex gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                {detailData && detailData.tenantStatus === 'Pending' ? (
+                  <>
+                    <button
+                      onClick={() => handleToggleStatus({ organizationId: detailData.organizationId }, 'Active')}
+                      className="flex-1 px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors"
+                    >
+                      Activate
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus({ organizationId: detailData.organizationId }, 'Blocked')}
+                      className="flex-1 px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors"
+                    >
+                      Block
+                    </button>
+                  </>
+                ) : detailData && (
                   <button
-                    type="button"
-                    onClick={() => handleSuspendTenant(selectedTenant)}
-                    className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400"
+                    onClick={() => handleToggleStatus({ organizationId: detailData.organizationId }, detailData.tenantStatus === 'Blocked' ? 'Active' : 'Blocked')}
+                    className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors ${detailData.tenantStatus === 'Blocked' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
                   >
-                    Suspend Tenant
-                  </button>
-                )}
-                {selectedTenant.subscriptionStatus === 'suspended' && (
-                  <button
-                    type="button"
-                    onClick={() => handleReactivateTenant(selectedTenant)}
-                    className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
-                  >
-                    Reactivate Tenant
+                    {detailData.tenantStatus === 'Blocked' ? 'Activate' : 'Block'}
                   </button>
                 )}
                 <button
-                  type="button"
-                  onClick={() => selectedTenant && handleDeleteTenant(selectedTenant)}
-                  className="w-full py-2 px-4 rounded-lg text-sm font-medium bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                  onClick={() => { setShowDetailModal(false); setDetailData(null) }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Delete Tenant
+                  Close
                 </button>
               </div>
             </div>
           </div>
         )}
-
-        {/* Quick Actions */}
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <button
-              onClick={() => toast('Generate tenant reports')}
-              className="btn-primary text-sm"
-            >
-              Export Reports
-            </button>
-            <button
-              onClick={() => toast('Bulk tenant operations')}
-              className="btn-secondary text-sm"
-            >
-              Bulk Operations
-            </button>
-            <button
-              onClick={() => toast('Send tenant notifications')}
-              className="btn-secondary text-sm"
-            >
-              Send Notifications
-            </button>
-          </div>
-        </div>
       </section>
     </LoadingOverlay>
-  );
-};
-
-export default TenantManagement;
+  )
+}
