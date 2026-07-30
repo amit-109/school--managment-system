@@ -1,9 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
+
+const emptyFilters = {
+  classId: '',
+  status: '',
+  fromDate: '',
+  toDate: '',
+  termId: '',
+  sessionId: ''
+}
 
 export default function Invoices() {
   const { organizationId } = useSelector((state) => state.auth)
@@ -12,22 +21,76 @@ export default function Invoices() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filters, setFilters] = useState(emptyFilters)
+  const [classes, setClasses] = useState([])
+  const [terms, setTerms] = useState([])
+  const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [invoiceDetail, setInvoiceDetail] = useState(null)
+  const searchDebounceRef = useRef(null)
 
   useEffect(() => {
-    loadInvoices(currentPage, pageSize, searchTerm)
-  }, [currentPage, pageSize, searchTerm])
+    loadDropdowns()
+  }, [])
 
-  const loadInvoices = async (page = 1, size = 10, search = '') => {
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 300)
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [searchTerm])
+
+  useEffect(() => {
+    loadInvoices(currentPage, pageSize, debouncedSearch, filters)
+  }, [currentPage, pageSize, debouncedSearch, filters])
+
+  const loadDropdowns = async () => {
+    try {
+      const response = await apiClient.get('/admin/fees/dropdowns')
+      if (response.data.success) {
+        const data = response.data.data || {}
+        setClasses(data.classes || [])
+        setTerms(data.terms || [])
+        setSessions(data.sessions || [])
+      }
+    } catch (error) {
+      console.error('Failed to load invoice filter dropdowns:', error)
+    }
+  }
+
+  const loadInvoices = async (page = 1, size = 10, search = '', activeFilters = emptyFilters) => {
     setLoading(true)
     try {
-      const response = await apiClient.get(`/admin/fees/invoices?page=${page}&size=${size}${search ? `&search=${search}` : ''}`)
+      const params = new URLSearchParams({
+        page: String(page),
+        size: String(size)
+      })
+      if (search) params.append('search', search)
+      if (activeFilters.classId) params.append('classId', activeFilters.classId)
+      if (activeFilters.status) params.append('status', activeFilters.status)
+      if (activeFilters.fromDate) params.append('fromDate', activeFilters.fromDate)
+      if (activeFilters.toDate) params.append('toDate', activeFilters.toDate)
+      if (activeFilters.termId) params.append('termId', activeFilters.termId)
+      if (activeFilters.sessionId) params.append('sessionId', activeFilters.sessionId)
+
+      const response = await apiClient.get(`/admin/fees/invoices?${params}`)
       if (response.data.success) {
-        setInvoices(response.data.data?.invoices || response.data.data || [])
-        setTotalCount(response.data.data?.totalCount || response.data.data?.length || 0)
+        const data = response.data.data
+        // New API: { invoices, totalCount }. Old API (not restarted): bare array.
+        if (Array.isArray(data)) {
+          setInvoices(data)
+          setTotalCount(data.length)
+        } else {
+          setInvoices(data?.invoices || [])
+          setTotalCount(data?.totalCount || 0)
+        }
       }
     } catch (error) {
       console.error('Failed to load invoices:', error)
@@ -35,6 +98,18 @@ export default function Invoices() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setFilters(emptyFilters)
+    setSearchTerm('')
+    setDebouncedSearch('')
+    setCurrentPage(1)
   }
 
   const loadInvoiceDetail = async (invoiceId) => {
@@ -56,6 +131,7 @@ export default function Invoices() {
   const cols = useMemo(() => [
     { field: 'InvoiceNo', headerName: 'Invoice No' },
     { field: 'StudentName', headerName: 'Student' },
+    { field: 'ClassName', headerName: 'Class' },
     { field: 'TotalAmount', headerName: 'Total Amount', valueFormatter: (params) => `₹ ${params.value}` },
     { field: 'TotalDiscount', headerName: 'Discount', valueFormatter: (params) => `₹ ${params.value}` },
     { field: 'NetPayable', headerName: 'Net Payable', valueFormatter: (params) => `₹ ${params.value}` },
@@ -266,29 +342,103 @@ export default function Invoices() {
     }, 250)
   }
 
+  const selectClass =
+    'px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm min-h-[44px]'
+
   const toolbar = (
-    <div className="flex gap-2">
-      <div className="relative">
+    <div className="flex flex-col gap-2 w-full">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search invoice / student / admission..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
+          />
+          <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <select
+          value={filters.classId}
+          onChange={(e) => updateFilter('classId', e.target.value)}
+          className={selectClass}
+          title="Filter by current class"
+        >
+          <option value="">All Classes</option>
+          {classes.map((cls) => (
+            <option key={cls.classId} value={cls.classId}>
+              {cls.className}{cls.section ? ` - ${cls.section}` : ''}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.status}
+          onChange={(e) => updateFilter('status', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="PartiallyPaid">Partially Paid</option>
+          <option value="Paid">Paid</option>
+        </select>
         <input
-          type="text"
-          placeholder="Search invoices..."
-          value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
+          type="date"
+          value={filters.fromDate}
+          onChange={(e) => updateFilter('fromDate', e.target.value)}
+          className={selectClass}
+          title="Invoice date from"
         />
-        <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <input
+          type="date"
+          value={filters.toDate}
+          onChange={(e) => updateFilter('toDate', e.target.value)}
+          className={selectClass}
+          title="Invoice date to"
+        />
+        <select
+          value={filters.termId}
+          onChange={(e) => updateFilter('termId', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">All Terms</option>
+          {terms.map((term) => (
+            <option key={term.termId} value={term.termId}>
+              {term.termName}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.sessionId}
+          onChange={(e) => updateFilter('sessionId', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">All Sessions</option>
+          {sessions.map((session) => (
+            <option key={session.sessionId} value={session.sessionId}>
+              {session.sessionName}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          onClick={() => loadInvoices(currentPage, pageSize, debouncedSearch, filters)}
+          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 min-h-[44px]"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
       </div>
-      <button
-        onClick={() => loadInvoices(currentPage, pageSize, searchTerm)}
-        className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Refresh
-      </button>
     </div>
   )
 
