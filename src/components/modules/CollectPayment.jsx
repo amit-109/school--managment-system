@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
+
+const emptyFilters = {
+  classId: '',
+  paymentMode: '',
+  fromDate: '',
+  toDate: ''
+}
 
 export default function CollectPayment() {
   const { organizationId } = useSelector((state) => state.auth)
@@ -15,6 +22,10 @@ export default function CollectPayment() {
   const [showModal, setShowModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [paymentSearchTerm, setPaymentSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filters, setFilters] = useState(emptyFilters)
+  const [classes, setClasses] = useState([])
+  const searchDebounceRef = useRef(null)
   
   const [students, setStudents] = useState([])
   const [filteredStudents, setFilteredStudents] = useState([])
@@ -35,26 +46,60 @@ export default function CollectPayment() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    loadPayments(currentPage, pageSize, paymentSearchTerm)
-  }, [currentPage, pageSize, paymentSearchTerm])
-
-  useEffect(() => {
     loadStudents()
     loadPaymentMethods()
+    loadClasses()
   }, [])
 
-  const handlePaymentSearch = (e) => {
-    setPaymentSearchTerm(e.target.value)
-    setCurrentPage(1)
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(paymentSearchTerm)
+      setCurrentPage(1)
+    }, 300)
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [paymentSearchTerm])
+
+  useEffect(() => {
+    loadPayments(currentPage, pageSize, debouncedSearch, filters)
+  }, [currentPage, pageSize, debouncedSearch, filters])
+
+  const loadClasses = async () => {
+    try {
+      const response = await apiClient.get('/admin/fees/dropdowns')
+      if (response.data.success) {
+        setClasses(response.data.data?.classes || [])
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error)
+    }
   }
 
-  const loadPayments = async (page = 1, size = 10, search = '') => {
+  const loadPayments = async (page = 1, size = 10, search = '', activeFilters = emptyFilters) => {
     setLoading(true)
     try {
-      const response = await apiClient.get(`/admin/fees/payments?page=${page}&size=${size}${search ? `&search=${search}` : ''}`)
+      const params = new URLSearchParams({
+        page: String(page),
+        size: String(size)
+      })
+      if (search) params.append('search', search)
+      if (activeFilters.classId) params.append('classId', activeFilters.classId)
+      if (activeFilters.paymentMode) params.append('paymentMode', activeFilters.paymentMode)
+      if (activeFilters.fromDate) params.append('fromDate', activeFilters.fromDate)
+      if (activeFilters.toDate) params.append('toDate', activeFilters.toDate)
+
+      const response = await apiClient.get(`/admin/fees/payments?${params}`)
       if (response.data.success) {
-        setPayments(response.data.data?.payments || response.data.data || [])
-        setTotalCount(response.data.data?.totalCount || response.data.totalCount || response.data.data?.length || 0)
+        const data = response.data.data
+        if (Array.isArray(data)) {
+          setPayments(data)
+          setTotalCount(data.length)
+        } else {
+          setPayments(data?.payments || [])
+          setTotalCount(data?.totalCount || 0)
+        }
       }
     } catch (error) {
       console.error('Failed to load payments:', error)
@@ -62,6 +107,18 @@ export default function CollectPayment() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+    setCurrentPage(1)
+  }
+
+  const clearFilters = () => {
+    setFilters(emptyFilters)
+    setPaymentSearchTerm('')
+    setDebouncedSearch('')
+    setCurrentPage(1)
   }
 
   const loadStudents = async () => {
@@ -120,6 +177,7 @@ export default function CollectPayment() {
   const cols = useMemo(() => [
     { field: 'ReceiptNo', headerName: 'Receipt No' },
     { field: 'StudentName', headerName: 'Student' },
+    { field: 'ClassName', headerName: 'Class' },
     { field: 'TotalPaidAmount', headerName: 'Amount', valueFormatter: (params) => `₹ ${params.value}` },
     { field: 'PaymentMode', headerName: 'Payment Mode' },
     { field: 'PaymentDate', headerName: 'Payment Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
@@ -183,7 +241,7 @@ export default function CollectPayment() {
         }
         setShowModal(false)
         resetForm()
-        loadPayments(currentPage, pageSize, paymentSearchTerm)
+        loadPayments(currentPage, pageSize, debouncedSearch, filters)
       } else {
         toast.error(response.data.message || 'Failed to collect payment')
       }
@@ -194,29 +252,81 @@ export default function CollectPayment() {
     }
   }
 
+  const selectClass =
+    'px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm min-h-[44px]'
+
+  const paymentModeOptions = ['Cash', 'UPI', 'QR', 'Card', 'Online', 'Cheque', 'BankTransfer']
+
   const toolbar = (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      <div className="relative w-full sm:w-auto">
+    <div className="flex flex-col gap-2 w-full">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search receipt / student / ref..."
+            value={paymentSearchTerm}
+            onChange={(e) => setPaymentSearchTerm(e.target.value)}
+            className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
+          />
+          <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <select
+          value={filters.classId}
+          onChange={(e) => updateFilter('classId', e.target.value)}
+          className={selectClass}
+          title="Filter by current class"
+        >
+          <option value="">All Classes</option>
+          {classes.map((cls) => (
+            <option key={cls.classId} value={cls.classId}>
+              {cls.className}{cls.section ? ` - ${cls.section}` : ''}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.paymentMode}
+          onChange={(e) => updateFilter('paymentMode', e.target.value)}
+          className={selectClass}
+        >
+          <option value="">All Modes</option>
+          {paymentModeOptions.map((mode) => (
+            <option key={mode} value={mode}>{mode}</option>
+          ))}
+        </select>
         <input
-          type="text"
-          placeholder="Search payments..."
-          value={paymentSearchTerm}
-          onChange={handlePaymentSearch}
-          className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-full sm:w-64 min-h-[44px]"
+          type="date"
+          value={filters.fromDate}
+          onChange={(e) => updateFilter('fromDate', e.target.value)}
+          className={selectClass}
+          title="Payment date from"
         />
-        <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <input
+          type="date"
+          value={filters.toDate}
+          onChange={(e) => updateFilter('toDate', e.target.value)}
+          className={selectClass}
+          title="Payment date to"
+        />
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
+        >
+          Clear
+        </button>
+        <button
+          type="button"
+          onClick={() => { resetForm(); setShowModal(true) }}
+          className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 min-h-[44px] justify-center"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Collect Payment
+        </button>
       </div>
-      <button
-        onClick={() => { resetForm(); setShowModal(true) }}
-        className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 min-h-[44px] w-full sm:w-auto justify-center"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        Collect Payment
-      </button>
     </div>
   )
 
