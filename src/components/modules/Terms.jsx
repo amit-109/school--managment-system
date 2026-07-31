@@ -81,7 +81,13 @@ export default function Terms() {
   const validate = () => {
     const newErrors = {}
     if (!form.termName.trim()) newErrors.termName = 'Term name is required'
-    if (form.startMonth >= form.endMonth) newErrors.endMonth = 'End month must be after start month'
+    if (!form.startMonth || form.startMonth < 1 || form.startMonth > 12) {
+      newErrors.startMonth = 'Start month is required'
+    }
+    if (!form.endMonth || form.endMonth < 1 || form.endMonth > 12) {
+      newErrors.endMonth = 'End month is required'
+    }
+    // Allow end < start for year-spanning terms (e.g. April → March)
     return newErrors
   }
 

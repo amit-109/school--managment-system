@@ -27,6 +27,38 @@ export default function GenerateInvoice() {
   })
   const [errors, setErrors] = useState({})
 
+  /** Last day of month (1-12) as YYYY-MM-DD */
+  const lastDayOfMonth = (month, year) => {
+    const d = new Date(year, month, 0)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const getSessionStartYear = (sessionId) => {
+    const session = sessions.find(s => s.sessionId === sessionId)
+    if (!session?.sessionName) return null
+    const match = String(session.sessionName).match(/(20\d{2})/)
+    return match ? parseInt(match[1], 10) : null
+  }
+
+  /**
+   * Bind due date from term months.
+   * Same-year terms (end >= start): last day of start month (unchanged).
+   * Year-spanning (end < start): last day of end month in next calendar year.
+   */
+  const getDueDateFromTerm = (term, sessionId, invoiceDate) => {
+    if (!term?.startMonth) return ''
+    const startMonth = Number(term.startMonth)
+    const endMonth = Number(term.endMonth)
+    const baseYear =
+      getSessionStartYear(sessionId) ||
+      (invoiceDate ? new Date(invoiceDate).getFullYear() : new Date().getFullYear())
+
+    if (endMonth && endMonth < startMonth) {
+      return lastDayOfMonth(endMonth, baseYear + 1)
+    }
+    return lastDayOfMonth(startMonth, baseYear)
+  }
+
   useEffect(() => {
     loadDropdownData()
   }, [])
@@ -211,13 +243,11 @@ export default function GenerateInvoice() {
                 onChange={(e) => {
                   const termId = parseInt(e.target.value) || 0
                   const term = terms.find(t => t.termId === termId)
-                  let dueDate = ''
-                  if (term?.startMonth) {
-                    const year = new Date().getFullYear()
-                    const d = new Date(year, term.startMonth, 0)
-                    dueDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                  }
-                  setForm(f => ({...f, termId, dueDate}))
+                  setForm(f => ({
+                    ...f,
+                    termId,
+                    dueDate: getDueDateFromTerm(term, f.sessionId, f.invoiceDate)
+                  }))
                 }}
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                   errors.termId ? 'border-red-500' : 'border-slate-300'
@@ -237,7 +267,19 @@ export default function GenerateInvoice() {
               <label className="block text-sm font-medium mb-2">Session *</label>
               <select
                 value={form.sessionId}
-                onChange={(e) => setForm(f => ({...f, sessionId: parseInt(e.target.value) || 0}))}
+                onChange={(e) => {
+                  const sessionId = parseInt(e.target.value) || 0
+                  setForm(f => {
+                    const term = terms.find(t => t.termId === f.termId)
+                    return {
+                      ...f,
+                      sessionId,
+                      dueDate: term
+                        ? getDueDateFromTerm(term, sessionId, f.invoiceDate)
+                        : f.dueDate
+                    }
+                  })
+                }}
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                   errors.sessionId ? 'border-red-500' : 'border-slate-300'
                 }`}

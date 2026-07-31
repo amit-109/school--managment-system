@@ -15,6 +15,17 @@ const getLastDayOfMonth = (month, year = new Date().getFullYear()) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
+/** Same-year: last day of start month. Year-spanning (end < start): last day of end month next year. */
+const getDueDateFromTermMonths = (term, baseYear = new Date().getFullYear()) => {
+  if (!term?.startMonth) return ''
+  const startMonth = Number(term.startMonth)
+  const endMonth = Number(term.endMonth)
+  if (endMonth && endMonth < startMonth) {
+    return getLastDayOfMonth(endMonth, baseYear + 1)
+  }
+  return getLastDayOfMonth(startMonth, baseYear)
+}
+
 export default function FeeStructures() {
   const { organizationId } = useSelector((state) => state.auth)
   const [feeStructures, setFeeStructures] = useState([])
@@ -208,11 +219,10 @@ export default function FeeStructures() {
     if (successCount > 0) { setShowModal(false); resetForm(); loadFeeStructures() }
   }
 
-  // Auto-calculate due date from selected term's startMonth
+  // Auto-calculate due date from term months (year-span aware)
   const getDueDateFromTerm = (termId) => {
     const term = terms.find(t => t.termId === parseInt(termId))
-    if (!term?.startMonth) return ''
-    return getLastDayOfMonth(term.startMonth)
+    return getDueDateFromTermMonths(term)
   }
 
   // Get existing term IDs for current class+session
