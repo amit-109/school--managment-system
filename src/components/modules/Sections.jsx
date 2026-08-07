@@ -168,12 +168,6 @@ export default function Sections() {
 
   const columns = useMemo(() => [
     {
-      headerName: 'ID',
-      field: 'sectionId',
-      width: 80,
-      sortable: true
-    },
-    {
       headerName: 'Section Name',
       field: 'sectionName',
       sortable: true
@@ -216,9 +210,11 @@ export default function Sections() {
         className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
       >
         <option value="">Select Class</option>
-        {classes.map(cls => (
+        {classes
+          .filter((cls) => cls.isActive !== false || selectedClassId === String(cls.classId))
+          .map(cls => (
           <option key={cls.classId} value={cls.classId.toString()}>
-            {cls.className}
+            {cls.className}{cls.isActive === false ? ' (Inactive)' : ''}
           </option>
         ))}
       </select>
@@ -282,14 +278,13 @@ export default function Sections() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Description *</label>
+                  <label className="block text-sm font-medium mb-1">Description</label>
                   <textarea
-                    required
                     value={form.description}
                     onChange={(e) => setForm({...form, description: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     rows={2}
-                    placeholder="Section description"
+                    placeholder="Section description (optional)"
                   />
                 </div>
 

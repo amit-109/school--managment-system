@@ -7,7 +7,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   const [role, setRole] = useState('operator');
   const [expandedModules, setExpandedModules] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const disabledSubmoduleIds = new Set(['parents', 'parent']);
+  const disabledSubmoduleIds = new Set(['parents', 'parent', 'generate-invoice', 'invoices', 'payments', 'concessions']);
   const hiddenModuleIds = new Set(['subject-management']);
 
   // Update local role state when Redux userRole changes
@@ -60,6 +60,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Generate Invoice': '📄',
     'Invoices': '📋',
     'Collect Payment': '💵',
+    'Payments': '🧾',
     'Payment Methods': '💳',
     'Users': '👤',
     'Students': '🎓',
@@ -71,7 +72,8 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
     'Class Outstanding': '🏫',
     'Student Outstanding': '🎓',
     'Fee Type Collection': '💎',
-    'Student Ledger': '📖'
+    'Student Ledger': '📖',
+    'Student Fee Dues': '🧾'
   };
 
   // Static menu items for SuperAdmin

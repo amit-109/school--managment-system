@@ -53,7 +53,6 @@ export default function Sessions() {
   }))
 
   const cols = useMemo(() => [
-    { field: 'sessionId', headerName: 'ID', maxWidth: 100 },
     { field: 'sessionName', headerName: 'Session Name' },
     { field: 'startDate', headerName: 'Start Date', maxWidth: 120 },
     { field: 'endDate', headerName: 'End Date', maxWidth: 120 },

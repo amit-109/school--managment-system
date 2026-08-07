@@ -46,18 +46,25 @@ export default function Teachers() {
   }, [currentPage, pageSize, searchTerm]);
 
   const loadTeachers = async (pageNumber = 1, size = 10, search = '') => {
-    console.log('Loading teachers...');
     setLoading(true);
     try {
       const response = await getTeacherUsers(pageNumber, size, search, '');
-      console.log('Teachers API response:', response);
       if (response.success) {
         setTeachers(response.data?.users || []);
         setTotalCount(response.data?.totalCount || response.data?.users?.length || 0);
+      } else {
+        setTeachers([]);
+        setTotalCount(0);
       }
     } catch (error) {
-      console.error('Error loading teachers:', error);
-      toast.error('Failed to load teachers');
+      // Empty list used to return 404 — treat as no data, not a failure
+      if (error.response?.status === 404) {
+        setTeachers([]);
+        setTotalCount(0);
+      } else {
+        console.error('Error loading teachers:', error);
+        toast.error('Failed to load teachers');
+      }
     } finally {
       setLoading(false);
     }
@@ -361,14 +368,13 @@ export default function Teachers() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-1">Last Name *</label>
+                    <label className="block text-sm font-medium mb-1">Last Name</label>
                     <input
                       type="text"
-                      required
                       value={form.lastName}
                       onChange={(e) => setForm({...form, lastName: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                      placeholder="Enter last name"
+                      placeholder="Enter last name (optional)"
                     />
                   </div>
                   

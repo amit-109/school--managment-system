@@ -1,54 +1,66 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
+import { getSections } from '../Services/adminService'
+import { printPaymentById } from '../utils/printFeeReceipt'
+import { pickLatestSessionId } from '../utils/sessionUtils'
 
 const emptyFilters = {
   classId: '',
+  sectionId: '',
   paymentMode: '',
   fromDate: '',
   toDate: ''
 }
 
+const emptyCollectForm = {
+  studentId: 0,
+  studentName: '',
+  admissionNo: '',
+  paymentTarget: 'TermFee',
+  sessionId: '',
+  paymentMode: 'Cash',
+  referenceNo: '',
+  notes: '',
+  totalPaidAmount: '',
+  yearlyTotal: 0,
+  termFeeLeft: 0,
+  oldFeeLeft: 0
+}
+
 export default function CollectPayment() {
-  const { organizationId } = useSelector((state) => state.auth)
   const [payments, setPayments] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
   const [paymentSearchTerm, setPaymentSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filters, setFilters] = useState(emptyFilters)
   const [classes, setClasses] = useState([])
-  const searchDebounceRef = useRef(null)
-  
-  const [students, setStudents] = useState([])
-  const [filteredStudents, setFilteredStudents] = useState([])
-  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
+  const [filterSections, setFilterSections] = useState([])
+  const [sessions, setSessions] = useState([])
   const [paymentMethods, setPaymentMethods] = useState([])
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
-  const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
-  const [invoices, setInvoices] = useState([])
-  const [loadingInvoices, setLoadingInvoices] = useState(false)
-  
-  const [form, setForm] = useState({
-    studentId: 0,
-    paymentMode: 'Cash',
-    referenceNo: '',
-    notes: '',
-    totalPaidAmount: ''
-  })
+  const searchDebounceRef = useRef(null)
+
+  // Collect modal
+  const [showModal, setShowModal] = useState(false)
+  const [modalClassId, setModalClassId] = useState('')
+  const [modalSectionId, setModalSectionId] = useState('')
+  const [modalSessionId, setModalSessionId] = useState('')
+  const [modalSections, setModalSections] = useState([])
+  const [studentBalances, setStudentBalances] = useState([])
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
+  const [studentQuery, setStudentQuery] = useState('')
+  const [form, setForm] = useState(emptyCollectForm)
   const [errors, setErrors] = useState({})
+  const studentDropdownRef = useRef(null)
 
   useEffect(() => {
-    loadStudents()
+    loadDropdowns()
     loadPaymentMethods()
-    loadClasses()
   }, [])
 
   useEffect(() => {
@@ -57,567 +69,625 @@ export default function CollectPayment() {
       setDebouncedSearch(paymentSearchTerm)
       setCurrentPage(1)
     }, 300)
-    return () => {
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
-    }
+    return () => clearTimeout(searchDebounceRef.current)
   }, [paymentSearchTerm])
 
   useEffect(() => {
     loadPayments(currentPage, pageSize, debouncedSearch, filters)
   }, [currentPage, pageSize, debouncedSearch, filters])
 
-  const loadClasses = async () => {
+  useEffect(() => {
+    if (!showModal || !modalClassId) {
+      setStudentBalances([])
+      return
+    }
+    if (modalSections.length > 0 && !modalSectionId) {
+      setStudentBalances([])
+      return
+    }
+    loadBalances()
+  }, [showModal, modalClassId, modalSectionId, modalSessionId, modalSections.length])
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (studentDropdownRef.current && !studentDropdownRef.current.contains(e.target)) {
+        setStudentDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  const loadDropdowns = async () => {
     try {
       const response = await apiClient.get('/admin/fees/dropdowns')
       if (response.data.success) {
-        setClasses(response.data.data?.classes || [])
+        setClasses((response.data.data?.classes || []).filter((c) => c.isActive !== false))
+        const sess = (response.data.data?.sessions || []).filter((s) => s.isActive !== false)
+        setSessions(sess)
+        const latestId = pickLatestSessionId(sess)
+        if (latestId) setModalSessionId(latestId)
       }
-    } catch (error) {
-      console.error('Failed to load classes:', error)
-    }
-  }
-
-  const loadPayments = async (page = 1, size = 10, search = '', activeFilters = emptyFilters) => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        size: String(size)
-      })
-      if (search) params.append('search', search)
-      if (activeFilters.classId) params.append('classId', activeFilters.classId)
-      if (activeFilters.paymentMode) params.append('paymentMode', activeFilters.paymentMode)
-      if (activeFilters.fromDate) params.append('fromDate', activeFilters.fromDate)
-      if (activeFilters.toDate) params.append('toDate', activeFilters.toDate)
-
-      const response = await apiClient.get(`/admin/fees/payments?${params}`)
-      if (response.data.success) {
-        const data = response.data.data
-        if (Array.isArray(data)) {
-          setPayments(data)
-          setTotalCount(data.length)
-        } else {
-          setPayments(data?.payments || [])
-          setTotalCount(data?.totalCount || 0)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load payments:', error)
-      toast.error('Failed to load payments')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateFilter = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-    setCurrentPage(1)
-  }
-
-  const clearFilters = () => {
-    setFilters(emptyFilters)
-    setPaymentSearchTerm('')
-    setDebouncedSearch('')
-    setCurrentPage(1)
-  }
-
-  const loadStudents = async () => {
-    try {
-      const response = await apiClient.get('/admin/fees/students')
-      if (response.data.success) {
-        const studentData = response.data.data.data || []
-        setStudents(studentData)
-        setFilteredStudents(studentData)
-      }
-    } catch (error) {
-      console.error('Failed to load students:', error)
-    }
-  }
-
-  const loadStudentInvoices = async (userId) => {
-    setLoadingInvoices(true)
-    setInvoices([])
-    try {
-      const response = await apiClient.get(`/admin/fees/invoice/${userId}`)
-      if (response.data.success) {
-        setInvoices(response.data.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to load invoices:', error)
-    } finally {
-      setLoadingInvoices(false)
+    } catch {
+      // ignore
     }
   }
 
   const loadPaymentMethods = async () => {
     try {
       const response = await apiClient.get('/PaymentMethods/methods')
-      if (response.data.success) {
-        setPaymentMethods(response.data.data || [])
-      }
-    } catch (error) {
-      console.error('Failed to load payment methods:', error)
+      const list = response.data?.data || response.data || []
+      setPaymentMethods(Array.isArray(list) ? list.filter((m) => m.isActive !== false) : [])
+    } catch {
+      setPaymentMethods([])
     }
   }
 
-  const loadSpecificPaymentMethod = async (methodType) => {
-    setLoadingPaymentMethod(true)
+  const loadSections = async (classId, forModal) => {
+    if (!classId) {
+      if (forModal) setModalSections([])
+      else setFilterSections([])
+      return
+    }
     try {
-      const response = await apiClient.get(`/PaymentMethods/methods/${methodType}`)
-      if (response.data.success) {
-        setSelectedPaymentMethod(response.data.data)
-      }
-    } catch (error) {
-      console.error(`Failed to load ${methodType} payment method:`, error)
-    } finally {
-      setLoadingPaymentMethod(false)
+      const res = await getSections(classId)
+      const list = res.success ? (res.data || []) : []
+      if (forModal) setModalSections(list)
+      else setFilterSections(list)
+    } catch {
+      if (forModal) setModalSections([])
+      else setFilterSections([])
     }
   }
 
-  const cols = useMemo(() => [
-    { field: 'ReceiptNo', headerName: 'Receipt No' },
-    { field: 'StudentName', headerName: 'Student' },
-    { field: 'ClassName', headerName: 'Class' },
-    { field: 'TotalPaidAmount', headerName: 'Amount', valueFormatter: (params) => `₹ ${params.value}` },
-    { field: 'PaymentMode', headerName: 'Payment Mode' },
-    { field: 'PaymentDate', headerName: 'Payment Date', valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
-    { field: 'ReferenceNo', headerName: 'Reference No' },
-    { field: 'AllocatedAmount', headerName: 'Allocated', valueFormatter: (params) => `₹ ${params.value || 0}` },
-    { field: 'UnAllocatedAmount', headerName: 'Unallocated', valueFormatter: (params) => `₹ ${params.value || 0}` }
-  ], [])
-
-  const validate = () => {
-    const newErrors = {}
-    if (!form.studentId) newErrors.studentId = 'Student is required'
-    if (!form.totalPaidAmount || form.totalPaidAmount <= 0) newErrors.totalPaidAmount = 'Valid amount is required'
-    if ((form.paymentMode === 'UPI' || form.paymentMode === 'QR') && !form.referenceNo) {
-      newErrors.referenceNo = 'Transaction reference number is required for UPI/QR payments'
-    }
-    if (form.paymentMode !== 'Cash' && form.paymentMode !== 'UPI' && form.paymentMode !== 'QR' && !form.referenceNo) {
-      newErrors.referenceNo = 'Reference number is required for non-cash payments'
-    }
-    return newErrors
-  }
-
-  const resetForm = () => {
-    setForm({
-      studentId: 0,
-      paymentMode: 'Cash',
-      referenceNo: '',
-      notes: '',
-      totalPaidAmount: ''
-    })
-    setSearchTerm('')
-    setFilteredStudents([])
-    setStudentDropdownOpen(false)
-    setSelectedPaymentMethod(null)
-    setInvoices([])
-    setErrors({})
-  }
-
-  const handleSubmit = async () => {
-    const newErrors = validate()
-    setErrors(newErrors)
-    if (Object.keys(newErrors).length > 0) return
-
+  const loadPayments = async (page = 1, size = 10, search = '', activeFilters = emptyFilters) => {
     setLoading(true)
     try {
-      const payload = {
-        studentId: form.studentId,
-        paymentDate: new Date().toISOString().split('T')[0],
-        paymentMode: form.paymentMode,
-        referenceNo: form.referenceNo,
-        notes: form.notes,
-        totalPaidAmount: form.totalPaidAmount
-      }
-
-      const response = await apiClient.post('/admin/fees/payments', payload)
-
+      const params = new URLSearchParams()
+      params.append('page', String(page))
+      params.append('size', String(size))
+      if (search) params.append('search', search)
+      if (activeFilters.classId) params.append('classId', activeFilters.classId)
+      if (activeFilters.sectionId) params.append('sectionId', activeFilters.sectionId)
+      if (activeFilters.paymentMode) params.append('paymentMode', activeFilters.paymentMode)
+      if (activeFilters.fromDate) params.append('fromDate', activeFilters.fromDate)
+      if (activeFilters.toDate) params.append('toDate', activeFilters.toDate)
+      const response = await apiClient.get(`/admin/fees/payments?${params}`)
       if (response.data.success) {
-        const result = response.data.data
-        toast.success(`Payment collected successfully! Receipt: ${result.receiptNo}`)
-        if (result.unallocated > 0) {
-          toast.info(`Unallocated amount: ₹${result.unallocated}`)
-        }
-        setShowModal(false)
-        resetForm()
-        loadPayments(currentPage, pageSize, debouncedSearch, filters)
+        const data = response.data.data
+        setPayments(data?.payments || data || [])
+        setTotalCount(data?.totalCount || data?.payments?.length || 0)
       } else {
-        toast.error(response.data.message || 'Failed to collect payment')
+        setPayments([])
+        setTotalCount(0)
       }
-    } catch (error) {
-      toast.error(`Network error: ${error.message}`)
+    } catch {
+      toast.error('Failed to load payments')
+      setPayments([])
+      setTotalCount(0)
     } finally {
       setLoading(false)
     }
   }
 
-  const selectClass =
-    'px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm min-h-[44px]'
+  const loadBalances = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      params.append('classId', modalClassId)
+      if (modalSectionId) params.append('sectionId', modalSectionId)
+      if (modalSessionId) params.append('sessionId', modalSessionId)
+      const response = await apiClient.get(`/admin/fees/balances?${params}`)
+      if (response.data.success) setStudentBalances(response.data.data || [])
+      else setStudentBalances([])
+    } catch {
+      toast.error('Failed to load students')
+      setStudentBalances([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const paymentModeOptions = ['Cash', 'UPI', 'QR', 'Card', 'Online', 'Cheque', 'BankTransfer']
+  const clearFilters = () => {
+    setPaymentSearchTerm('')
+    setDebouncedSearch('')
+    setFilters(emptyFilters)
+    setFilterSections([])
+    setCurrentPage(1)
+  }
 
-  const toolbar = (
-    <div className="flex flex-col gap-2 w-full">
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search receipt / student / ref..."
-            value={paymentSearchTerm}
-            onChange={(e) => setPaymentSearchTerm(e.target.value)}
-            className="px-3 py-2 pl-9 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 text-sm w-64 min-h-[44px]"
-          />
-          <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <select
-          value={filters.classId}
-          onChange={(e) => updateFilter('classId', e.target.value)}
-          className={selectClass}
-          title="Filter by current class"
-        >
-          <option value="">All Classes</option>
-          {classes.map((cls) => (
-            <option key={cls.classId} value={cls.classId}>
-              {cls.className}{cls.section ? ` - ${cls.section}` : ''}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.paymentMode}
-          onChange={(e) => updateFilter('paymentMode', e.target.value)}
-          className={selectClass}
-        >
-          <option value="">All Modes</option>
-          {paymentModeOptions.map((mode) => (
-            <option key={mode} value={mode}>{mode}</option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={filters.fromDate}
-          onChange={(e) => updateFilter('fromDate', e.target.value)}
-          className={selectClass}
-          title="Payment date from"
-        />
-        <input
-          type="date"
-          value={filters.toDate}
-          onChange={(e) => updateFilter('toDate', e.target.value)}
-          className={selectClass}
-          title="Payment date to"
-        />
-        <button
-          type="button"
-          onClick={clearFilters}
-          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm min-h-[44px]"
-        >
-          Clear
-        </button>
-        <button
-          type="button"
-          onClick={() => { resetForm(); setShowModal(true) }}
-          className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2 min-h-[44px] justify-center"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Collect Payment
-        </button>
-      </div>
-    </div>
-  )
+  const openCollectModal = () => {
+    const latestId = pickLatestSessionId(sessions) || modalSessionId
+    if (latestId) setModalSessionId(latestId)
+    setForm({ ...emptyCollectForm, sessionId: latestId, paymentMode: 'Cash' })
+    setErrors({})
+    setModalClassId('')
+    setModalSectionId('')
+    setModalSections([])
+    setStudentBalances([])
+    setStudentQuery('')
+    setStudentDropdownOpen(false)
+    setShowModal(true)
+  }
+
+  const studentLabel = (row) => {
+    const name = row.studentName || row.StudentName || ''
+    const adm = row.admissionNo || row.AdmissionNo || ''
+    return adm ? `${name} (${adm})` : name
+  }
+
+  const filteredStudents = useMemo(() => {
+    const q = studentQuery.trim().toLowerCase()
+    if (!q) return studentBalances
+    return studentBalances.filter((row) => {
+      const name = String(row.studentName || row.StudentName || '').toLowerCase()
+      const adm = String(row.admissionNo || row.AdmissionNo || '').toLowerCase()
+      return name.includes(q) || adm.includes(q) || studentLabel(row).toLowerCase().includes(q)
+    })
+  }, [studentBalances, studentQuery])
+
+  const selectStudent = (row) => {
+    const hasOld = Number(row.oldFeeLeft || row.OldFeeLeft || 0) > 0
+    const name = row.studentName || row.StudentName || ''
+    const adm = row.admissionNo || row.AdmissionNo || ''
+    setForm({
+      studentId: row.studentId || row.StudentId,
+      studentName: name,
+      admissionNo: adm,
+      paymentTarget: hasOld ? '' : 'TermFee',
+      sessionId: modalSessionId,
+      paymentMode: 'Cash',
+      referenceNo: '',
+      notes: '',
+      totalPaidAmount: '',
+      yearlyTotal: Number(row.yearlyTotal || row.YearlyTotal || 0),
+      termFeeLeft: Number(row.termFeeLeft || row.TermFeeLeft || 0),
+      oldFeeLeft: Number(row.oldFeeLeft || row.OldFeeLeft || 0)
+    })
+    setStudentQuery(studentLabel(row))
+    setStudentDropdownOpen(false)
+    setErrors({})
+  }
+
+  const clearSelectedStudent = () => {
+    setForm({ ...emptyCollectForm, sessionId: modalSessionId, paymentMode: 'Cash' })
+    setStudentQuery('')
+    setStudentDropdownOpen(false)
+    setErrors({})
+  }
+
+  const maxPayable = () => {
+    if (form.paymentTarget === 'OldFee') return form.oldFeeLeft
+    if (form.paymentTarget === 'TermFee') return form.termFeeLeft
+    return 0
+  }
+
+  const handleCollectSubmit = async (e) => {
+    e.preventDefault()
+    const next = {}
+    if (!form.paymentTarget) next.paymentTarget = 'Select what to pay'
+    if (!form.totalPaidAmount || Number(form.totalPaidAmount) <= 0) next.totalPaidAmount = 'Enter amount'
+    if (Number(form.totalPaidAmount) > maxPayable()) next.totalPaidAmount = `Max ${maxPayable().toFixed(2)}`
+    if (!form.paymentMode) next.paymentMode = 'Required'
+    const modeNorm = String(form.paymentMode || '').toLowerCase().replace(/\s+/g, '')
+    if ((modeNorm === 'qr' || modeNorm === 'qrcode' || modeNorm === 'upi') && !String(form.referenceNo || '').trim()) {
+      next.referenceNo = 'Transaction reference required'
+    }
+    setErrors(next)
+    if (Object.keys(next).length) return
+
+    setLoading(true)
+    try {
+      const payload = {
+        studentId: form.studentId,
+        sessionId: form.sessionId ? parseInt(form.sessionId, 10) : null,
+        paymentTarget: form.paymentTarget,
+        paymentDate: new Date().toISOString(),
+        paymentMode: form.paymentMode,
+        referenceNo: form.referenceNo || null,
+        notes: form.notes || null,
+        totalPaidAmount: parseFloat(form.totalPaidAmount)
+      }
+      const response = await apiClient.post('/admin/fees/payments', payload)
+      if (response.data.success) {
+        toast.success(response.data.message || 'Payment recorded')
+        setShowModal(false)
+        loadPayments(currentPage, pageSize, debouncedSearch, filters)
+      } else {
+        toast.error(response.data.message || 'Payment failed')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Payment failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePrint = async (row) => {
+    const paymentId = row.paymentId || row.PaymentId
+    setLoading(true)
+    try {
+      await printPaymentById(paymentId)
+    } catch (error) {
+      toast.error(error.message || 'Print failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const paymentCols = useMemo(() => [
+    { headerName: 'Receipt No', field: 'receiptNo', valueGetter: (p) => p.data?.receiptNo || p.data?.ReceiptNo },
+    { headerName: 'Student', field: 'studentName', valueGetter: (p) => p.data?.studentName || p.data?.StudentName || p.data?.fullName },
+    {
+      headerName: 'Class',
+      field: 'className',
+      valueGetter: (p) => {
+        const cls = p.data?.className || p.data?.ClassName || ''
+        const sec = p.data?.sectionName || p.data?.SectionName || ''
+        return sec ? `${cls}(${sec})` : (cls || '—')
+      }
+    },
+    {
+      headerName: 'Amount',
+      field: 'totalPaidAmount',
+      valueGetter: (p) => `₹ ${Number(p.data?.totalPaidAmount ?? p.data?.TotalPaidAmount ?? 0).toFixed(2)}`
+    },
+    { headerName: 'Payment Mode', field: 'paymentMode', valueGetter: (p) => p.data?.paymentMode || p.data?.PaymentMode },
+    {
+      headerName: 'Payment Date',
+      field: 'paymentDate',
+      valueGetter: (p) => {
+        const d = p.data?.paymentDate || p.data?.PaymentDate
+        return d ? new Date(d).toLocaleDateString() : ''
+      }
+    },
+    { headerName: 'Reference No', field: 'referenceNo', valueGetter: (p) => p.data?.referenceNo || p.data?.ReferenceNo || '' }
+  ], [])
+
+  const modeOptions = ['Cash', 'UPI', 'QR']
+
+  const normalizeMode = (m) => String(m || '').toLowerCase().replace(/\s+/g, '')
+  const selectedMode = normalizeMode(form.paymentMode)
+  const qrMethod = paymentMethods.find((m) => {
+    const t = normalizeMode(m.methodType || m.MethodType)
+    return t === 'qr' || t === 'qrcode'
+  })
+  const upiMethod = paymentMethods.find((m) => normalizeMode(m.methodType || m.MethodType) === 'upi')
+  const qrImageUrl = qrMethod?.qrImageUrl || qrMethod?.QrImageUrl || ''
+  const upiIdValue = upiMethod?.upiId || upiMethod?.UpiId || ''
+  const showQrPanel = selectedMode === 'qr' || selectedMode === 'qrcode'
+  const showUpiPanel = selectedMode === 'upi'
+
+  const canPickStudent = modalClassId && (modalSections.length === 0 || modalSectionId)
+  const studentSelected = form.studentId > 0
 
   return (
     <LoadingOverlay isLoading={loading}>
-      <div className="space-y-6">
+      <section className="space-y-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Fee Payment Collection</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">Collect and manage student fee payments</p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Collect Payment</h1>
+          <p className="text-sm text-slate-600">All received payments — collect new payments from the button</p>
         </div>
 
         <AgGridBox
           title="Payments"
-          columnDefs={cols}
+          columnDefs={paymentCols}
           rowData={payments}
-          toolbar={toolbar}
+          onPrint={handlePrint}
           serverPagination
           currentPage={currentPage}
           pageSize={pageSize}
           totalRecords={totalCount}
-          onPageChange={(page) => setCurrentPage(page)}
+          onPageChange={setCurrentPage}
           onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
+          toolbar={(
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                value={paymentSearchTerm}
+                onChange={(e) => setPaymentSearchTerm(e.target.value)}
+                placeholder="Search receipt / student / ref..."
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+              />
+              <select
+                value={filters.classId}
+                onChange={async (e) => {
+                  const classId = e.target.value
+                  setFilters((f) => ({ ...f, classId, sectionId: '' }))
+                  setCurrentPage(1)
+                  await loadSections(classId, false)
+                }}
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+              >
+                <option value="">All Classes</option>
+                {classes.map((c) => <option key={c.classId} value={c.classId}>{c.className}</option>)}
+              </select>
+              {filterSections.length > 0 && (
+                <select
+                  value={filters.sectionId}
+                  onChange={(e) => {
+                    setFilters((f) => ({ ...f, sectionId: e.target.value }))
+                    setCurrentPage(1)
+                  }}
+                  className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                >
+                  <option value="">All Sections</option>
+                  {filterSections.map((s) => (
+                    <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>
+                  ))}
+                </select>
+              )}
+              <select
+                value={filters.paymentMode}
+                onChange={(e) => { setFilters((f) => ({ ...f, paymentMode: e.target.value })); setCurrentPage(1) }}
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+              >
+                <option value="">All Modes</option>
+                {modeOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <input
+                type="date"
+                value={filters.fromDate}
+                onChange={(e) => { setFilters((f) => ({ ...f, fromDate: e.target.value })); setCurrentPage(1) }}
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+              />
+              <input
+                type="date"
+                value={filters.toDate}
+                onChange={(e) => { setFilters((f) => ({ ...f, toDate: e.target.value })); setCurrentPage(1) }}
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+              />
+              <button type="button" onClick={clearFilters} className="px-3 py-1.5 border rounded-lg text-sm">
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={openCollectModal}
+                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm"
+              >
+                + Collect Payment
+              </button>
+            </div>
+          )}
         />
 
         {showModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-2 sm:p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setStudentDropdownOpen(false)}>
+            <div
+              className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Collect Payment</h3>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <button type="button" onClick={() => setShowModal(false)} className="text-slate-500 hover:text-slate-800 text-xl leading-none">&times;</button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Student *</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search and select student..."
-                      value={searchTerm}
-                      onFocus={() => {
-                        setFilteredStudents(students)
-                        setStudentDropdownOpen(true)
-                      }}
-                      onBlur={() => setTimeout(() => setStudentDropdownOpen(false), 150)}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        setSearchTerm(value)
-                        setForm(f => ({...f, studentId: 0}))
-                        setFilteredStudents(
-                          value
-                            ? students.filter(s =>
-                                s.studentName.toLowerCase().includes(value.toLowerCase()) ||
-                                s.admissionNo.toLowerCase().includes(value.toLowerCase())
-                              )
-                            : students
-                        )
-                        setStudentDropdownOpen(true)
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                        errors.studentId ? 'border-red-500' : 'border-slate-300'
-                      }`}
-                    />
-                    {studentDropdownOpen && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {filteredStudents.length > 0 ? filteredStudents.map(student => (
-                          <button
-                            key={student.studentId}
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              setForm(f => ({...f, studentId: student.studentId}))
-                              setSearchTerm(student.studentName)
-                              setStudentDropdownOpen(false)
-                              loadStudentInvoices(student.userId)
-                            }}
-                            className="w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-600 border-b border-slate-200 dark:border-slate-600 last:border-b-0 min-h-[48px]"
-                          >
-                            <div className="font-medium">{student.studentName}</div>
-                            <div className="text-sm text-slate-500">Admission: {student.admissionNo}</div>
-                          </button>
-                        )) : (
-                          <div className="p-3"><p className="text-sm text-slate-500">No students found</p></div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {errors.studentId && <p className="text-red-500 text-xs mt-1">{errors.studentId}</p>}
-                </div>
-
-                {/* Invoices */}
-                {form.studentId > 0 && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Available Invoices</label>
-                    {loadingInvoices ? (
-                      <div className="flex items-center gap-2 px-3 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
-                        <span className="text-sm text-slate-500">Loading invoices...</span>
-                      </div>
-                    ) : invoices.length > 0 ? (
-                      <div className="border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50 dark:bg-slate-700">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Invoice No</th>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Due Date</th>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Net Payable</th>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Paid</th>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Balance</th>
-                              <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {invoices.map((inv, i) => (
-                              <tr key={inv.InvoiceId || i} className="border-t border-slate-200 dark:border-slate-600">
-                                <td className="px-3 py-2">{inv.InvoiceNo}</td>
-                                <td className="px-3 py-2">{new Date(inv.DueDate).toLocaleDateString()}</td>
-                                <td className="px-3 py-2">₹{inv.NetPayable}</td>
-                                <td className="px-3 py-2">₹{inv.PaidAmount}</td>
-                                <td className="px-3 py-2">₹{inv.BalanceAmount}</td>
-                                <td className="px-3 py-2">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                    inv.Status === 'Paid' ? 'bg-green-100 text-green-700' :
-                                    inv.Status === 'Partial' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>{inv.Status}</span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="px-3 py-3 border border-slate-200 dark:border-slate-600 rounded-lg text-sm text-slate-500">No invoices found for this student</div>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Payment Mode</label>
+                  <label className="block text-sm font-medium mb-1">Class *</label>
                   <select
-                    value={form.paymentMode}
-                    onChange={(e) => {
-                      const mode = e.target.value
-                      setForm(f => ({...f, paymentMode: mode, referenceNo: ''}))
-                      setErrors({})
-                      
-                      // Load specific payment method for UPI/QR
-                      if (mode === 'UPI') {
-                        loadSpecificPaymentMethod('UPI')
-                      } else if (mode === 'QR') {
-                        loadSpecificPaymentMethod('QR')
-                      } else {
-                        setSelectedPaymentMethod(null)
-                      }
+                    value={modalClassId}
+                    onChange={async (e) => {
+                      const id = e.target.value
+                      setModalClassId(id)
+                      setModalSectionId('')
+                      clearSelectedStudent()
+                      await loadSections(id, true)
                     }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
                   >
-                    <option value="Cash">Cash</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Online">Online Transfer</option>
-                    <option value="Card">Card Payment</option>
-                    <option value="UPI">UPI</option>
-                    <option value="QR">QR Code</option>
+                    <option value="">Select Class</option>
+                    {classes.map((c) => <option key={c.classId} value={c.classId}>{c.className}</option>)}
                   </select>
                 </div>
-
-                {/* Show UPI ID for UPI payments */}
-                {form.paymentMode === 'UPI' && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">UPI ID</label>
-                    {loadingPaymentMethod ? (
-                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
-                        <span className="text-slate-600 dark:text-slate-400">Loading UPI details...</span>
-                      </div>
-                    ) : selectedPaymentMethod ? (
-                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
-                        {selectedPaymentMethod.upiId}
-                      </div>
-                    ) : (
-                      <div className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 text-red-500">
-                        UPI method not configured
-                      </div>
-                    )}
+                {modalSections.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Section *</label>
+                    <select
+                      value={modalSectionId}
+                      onChange={(e) => {
+                        setModalSectionId(e.target.value)
+                        clearSelectedStudent()
+                      }}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                    >
+                      <option value="">Select Section</option>
+                      {modalSections.map((s) => (
+                        <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
-
-                {/* Show QR Code for QR payments */}
-                {form.paymentMode === 'QR' && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">QR Code</label>
-                    {loadingPaymentMethod ? (
-                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
-                          <span className="text-slate-600 dark:text-slate-400">Loading QR code...</span>
-                        </div>
-                      </div>
-                    ) : selectedPaymentMethod && selectedPaymentMethod.qrImageUrl ? (
-                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
-                        <img
-                          src={selectedPaymentMethod.qrImageUrl}
-                          alt="QR Code for Payment"
-                          className="mx-auto max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg"
-                          style={{maxHeight: '300px', maxWidth: '300px'}}
-                        />
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">Scan this QR code to make payment</p>
-                      </div>
-                    ) : (
-                      <div className="text-center p-4 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700">
-                        <p className="text-red-500">QR code not configured</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    {form.paymentMode === 'UPI' || form.paymentMode === 'QR' ? 'Transaction Reference No *' : `Reference No ${form.paymentMode !== 'Cash' ? '*' : ''}`}
-                  </label>
-                  <input
-                    type="text"
-                    value={form.referenceNo}
-                    onChange={(e) => setForm(f => ({...f, referenceNo: e.target.value}))}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.referenceNo ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                    placeholder={form.paymentMode === 'UPI' || form.paymentMode === 'QR' ? 'Enter transaction reference number' : 'Enter reference number'}
-                    disabled={form.paymentMode === 'Cash'}
-                  />
-                  {errors.referenceNo && <p className="text-red-500 text-xs mt-1">{errors.referenceNo}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Amount *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.totalPaidAmount}
+                  <label className="block text-sm font-medium mb-1">Session</label>
+                  <select
+                    value={modalSessionId}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setForm(f => ({...f, totalPaidAmount: value === '' ? '' : parseFloat(value) || 0}));
+                      setModalSessionId(e.target.value)
+                      clearSelectedStudent()
                     }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
-                      errors.totalPaidAmount ? 'border-red-500' : 'border-slate-300'
-                    }`}
-                    placeholder="Enter payment amount"
-                  />
-                  {errors.totalPaidAmount && <p className="text-red-500 text-xs mt-1">{errors.totalPaidAmount}</p>}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Notes</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => setForm(f => ({...f, notes: e.target.value}))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
-                    rows="3"
-                    placeholder="Enter any notes for this payment"
-                  />
+                    className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                  >
+                    <option value="">Select</option>
+                    {sessions.map((s) => <option key={s.sessionId} value={s.sessionId}>{s.sessionName}</option>)}
+                  </select>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-6 py-3 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading || invoices.length === 0}
-                >
-                  {loading ? 'Processing...' : 'Collect Payment'}
-                </button>
+              <div className="relative" ref={studentDropdownRef}>
+                <label className="block text-sm font-medium mb-1">Student *</label>
+                {!canPickStudent ? (
+                  <p className="text-sm text-slate-500 px-3 py-2 border rounded-lg bg-slate-50 dark:bg-slate-700/40">
+                    Select class{modalSections.length > 0 ? ' and section' : ''} first
+                  </p>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <input
+                        value={studentSelected
+                          ? `${form.studentName} (${form.admissionNo || '-'})`
+                          : studentQuery}
+                        onChange={(e) => {
+                          if (studentSelected) clearSelectedStudent()
+                          setStudentQuery(e.target.value)
+                          setStudentDropdownOpen(true)
+                        }}
+                        onFocus={() => setStudentDropdownOpen(true)}
+                        placeholder="Search by name or admission no."
+                        className="w-full px-3 py-2 pr-9 border rounded-lg dark:bg-slate-700"
+                        autoComplete="off"
+                      />
+                      {(studentQuery || studentSelected) && (
+                        <button
+                          type="button"
+                          onClick={clearSelectedStudent}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-lg leading-none"
+                          title="Clear"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                    {studentDropdownOpen && !studentSelected && (
+                      <ul className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto border rounded-lg bg-white dark:bg-slate-800 shadow-lg">
+                        {filteredStudents.length === 0 ? (
+                          <li className="px-3 py-2 text-sm text-slate-500">
+                            {studentBalances.length === 0 ? 'No students found' : 'No match'}
+                          </li>
+                        ) : (
+                          filteredStudents.map((s) => {
+                            const id = s.studentId || s.StudentId
+                            return (
+                              <li key={id}>
+                                <button
+                                  type="button"
+                                  onClick={() => selectStudent(s)}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                                >
+                                  {studentLabel(s)}
+                                </button>
+                              </li>
+                            )
+                          })
+                        )}
+                      </ul>
+                    )}
+                  </>
+                )}
               </div>
+
+              {studentSelected && (
+                <form onSubmit={handleCollectSubmit} className="space-y-3 border-t pt-4">
+                  <p className="text-sm text-slate-600">
+                    Yearly: {form.yearlyTotal.toFixed(2)} | Term left: {form.termFeeLeft.toFixed(2)} | Old left: {form.oldFeeLeft.toFixed(2)}
+                  </p>
+                  {form.oldFeeLeft > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Pay for *</label>
+                      <select
+                        value={form.paymentTarget}
+                        onChange={(e) => setForm((f) => ({ ...f, paymentTarget: e.target.value, totalPaidAmount: '' }))}
+                        className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                      >
+                        <option value="">Select</option>
+                        <option value="TermFee">Term Fee</option>
+                        <option value="OldFee">Old Fee</option>
+                      </select>
+                      {errors.paymentTarget && <p className="text-red-500 text-xs">{errors.paymentTarget}</p>}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Payment Mode</label>
+                      <select
+                        value={form.paymentMode}
+                        onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                      >
+                        {modeOptions.map((m) => <option key={m} value={m}>{m === 'QR' ? 'QR Code' : m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Amount * (max {maxPayable().toFixed(2)})</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.totalPaidAmount}
+                        onChange={(e) => setForm((f) => ({ ...f, totalPaidAmount: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                        placeholder="Enter payment amount"
+                      />
+                      {errors.totalPaidAmount && <p className="text-red-500 text-xs">{errors.totalPaidAmount}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        {showQrPanel || showUpiPanel ? 'Transaction Reference No *' : 'Reference No'}
+                      </label>
+                      <input
+                        value={form.referenceNo}
+                        onChange={(e) => setForm((f) => ({ ...f, referenceNo: e.target.value }))}
+                        className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                        placeholder={showQrPanel || showUpiPanel ? 'Enter transaction reference number' : 'Enter reference number'}
+                      />
+                      {errors.referenceNo && <p className="text-red-500 text-xs">{errors.referenceNo}</p>}
+                    </div>
+                  </div>
+
+                  {showQrPanel && (
+                    <div className="border rounded-xl p-4 bg-slate-50 dark:bg-slate-700/40 text-center space-y-2">
+                      <p className="text-sm font-medium">QR Code</p>
+                      {qrImageUrl ? (
+                        <>
+                          <img
+                            src={qrImageUrl}
+                            alt="QR Code"
+                            className="mx-auto max-h-56 max-w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white"
+                          />
+                          <p className="text-sm text-slate-600 dark:text-slate-300">Scan this QR code to make payment</p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-amber-700 dark:text-amber-300">
+                          No QR image configured. Add one under Payment Methods.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {showUpiPanel && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">UPI ID</label>
+                      <div className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-sky-50 dark:bg-slate-700 dark:border-slate-600 text-slate-800 dark:text-slate-100 font-medium">
+                        {upiIdValue || 'No UPI ID configured — add one under Payment Methods'}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <textarea
+                      value={form.notes}
+                      onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-slate-700"
+                      rows={2}
+                      placeholder="Enter any notes for this payment"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                    <button type="submit" className="px-4 py-2 bg-slate-900 text-white rounded-lg">Collect Payment</button>
+                  </div>
+                </form>
+              )}
+
+              {!studentSelected && (
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                </div>
+              )}
             </div>
           </div>
         )}
-      </div>
+      </section>
       <Toaster position="top-right" />
     </LoadingOverlay>
   )

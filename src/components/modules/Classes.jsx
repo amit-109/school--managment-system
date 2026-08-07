@@ -4,17 +4,19 @@ import toast from 'react-hot-toast';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getClasses, createClass, updateClass, deleteClass, getTeachers } from '../Services/adminService';
+import { getClasses, createClass, updateClass, deleteClass, getTeachers, getSessions } from '../Services/adminService';
 
 export default function Classes() {
   const { permissions } = useSelector((state) => state.auth);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [sessionFilter, setSessionFilter] = useState('All');
   const [form, setForm] = useState({
     classId: 0,
     className: '',
@@ -29,6 +31,7 @@ export default function Classes() {
   useEffect(() => {
     loadClasses();
     loadTeachers();
+    loadSessions();
   }, []);
 
   const loadClasses = async () => {
@@ -53,6 +56,19 @@ export default function Classes() {
       }
     } catch (error) {
       console.error('Failed to load teachers:', error);
+    }
+  };
+
+  const loadSessions = async () => {
+    try {
+      const response = await getSessions();
+      const list = response?.success
+        ? (response.data || [])
+        : (Array.isArray(response) ? response : (response?.data || []));
+      setSessions((list || []).filter((s) => s.isActive !== false));
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      setSessions([]);
     }
   };
 
@@ -141,11 +157,11 @@ export default function Classes() {
 
   const handleExport = () => {
     const csvData = filteredClasses.map(cls => ({
-      'Class ID': cls.classId,
       'Class Name': cls.className,
       'Description': cls.description,
       'Class Teacher': cls.classTeacherName,
       'Academic Year': cls.academicYear,
+      'Sections': cls.sectionNames || 'No sections',
       'Order': cls.orderNo,
       'Status': cls.isActive ? 'Active' : 'Inactive'
     }))
@@ -171,23 +187,27 @@ export default function Classes() {
       const matchesSearch = searchTerm === '' ||
         cls.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cls.classTeacherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cls.academicYear?.toLowerCase().includes(searchTerm.toLowerCase())
+        cls.academicYear?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.sectionNames?.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesStatus = statusFilter === 'All' ||
         (statusFilter === 'Active' && cls.isActive) ||
         (statusFilter === 'Inactive' && !cls.isActive)
+
+      const matchesSession = sessionFilter === 'All' ||
+        cls.academicYear === sessionFilter
       
-      return matchesSearch && matchesStatus
+      return matchesSearch && matchesStatus && matchesSession
     })
-  }, [classes, searchTerm, statusFilter]);
+  }, [classes, searchTerm, statusFilter, sessionFilter]);
+
+  const sessionOptions = useMemo(() => {
+    const fromClasses = [...new Set((classes || []).map((c) => c.academicYear).filter(Boolean))];
+    const fromSessions = (sessions || []).map((s) => s.sessionName).filter(Boolean);
+    return [...new Set([...fromSessions, ...fromClasses])].sort();
+  }, [classes, sessions]);
 
   const columns = useMemo(() => [
-    {
-      headerName: 'ID',
-      field: 'classId',
-      width: 80,
-      sortable: true
-    },
     {
       headerName: 'Class Name',
       field: 'className',
@@ -202,6 +222,17 @@ export default function Classes() {
       headerName: 'Academic Year',
       field: 'academicYear',
       sortable: true
+    },
+    {
+      headerName: 'Sections',
+      field: 'sectionNames',
+      sortable: true,
+      valueGetter: (params) => {
+        const names = params.data?.sectionNames;
+        const count = params.data?.sectionCount ?? 0;
+        if (!names && !count) return 'No sections';
+        return names || `${count} section(s)`;
+      }
     },
     {
       headerName: 'Status',
@@ -232,6 +263,20 @@ export default function Classes() {
         </svg>
       </div>
       
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Session:</label>
+        <select
+          value={sessionFilter}
+          onChange={(e) => setSessionFilter(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        >
+          <option value="All">All</option>
+          {sessionOptions.map((sessionName) => (
+            <option key={sessionName} value={sessionName}>{sessionName}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex items-center gap-2">
         <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status:</label>
         <select
@@ -314,14 +359,13 @@ export default function Classes() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Description *</label>
+                  <label className="block text-sm font-medium mb-1">Description</label>
                   <textarea
-                    required
                     value={form.description}
                     onChange={(e) => setForm({...form, description: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
                     rows={2}
-                    placeholder="Class description"
+                    placeholder="Class description (optional)"
                   />
                 </div>
 
@@ -350,15 +394,20 @@ export default function Classes() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Academic Year *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium mb-1">Academic Year (Session) *</label>
+                  <select
                     required
                     value={form.academicYear}
                     onChange={(e) => setForm({...form, academicYear: e.target.value})}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
-                    placeholder="e.g., 2024-25"
-                  />
+                  >
+                    <option value="">Select Session</option>
+                    {sessions.map((session) => (
+                      <option key={session.sessionId || session.sessionName} value={session.sessionName}>
+                        {session.sessionName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

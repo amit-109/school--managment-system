@@ -5,6 +5,7 @@ import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
 import apiClient from '../Auth/base'
 import Swal from 'sweetalert2'
+import { getSections } from '../Services/adminService'
 
 const getLastDayOfMonth = (month, year = new Date().getFullYear()) => {
   const date = new Date(year, month, 0)
@@ -38,9 +39,10 @@ export default function FeeStructures() {
   const [feeTypes, setFeeTypes] = useState([])
   const [terms, setTerms] = useState([])
   const [sessions, setSessions] = useState([])
+  const [sections, setSections] = useState([])
 
   // Add mode: shared fields
-  const [addForm, setAddForm] = useState({ classId: '', section: 'A', sessionId: '' })
+  const [addForm, setAddForm] = useState({ classId: '', sectionId: '', sessionId: '' })
   // Matrix rows: map of termId -> rows[], each row = { feeTypeId, amount, dueDate }
   const [termRows, setTermRows] = useState({})
   // Track expanded terms
@@ -48,14 +50,28 @@ export default function FeeStructures() {
   const [addErrors, setAddErrors] = useState({})
 
   // Edit mode: matrix
-  const [editFilter, setEditFilter] = useState({ classId: '', termId: '' })
+  const [editFilter, setEditFilter] = useState({ classId: '', sectionId: '', termId: '' })
+  const [editSections, setEditSections] = useState([])
   const [editRows, setEditRows] = useState([])
   const [editErrors, setEditErrors] = useState({})
   const [form, setForm] = useState({
-    classFeeId: 0, classId: '', section: 'A', feeTypeId: '', termId: '',
+    classFeeId: 0, classId: '', sectionId: '', section: '', feeTypeId: '', termId: '',
     sessionId: '', amount: '', dueDate: '', isActive: true
   })
   const [errors, setErrors] = useState({})
+
+  const loadSectionsForClass = async (classId) => {
+    if (!classId) {
+      setSections([])
+      return
+    }
+    try {
+      const res = await getSections(classId)
+      setSections(res.success ? (res.data || []) : [])
+    } catch {
+      setSections([])
+    }
+  }
 
   useEffect(() => {
     loadFeeStructures()
@@ -96,7 +112,7 @@ export default function FeeStructures() {
 
   const cols = useMemo(() => [
     { field: 'ClassName', headerName: 'Class', sort: 'asc', sortIndex: 0 },
-    { field: 'Section', headerName: 'Section' },
+    { field: 'SectionName', headerName: 'Section', valueGetter: (p) => p.data?.SectionName || p.data?.Section || '—' },
     { field: 'TermName', headerName: 'Term', sort: 'asc', sortIndex: 1 },
     { field: 'DueDate', headerName: 'Due Date', sort: 'asc', sortIndex: 2, valueFormatter: (params) => new Date(params.value).toLocaleDateString() },
     { field: 'FeeTypeName', headerName: 'Fee Type' },
@@ -129,43 +145,82 @@ export default function FeeStructures() {
   }
 
   const resetForm = () => {
-    setForm({ classFeeId: 0, classId: '', section: 'A', feeTypeId: '', termId: '', sessionId: '', amount: '', dueDate: '', isActive: true })
+    setForm({ classFeeId: 0, classId: '', sectionId: '', section: '', feeTypeId: '', termId: '', sessionId: '', amount: '', dueDate: '', isActive: true })
     setErrors({})
-    setAddForm({ classId: '', section: 'A', sessionId: '' })
+    setAddForm({ classId: '', sectionId: '', sessionId: '' })
+    setSections([])
     setTermRows({})
     setExpandedTerms(new Set())
     setAddErrors({})
-    setEditFilter({ classId: '', termId: '' })
+    setEditFilter({ classId: '', sectionId: '', termId: '' })
+    setEditSections([])
     setEditRows([])
     setEditErrors({})
     setEditMode(false)
   }
 
-  // Load matching rows into edit matrix when class+term selected
-  const handleEditFilterChange = (field, value) => {
-    const newFilter = { ...editFilter, [field]: value }
-    setEditFilter(newFilter)
-    if (newFilter.classId && newFilter.termId) {
-      const matched = feeStructures.filter(
-        r => String(r.ClassId) === String(newFilter.classId) && String(r.TermId) === String(newFilter.termId)
-      )
-      setEditRows(matched.map(r => ({
-        classFeeId: r.ClassFeeId,
-        feeTypeId: r.FeeTypeId,
-        feeTypeName: r.FeeTypeName,
-        amount: r.Amount,
-        dueDate: r.DueDate ? r.DueDate.split('T')[0] : '',
-        section: r.Section || 'A',
-        sessionId: r.SessionId,
-        isActive: r.IsActive,
-        className: r.ClassName,
-        termName: r.TermName,
-        sessionName: r.SessionName
-      })))
-      setEditErrors({})
-    } else {
-      setEditRows([])
+  const loadEditSectionsForClass = async (classId) => {
+    if (!classId) {
+      setEditSections([])
+      return []
     }
+    try {
+      const res = await getSections(classId)
+      const list = res.success ? (res.data || []) : []
+      setEditSections(list)
+      return list
+    } catch {
+      setEditSections([])
+      return []
+    }
+  }
+
+  const loadEditRows = (filter, sectionList) => {
+    const secs = sectionList !== undefined ? sectionList : editSections
+    const needsSection = secs.length > 0
+    if (!filter.classId || !filter.termId || (needsSection && !filter.sectionId)) {
+      setEditRows([])
+      return
+    }
+
+    const matched = feeStructures.filter((r) => {
+      if (String(r.ClassId) !== String(filter.classId)) return false
+      if (String(r.TermId) !== String(filter.termId)) return false
+      if (needsSection) {
+        return String(r.SectionId || '') === String(filter.sectionId)
+      }
+      return !r.SectionId
+    })
+
+    setEditRows(matched.map((r) => ({
+      classFeeId: r.ClassFeeId,
+      feeTypeId: r.FeeTypeId,
+      feeTypeName: r.FeeTypeName,
+      amount: r.Amount,
+      dueDate: r.DueDate ? r.DueDate.split('T')[0] : '',
+      section: r.SectionName || r.Section || '',
+      sectionId: r.SectionId || null,
+      sessionId: r.SessionId,
+      isActive: r.IsActive,
+      className: r.ClassName,
+      termName: r.TermName,
+      sessionName: r.SessionName
+    })))
+    setEditErrors({})
+  }
+
+  // Load matching rows into edit matrix when class(+section)+term selected
+  const handleEditFilterChange = async (field, value) => {
+    let newFilter = { ...editFilter, [field]: value }
+    let sectionList = editSections
+
+    if (field === 'classId') {
+      newFilter = { ...newFilter, sectionId: '' }
+      sectionList = await loadEditSectionsForClass(value)
+    }
+
+    setEditFilter(newFilter)
+    loadEditRows(newFilter, sectionList)
   }
 
   const updateEditRow = (index, field, value) => {
@@ -199,7 +254,10 @@ export default function FeeStructures() {
           classFeeId: row.classFeeId,
           organizationId,
           classId: parseInt(editFilter.classId),
-          section: row.section,
+          sectionId: row.sectionId || (editFilter.sectionId ? parseInt(editFilter.sectionId, 10) : null),
+          section: row.section
+            || editSections.find((s) => String(s.sectionId) === String(row.sectionId || editFilter.sectionId))?.sectionName
+            || null,
           feeTypeId: row.feeTypeId,
           termId: parseInt(editFilter.termId),
           sessionId: row.sessionId,
@@ -225,18 +283,19 @@ export default function FeeStructures() {
     return getDueDateFromTermMonths(term)
   }
 
-  // Get existing term IDs for current class+session
+  // Get existing term IDs for current class+session(+section)
   const existingTermIds = useMemo(() => {
     if (!addForm.classId || !addForm.sessionId) return new Set()
     return new Set(
       feeStructures
         .filter(r =>
           String(r.ClassId) === String(addForm.classId) &&
-          String(r.SessionId) === String(addForm.sessionId)
+          String(r.SessionId) === String(addForm.sessionId) &&
+          String(r.SectionId || '') === String(addForm.sectionId || '')
         )
         .map(r => String(r.TermId))
     )
-  }, [feeStructures, addForm.classId, addForm.sessionId])
+  }, [feeStructures, addForm.classId, addForm.sessionId, addForm.sectionId])
 
   // Get existing fee type IDs for a specific term
   const getExistingFeeTypeIds = (termId) => {
@@ -246,7 +305,8 @@ export default function FeeStructures() {
         .filter(r =>
           String(r.ClassId) === String(addForm.classId) &&
           String(r.TermId) === String(termId) &&
-          String(r.SessionId) === String(addForm.sessionId)
+          String(r.SessionId) === String(addForm.sessionId) &&
+          String(r.SectionId || '') === String(addForm.sectionId || '')
         )
         .map(r => String(r.FeeTypeId))
     )
@@ -314,6 +374,7 @@ export default function FeeStructures() {
     const errs = {}
     if (!addForm.classId) errs.classId = 'Class is required'
     if (!addForm.sessionId) errs.sessionId = 'Session is required'
+    if (sections.length > 0 && !addForm.sectionId) errs.sectionId = 'Section is required'
     
     // Check if at least one term has rows
     let hasAnyRows = false
@@ -358,7 +419,8 @@ export default function FeeStructures() {
             classFeeId: 0,
             organizationId,
             classId: parseInt(addForm.classId),
-            section: addForm.section,
+            sectionId: addForm.sectionId ? parseInt(addForm.sectionId) : null,
+            section: sections.find(s => String(s.sectionId) === String(addForm.sectionId))?.sectionName || null,
             feeTypeId: parseInt(row.feeTypeId),
             termId: parseInt(termId),
             sessionId: parseInt(addForm.sessionId),
@@ -395,7 +457,8 @@ export default function FeeStructures() {
         classFeeId: editMode ? form.classFeeId : 0,
         organizationId: organizationId,
         classId: form.classId,
-        section: form.section,
+        sectionId: form.sectionId || null,
+        section: form.section || null,
         feeTypeId: form.feeTypeId,
         termId: form.termId,
         sessionId: form.sessionId,
@@ -422,7 +485,8 @@ export default function FeeStructures() {
   }
 
   const handleEdit = () => {
-    setEditFilter({ classId: '', termId: '' })
+    setEditFilter({ classId: '', sectionId: '', termId: '' })
+    setEditSections([])
     setEditRows([])
     setEditErrors({})
     setEditMode(true)
@@ -519,30 +583,38 @@ export default function FeeStructures() {
                   <select
                     value={addForm.classId}
                     onChange={(e) => {
-                      setAddForm(f => ({ ...f, classId: e.target.value }))
+                      const classId = e.target.value
+                      setAddForm(f => ({ ...f, classId, sectionId: '' }))
                       setTermRows({})
                       setExpandedTerms(new Set())
+                      loadSectionsForClass(classId)
                     }}
                     className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
                       addErrors.classId ? 'border-red-500' : 'border-slate-300'
                     }`}
                   >
                     <option value="">Select Class</option>
-                    {classes.map(cls => <option key={cls.classId} value={cls.classId}>{cls.className}</option>)}
+                    {classes.filter(c => c.isActive !== false).map(cls => <option key={cls.classId} value={cls.classId}>{cls.className}</option>)}
                   </select>
                   {addErrors.classId && <p className="text-red-500 text-xs mt-1">{addErrors.classId}</p>}
                 </div>
 
+                {sections.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Section</label>
+                  <label className="block text-sm font-medium mb-1">Section *</label>
                   <select
-                    value={addForm.section}
-                    onChange={(e) => setAddForm(f => ({ ...f, section: e.target.value }))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
+                    value={addForm.sectionId}
+                    onChange={(e) => setAddForm(f => ({ ...f, sectionId: e.target.value }))}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600 ${
+                      addErrors.sectionId ? 'border-red-500' : 'border-slate-300'
+                    }`}
                   >
-                    {['A','B','C','D'].map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value="">Select Section</option>
+                    {sections.map(s => <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>)}
                   </select>
+                  {addErrors.sectionId && <p className="text-red-500 text-xs mt-1">{addErrors.sectionId}</p>}
                 </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Session *</label>
@@ -805,7 +877,7 @@ export default function FeeStructures() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Edit Fee Structures</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Select class &amp; term to load and edit fee rows</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Select class, section (if any) &amp; term to load and edit fee rows</p>
                   </div>
                 </div>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
@@ -816,7 +888,7 @@ export default function FeeStructures() {
               </div>
 
               {/* Filter Panel */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-xl">
+              <div className={`grid grid-cols-1 ${editSections.length > 0 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-xl`}>
                 <div>
                   <label className="block text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1.5">Select Class</label>
                   <select
@@ -825,9 +897,24 @@ export default function FeeStructures() {
                     className="w-full px-3 py-2.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 bg-white font-medium"
                   >
                     <option value="">— Select Class —</option>
-                    {classes.map(cls => <option key={cls.classId} value={cls.classId}>{cls.className}</option>)}
+                    {classes.filter((c) => c.isActive !== false).map(cls => <option key={cls.classId} value={cls.classId}>{cls.className}</option>)}
                   </select>
                 </div>
+                {editSections.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1.5">Select Section</label>
+                    <select
+                      value={editFilter.sectionId}
+                      onChange={(e) => handleEditFilterChange('sectionId', e.target.value)}
+                      className="w-full px-3 py-2.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 bg-white font-medium"
+                    >
+                      <option value="">— Select Section —</option>
+                      {editSections.map((s) => (
+                        <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1.5">Select Term</label>
                   <select
@@ -842,19 +929,23 @@ export default function FeeStructures() {
               </div>
 
               {/* Empty State */}
-              {!editFilter.classId || !editFilter.termId ? (
+              {!editFilter.classId || !editFilter.termId || (editSections.length > 0 && !editFilter.sectionId) ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
                   <svg className="w-16 h-16 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <p className="text-sm font-medium">Select a Class and Term above to load fee structures</p>
+                  <p className="text-sm font-medium">
+                    {editSections.length > 0
+                      ? 'Select Class, Section, and Term above to load fee structures'
+                      : 'Select a Class and Term above to load fee structures'}
+                  </p>
                 </div>
               ) : editRows.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500">
                   <svg className="w-16 h-16 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
-                  <p className="text-sm font-medium">No fee structures found for this Class &amp; Term combination</p>
+                  <p className="text-sm font-medium">No fee structures found for this selection</p>
                 </div>
               ) : (
                 <>
@@ -863,7 +954,13 @@ export default function FeeStructures() {
                     <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold rounded-full">
                       {editRows.length} record(s) loaded
                     </span>
-                    <span className="text-xs text-slate-500">{editRows[0]?.className} &bull; {editRows[0]?.termName} &bull; {editRows[0]?.sessionName}</span>
+                    <span className="text-xs text-slate-500">
+                      {editRows[0]?.className}
+                      {editFilter.sectionId
+                        ? ` • ${editSections.find((s) => String(s.sectionId) === String(editFilter.sectionId))?.sectionName || ''}`
+                        : ''}
+                      {' • '}{editRows[0]?.termName} • {editRows[0]?.sessionName}
+                    </span>
                   </div>
 
                   {/* Editable Matrix */}
@@ -873,7 +970,9 @@ export default function FeeStructures() {
                         <tr className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                           <th className="px-4 py-3 text-left font-semibold">#</th>
                           <th className="px-4 py-3 text-left font-semibold">Fee Type</th>
-                          <th className="px-4 py-3 text-left font-semibold">Section</th>
+                          {editSections.length > 0 && (
+                            <th className="px-4 py-3 text-left font-semibold">Section</th>
+                          )}
                           <th className="px-4 py-3 text-left font-semibold">Amount (₹)</th>
                           <th className="px-4 py-3 text-left font-semibold">Due Date</th>
                           <th className="px-4 py-3 text-center font-semibold">Status</th>
@@ -891,15 +990,15 @@ export default function FeeStructures() {
                             <td className="px-4 py-3">
                               <span className="font-medium text-slate-700 dark:text-slate-200">{row.feeTypeName}</span>
                             </td>
-                            <td className="px-4 py-3">
-                              <select
-                                value={row.section}
-                                onChange={(e) => updateEditRow(i, 'section', e.target.value)}
-                                className="px-2 py-1.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700"
-                              >
-                                {['A','B','C','D'].map(s => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                            </td>
+                            {editSections.length > 0 && (
+                              <td className="px-4 py-3">
+                                <span className="text-slate-700 dark:text-slate-200">
+                                  {row.section
+                                    || editSections.find((s) => String(s.sectionId) === String(row.sectionId || editFilter.sectionId))?.sectionName
+                                    || '—'}
+                                </span>
+                              </td>
+                            )}
                             <td className="px-4 py-3">
                               <div className="relative">
                                 <span className="absolute left-2.5 top-2 text-slate-400 text-sm">₹</span>

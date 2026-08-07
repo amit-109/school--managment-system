@@ -23,6 +23,7 @@ import Fees from './components/modules/Fees.jsx'
 import Reports from './components/modules/Reports.jsx'
 import Classes from './components/modules/Classes.jsx'
 import Sections from './components/modules/Sections.jsx'
+import AdmissionPrefixes from './components/modules/AdmissionPrefixes.jsx'
 import Sessions from './components/modules/Sessions.jsx'
 import Subjects from './components/modules/Subjects.jsx'
 import ClassSubjects from './components/modules/ClassSubjects.jsx'
@@ -31,9 +32,6 @@ import Terms from './components/modules/Terms.jsx'
 import Feetype from './components/modules/Feetype.jsx'
 import FeeStructures from './components/modules/FeeStructures.jsx'
 import FeeManagement from './components/modules/FeeManagement.jsx'
-import Concessions from './components/modules/Concessions.jsx'
-import GenerateInvoice from './components/modules/GenerateInvoice.jsx'
-import Invoices from './components/modules/Invoices.jsx'
 import CollectPayment from './components/modules/CollectPayment.jsx'
 import PaymentMethods from './components/modules/PaymentMethods.jsx'
 import DailyCollection from './components/modules/DailyCollection.jsx'
@@ -41,6 +39,7 @@ import ClassOutstanding from './components/modules/ClassOutstanding.jsx'
 import StudentOutstanding from './components/modules/StudentOutstanding.jsx'
 import FeeTypeCollection from './components/modules/FeeTypeCollection.jsx'
 import StudentLedger from './components/modules/StudentLedger.jsx'
+import StudentFeeDues from './components/modules/StudentFeeDues.jsx'
 import PermissionAssignment from './components/modules/PermissionAssignment.jsx'
 import PermissionManagement from './components/modules/PermissionManagement.jsx'
 import Login from './components/Auth/Login.jsx'
@@ -384,6 +383,9 @@ export default function App() {
             {tab === 'reports' && <Reports />}
             {tab === 'classes' && <Classes />}
             {tab === 'sections' && <Sections />}
+            {tab === 'admission-prefixes' && <AdmissionPrefixes />}
+            {tab === 'admission-prefix' && <AdmissionPrefixes />}
+            {tab === 'admission-no-prefix' && <AdmissionPrefixes />}
             {tab === 'sessions' && <Sessions />}
             {tab === 'subjects' && <Subjects />}
             {tab === 'class-subjects' && <ClassSubjects />}
@@ -392,16 +394,21 @@ export default function App() {
             {tab === 'term' && <Terms />}
             {tab === 'feetype' && <Feetype />}
             {tab === 'fee-structures' && <FeeStructures />}
-            {tab === 'concessions' && <Concessions />}
-            {tab === 'generate-invoice' && <GenerateInvoice />}
-            {tab === 'invoices' && <Invoices />}
+            {tab === 'concessions' && <Students />}
             {tab === 'collect-payment' && <CollectPayment />}
+            {tab === 'payments' && <CollectPayment />}
+            {tab === 'payment-receipts' && <CollectPayment />}
             {tab === 'payment-methods' && <PaymentMethods />}
             {tab === 'daily-collection' && <DailyCollection />}
             {tab === 'class-outstanding' && <ClassOutstanding />}
             {tab === 'student-outstanding' && <StudentOutstanding />}
             {tab === 'fee-type-collection' && <FeeTypeCollection />}
             {tab === 'student-ledger' && <StudentLedger />}
+            {tab === 'student-fee-dues' && <StudentFeeDues />}
+            {tab === 'student-fee-due' && <StudentFeeDues />}
+            {/* Legacy invoice tabs redirected to collect payment */}
+            {tab === 'generate-invoice' && <CollectPayment />}
+            {tab === 'invoices' && <CollectPayment />}
             {tab === 'permission-management' && <PermissionManagement onNavigate={handleNavigate} />}
             {tab === 'permission-assignment' && <PermissionAssignment onNavigate={handleNavigate} />}
 

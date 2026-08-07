@@ -246,8 +246,8 @@ export const deleteSubject = async (subjectId) => {
 };
 
 // Session Management API exports
-export const getSessions = async (page = 0, size = 10) => {
-  const response = await apiClient.get(`/admin/sessions?PageNumber=${page}&PageSize=${size}`);
+export const getSessions = async () => {
+  const response = await apiClient.get('/admin/feemasters/session');
   return response.data;
 };
 
@@ -331,13 +331,22 @@ export const createStudentWithParent = async (studentParentData) => {
 };
 
 // Get Student Users (specific endpoint for students)
-export const getStudentUsers = async (pageNumber = 1, pageSize = 10, search = '', statusFilter = '') => {
+export const getStudentUsers = async (
+  pageNumber = 1,
+  pageSize = 10,
+  search = '',
+  statusFilter = '',
+  classId = '',
+  studentType = ''
+) => {
   try {
     const params = new URLSearchParams();
     params.append('PageNumber', pageNumber.toString());
     params.append('PageSize', pageSize.toString());
     if (search) params.append('Search', search);
     if (statusFilter) params.append('StatusFilter', statusFilter);
+    if (classId) params.append('ClassId', classId.toString());
+    if (studentType) params.append('StudentType', studentType);
 
     const response = await apiClient.get(`/admin/student-users?${params.toString()}`);
     return response.data;
@@ -416,5 +425,26 @@ export const checkUsernameExists = async (username) => {
 // Admission Number Check API
 export const checkAdmissionNoExists = async (admissionNo) => {
   const response = await apiClient.get(`/admin/admissionno-check?admissionNo=${encodeURIComponent(admissionNo)}`);
+  return response.data;
+};
+
+// Admission Prefix Master
+export const getAdmissionPrefixes = async () => {
+  const response = await apiClient.get('/admin/admission-prefixes');
+  return response.data;
+};
+
+export const upsertAdmissionPrefix = async (payload) => {
+  const response = await apiClient.post('/admin/admission-prefixes', payload);
+  return response.data;
+};
+
+export const deleteAdmissionPrefix = async (prefixId) => {
+  const response = await apiClient.delete(`/admin/admission-prefixes/${prefixId}`);
+  return response.data;
+};
+
+export const allocateNextAdmissionNo = async (classId) => {
+  const response = await apiClient.get(`/admin/admission-prefixes/next?classId=${classId}`);
   return response.data;
 };

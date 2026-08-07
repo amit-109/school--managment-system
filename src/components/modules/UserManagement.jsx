@@ -5,16 +5,26 @@ import Swal from 'sweetalert2';
 import AgGridBox from '../shared/AgGridBox';
 import LoadingOverlay from '../shared/LoadingOverlay';
 import PermissionButton from '../shared/PermissionButton';
-import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI } from '../Services/adminService';
+import { getUsers, createUser, updateUser, deleteUser, getAvailableRoles, getClasses, getSections, getStudentById, checkEmailExists as checkEmailExistsAPI, checkUsernameExists as checkUsernameExistsAPI, checkAdmissionNoExists as checkAdmissionNoExistsAPI, allocateNextAdmissionNo } from '../Services/adminService';
 
 const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
 const CATEGORY_OPTIONS = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Other'];
+
+const generatePassword = (length = 8) => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
 export default function UserManagement() {
   const { permissions } = useSelector((state) => state.auth);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -29,6 +39,7 @@ export default function UserManagement() {
   const [originalUsername, setOriginalUsername] = useState('');
   const [admissionNoError, setAdmissionNoError] = useState('');
   const [originalAdmissionNo, setOriginalAdmissionNo] = useState('');
+  const [prefixError, setPrefixError] = useState('');
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -51,6 +62,8 @@ export default function UserManagement() {
     fatherName: '',
     motherName: '',
     classId: 0,
+    sectionId: 0,
+    studentType: 'Regular',
     gender: '',
     category: ''
   });
@@ -219,14 +232,32 @@ export default function UserManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (selectedRole === 'Student') {
+      if (!form.classId) {
+        toast.error('Class is required');
+        return;
+      }
+      if (sections.length > 0 && !form.sectionId) {
+        toast.error('Section is required for the selected class');
+        return;
+      }
+      if (!form.studentType) {
+        toast.error('Student type is required');
+        return;
+      }
+      if (!editMode && (prefixError || !form.admissionNo || !form.username || !form.password)) {
+        toast.error(prefixError || 'Select a class with an admission prefix to generate credentials');
+        return;
+      }
+      if (admissionNoError) {
+        toast.error('Please fix admission number errors before submitting');
+        return;
+      }
+    }
     
     if (usernameError) {
       toast.error('Please fix username errors before submitting');
-      return;
-    }
-
-    if (selectedRole === 'Student' && admissionNoError) {
-      toast.error('Please fix admission number errors before submitting');
       return;
     }
 
@@ -241,7 +272,9 @@ export default function UserManagement() {
     try {
       const userData = {
         ...form,
-        roleName: selectedRole
+        roleName: selectedRole,
+        sectionId: form.sectionId || null,
+        classId: form.classId || null
       };
 
       if (editMode) {
@@ -249,7 +282,11 @@ export default function UserManagement() {
         toast.success('User updated successfully');
       } else {
         await createUser(userData);
-        toast.success('User created successfully');
+        if (selectedRole === 'Student') {
+          toast.success(`Student created. Username: ${form.username} / Password: ${form.password}`);
+        } else {
+          toast.success('User created successfully');
+        }
       }
       
       setShowModal(false);
@@ -263,35 +300,92 @@ export default function UserManagement() {
     }
   };
 
-  const handleEdit = (userData) => {
+  const handleEdit = async (userData) => {
     const email = userData.email || '';
     const username = userData.username || '';
-    const admissionNo = userData.admissionNo || userData.studentAdmissionNo || '';
-    const resolvedClassId = parseInt(
+    let admissionNo = userData.admissionNo || userData.studentAdmissionNo || '';
+    let resolvedClassId = parseInt(
       userData.classId ?? userData.currentClassId ?? userData.studentClassId ?? 0,
       10
     ) || 0;
+    let resolvedSectionId = parseInt(
+      userData.sectionId ?? userData.currentSectionId ?? 0,
+      10
+    ) || 0;
+    let studentType = userData.studentType || 'Regular';
+    let firstName = userData.firstName || '';
+    let lastName = userData.lastName || '';
+    let phoneNumber = userData.phoneNumber || userData.phone || '';
+    let address = userData.address || '';
+    let fatherName = userData.fatherName || '';
+    let motherName = userData.motherName || '';
+    let gender = userData.gender || '';
+    let category = userData.category || '';
+
+    if (userData.roleName === 'Student') {
+      try {
+        const response = await getStudentById(userData.userId);
+        if (response.success && response.data) {
+          const studentData = response.data;
+          firstName = studentData.studentFirstName || studentData.firstName || firstName;
+          lastName = studentData.studentLastName || studentData.lastName || lastName;
+          admissionNo = studentData.admissionNo || admissionNo;
+          resolvedClassId = parseInt(
+            studentData.classId ?? studentData.currentClassId ?? resolvedClassId,
+            10
+          ) || 0;
+          resolvedSectionId = parseInt(
+            studentData.sectionId ?? studentData.currentSectionId ?? 0,
+            10
+          ) || 0;
+          studentType = studentData.studentType || studentType || 'Regular';
+          phoneNumber = studentData.studentPhoneNumber || studentData.phoneNumber || studentData.phone || phoneNumber;
+          address = studentData.address || address;
+          fatherName = studentData.fatherName || fatherName;
+          motherName = studentData.motherName || motherName;
+          gender = studentData.gender || gender;
+          category = studentData.category || category;
+        }
+      } catch (error) {
+        console.error('Failed to load student details', error);
+      }
+
+      if (resolvedClassId) {
+        try {
+          const secRes = await getSections(resolvedClassId);
+          setSections(secRes.success ? (secRes.data || []) : []);
+        } catch {
+          setSections([]);
+        }
+      } else {
+        setSections([]);
+      }
+    } else {
+      setSections([]);
+    }
 
     setForm({
       userId: userData.userId,
       roleName: userData.roleName,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
+      firstName,
+      lastName,
       username: username,
       email: email,
-      password: '', // Don't populate password for security
-      phoneNumber: userData.phoneNumber || userData.phone,
+      password: '',
+      phoneNumber,
       qualification: userData.qualification,
       designation: userData.designation,
       salary: userData.salary || 0,
       occupation: userData.occupation,
-      address: userData.address,
-      admissionNo: admissionNo,
-      fatherName: userData.fatherName || '',
-      motherName: userData.motherName || '',
+      address,
+      admissionNo,
+      fatherName,
+      motherName,
       classId: resolvedClassId,
-      gender: userData.gender || '',
-      category: userData.category || ''
+      sectionId: resolvedSectionId,
+      studentType,
+      gender,
+      category
     });
     setSelectedRole(userData.roleName);
     setOriginalEmail(email);
@@ -347,10 +441,14 @@ export default function UserManagement() {
       fatherName: '',
       motherName: '',
       classId: 0,
+      sectionId: 0,
+      studentType: 'Regular',
       gender: '',
       category: ''
     });
     setSelectedRole('');
+    setSections([]);
+    setPrefixError('');
     setEmailError('');
     setOriginalEmail('');
     setUsernameError('');
@@ -418,7 +516,7 @@ export default function UserManagement() {
       case 'Teacher':
         return [...baseFields, 'phoneNumber', 'gender', 'category', 'qualification', 'designation', 'salary', 'address'];
       case 'Student':
-        return [...baseFields, 'admissionNo', 'fatherName', 'motherName', 'gender', 'category', 'classId', 'phoneNumber', 'address'];
+        return [...baseFields, 'admissionNo', 'fatherName', 'motherName', 'gender', 'category', 'classId', ...(sections.length > 0 ? ['sectionId'] : []), 'studentType', 'phoneNumber', 'address'];
       case 'Parent':
         return [...baseFields, 'phoneNumber', 'gender', 'category', 'occupation', 'address'];
       default:
@@ -429,7 +527,7 @@ export default function UserManagement() {
   const isFieldRequired = (field, role) => {
     const requiredFields = {
       Teacher: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber'],
-      Student: ['firstName', 'lastName', 'username', 'password', 'admissionNo', 'classId'],
+      Student: ['firstName', 'username', 'password', 'admissionNo', 'classId', 'studentType'],
       Parent: ['firstName', 'lastName', 'username', 'email', 'password', 'phoneNumber']
     };
     return requiredFields[role]?.includes(field) || false;
@@ -553,6 +651,8 @@ export default function UserManagement() {
       fatherName: { label: 'Father Name', type: 'text', placeholder: 'Enter father name (optional)' },
       motherName: { label: 'Mother Name', type: 'text', placeholder: 'Enter mother name (optional)' },
       classId: { label: 'Class', type: 'select-class' },
+      sectionId: { label: 'Section', type: 'select-section' },
+      studentType: { label: 'Student Type', type: 'select-student-type' },
       address: { label: 'Address', type: 'textarea', placeholder: 'Enter address' },
       admissionNo: { label: 'Admission Number', type: 'text', placeholder: 'Enter admission number' }
     };
@@ -569,15 +669,98 @@ export default function UserManagement() {
           <select
             required={isRequired}
             value={form.classId || ''}
-            onChange={(e) => setForm({...form, classId: parseInt(e.target.value) || 0})}
+            onChange={async (e) => {
+              const classId = parseInt(e.target.value) || 0;
+              setForm((prev) => ({ ...prev, classId, sectionId: 0 }));
+              setPrefixError('');
+              if (!classId) {
+                setSections([]);
+                if (!editMode && selectedRole === 'Student') {
+                  setForm((prev) => ({ ...prev, classId: 0, sectionId: 0, admissionNo: '', username: '', password: '' }));
+                }
+                return;
+              }
+              try {
+                const secRes = await getSections(classId);
+                setSections(secRes.success ? (secRes.data || []) : []);
+              } catch {
+                setSections([]);
+              }
+              if (!editMode && selectedRole === 'Student') {
+                try {
+                  const nextRes = await allocateNextAdmissionNo(classId);
+                  if (nextRes.success) {
+                    const admissionNo = nextRes.data?.admissionNo || '';
+                    setForm((prev) => ({
+                      ...prev,
+                      classId,
+                      sectionId: 0,
+                      admissionNo,
+                      username: admissionNo,
+                      password: generatePassword(8)
+                    }));
+                  } else {
+                    setPrefixError(nextRes.message || 'Configure admission prefix for this class first.');
+                    setForm((prev) => ({ ...prev, classId, sectionId: 0, admissionNo: '', username: '', password: '' }));
+                  }
+                } catch (err) {
+                  setPrefixError(err.response?.data?.message || 'Configure admission prefix for this class first.');
+                  setForm((prev) => ({ ...prev, classId, sectionId: 0, admissionNo: '', username: '', password: '' }));
+                }
+              }
+            }}
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
           >
             <option value="">Select Class</option>
-            {classes.map(cls => (
+            {classes
+              .filter((cls) => cls.isActive !== false || (editMode && Number(form.classId) === Number(cls.classId)))
+              .map(cls => (
               <option key={cls.classId} value={cls.classId}>
-                {cls.className}
+                {cls.className}{cls.isActive === false ? ' (Inactive)' : ''}
               </option>
             ))}
+          </select>
+          {prefixError && selectedRole === 'Student' && !editMode && (
+            <p className="text-red-500 text-sm mt-1">{prefixError}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (fieldName === 'sectionId') {
+      if (sections.length === 0) return null;
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">Section *</label>
+          <select
+            required
+            value={form.sectionId || ''}
+            onChange={(e) => setForm({ ...form, sectionId: parseInt(e.target.value) || 0 })}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          >
+            <option value="">Select Section</option>
+            {sections.map((sec) => (
+              <option key={sec.sectionId} value={sec.sectionId}>
+                {sec.sectionName}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
+
+    if (fieldName === 'studentType') {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">Student Type *</label>
+          <select
+            required
+            value={form.studentType || 'Regular'}
+            onChange={(e) => setForm({ ...form, studentType: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          >
+            <option value="Regular">Regular</option>
+            <option value="Private">Private</option>
           </select>
         </div>
       );
@@ -694,6 +877,7 @@ export default function UserManagement() {
     }
 
     if (fieldName === 'username') {
+      const autoStudent = selectedRole === 'Student' && !editMode;
       return (
         <div key={fieldName}>
           <label className="block text-sm font-medium mb-1">
@@ -702,13 +886,16 @@ export default function UserManagement() {
           <input
             type={config.type}
             required={isRequired}
+            readOnly={autoStudent}
             value={form.username}
             onChange={(e) => {
+              if (autoStudent) return;
               const username = e.target.value;
               setForm({...form, username});
               setUsernameError('');
             }}
             onBlur={(e) => {
+              if (autoStudent) return;
               const username = e.target.value.trim();
               if (!username) {
                 setUsernameError('');
@@ -721,11 +908,13 @@ export default function UserManagement() {
               checkUsernameExists(username);
             }}
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+              autoStudent ? 'bg-slate-100 dark:bg-slate-600 cursor-not-allowed' : ''
+            } ${
               usernameError
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
             }`}
-            placeholder={config.placeholder}
+            placeholder={autoStudent ? 'Auto = admission no' : config.placeholder}
           />
           {usernameError && (
             <p className="text-red-500 text-sm mt-1">{usernameError}</p>
@@ -735,6 +924,7 @@ export default function UserManagement() {
     }
 
     if (fieldName === 'admissionNo') {
+      const autoStudent = selectedRole === 'Student' && !editMode;
       return (
         <div key={fieldName}>
           <label className="block text-sm font-medium mb-1">
@@ -743,13 +933,16 @@ export default function UserManagement() {
           <input
             type={config.type}
             required={isRequired}
+            readOnly={autoStudent}
             value={form.admissionNo}
             onChange={(e) => {
+              if (autoStudent) return;
               const admissionNo = e.target.value;
               setForm({...form, admissionNo});
               setAdmissionNoError('');
             }}
             onBlur={(e) => {
+              if (autoStudent) return;
               const admissionNo = e.target.value.trim();
               if (!admissionNo) {
                 setAdmissionNoError('');
@@ -762,14 +955,44 @@ export default function UserManagement() {
               checkAdmissionNoExists(admissionNo);
             }}
             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-700 dark:text-slate-100 ${
+              autoStudent ? 'bg-slate-100 dark:bg-slate-600 cursor-not-allowed' : ''
+            } ${
               admissionNoError
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-slate-300 dark:border-slate-600 focus:ring-primary-500'
             }`}
-            placeholder={config.placeholder}
+            placeholder={autoStudent ? 'Auto from class prefix' : config.placeholder}
           />
           {admissionNoError && (
             <p className="text-red-500 text-sm mt-1">{admissionNoError}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (fieldName === 'password' && selectedRole === 'Student' && !editMode) {
+      return (
+        <div key={fieldName}>
+          <label className="block text-sm font-medium mb-1">Password *</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              required
+              readOnly
+              value={form.password}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-600 cursor-not-allowed dark:text-slate-100"
+              placeholder="Auto generated"
+            />
+            <button
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, password: generatePassword(8) }))}
+              className="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700 whitespace-nowrap"
+            >
+              Regen
+            </button>
+          </div>
+          {form.password && (
+            <p className="text-xs text-slate-500 mt-1">Share this password with the student — shown once.</p>
           )}
         </div>
       );
