@@ -1,333 +1,377 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { apiClient } from '../Auth/base';
-import AgGridBox from '../shared/AgGridBox';
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
+import AgGridBox from '../shared/AgGridBox'
+import LoadingOverlay from '../shared/LoadingOverlay'
+import apiClient from '../Auth/base'
+import { getSections } from '../Services/adminService'
+import { pickLatestSessionId } from '../utils/sessionUtils'
 
-const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const emptySummary = {
+  paymentsCount: 0,
+  totalCollected: 0,
+  termCollected: 0,
+  oldCollected: 0
+}
+
+const defaultFromDate = () => {
+  const d = new Date()
+  d.setDate(d.getDate() - 6)
+  return d.toISOString().split('T')[0]
+}
+
+const todayIso = () => new Date().toISOString().split('T')[0]
+
+const paymentTargetLabel = (v) => (v === 'OldFee' ? 'Old Fee' : 'Term Fee')
 
 export default function DailyCollection() {
-  const [filters, setFilters] = useState({
-    dateFrom: new Date().toISOString().split('T')[0],
-    dateTo: new Date().toISOString().split('T')[0],
-    paymentMode: 'All'
-  });
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [exportLoading, setExportLoading] = useState(false);
-
-  const paymentModes = ['All', 'Cash', 'QR', 'UPI', 'Bank', 'Cheque', 'Card'];
-
-  const summary = useMemo(() => {
-    const totalRow = data.find(item => item.id === 'total');
-
-    return {
-      paymentsCount: totalRow?.paymentsCount || 0,
-      totalCollected: totalRow?.totalCollectedValue || 0,
-      allocatedAmount: totalRow?.allocatedAmountValue || 0,
-      unallocatedAmount: totalRow?.unallocatedAmountValue || 0,
-      recordsCount: data.filter(item => item.id !== 'total').length
-    };
-  }, [data]);
+  const [loading, setLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [classes, setClasses] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [sections, setSections] = useState([])
+  const [classId, setClassId] = useState('')
+  const [sectionId, setSectionId] = useState('')
+  const [sessionId, setSessionId] = useState('')
+  const [defaultSessionId, setDefaultSessionId] = useState('')
+  const [dateFrom, setDateFrom] = useState(defaultFromDate)
+  const [dateTo, setDateTo] = useState(todayIso)
+  const [paymentMode, setPaymentMode] = useState('All')
+  const [studentSearch, setStudentSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [rows, setRows] = useState([])
+  const [summary, setSummary] = useState(emptySummary)
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [ready, setReady] = useState(false)
+  const searchDebounceRef = useRef(null)
 
   useEffect(() => {
-    handleSearch();
-  }, []);
+    loadDropdowns()
+  }, [])
 
-  const handleSearch = async () => {
-    if (!filters.dateFrom || !filters.dateTo) {
-      return;
-    }
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(studentSearch.trim())
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [studentSearch])
 
-    setLoading(true);
+  useEffect(() => {
+    if (!ready) return
+    if (!dateFrom || !dateTo) return
+    loadData()
+  }, [ready, classId, sectionId, sessionId, dateFrom, dateTo, paymentMode, debouncedSearch, currentPage, pageSize])
+
+  const loadDropdowns = async () => {
     try {
-      const params = new URLSearchParams({
-        from: filters.dateFrom,
-        to: filters.dateTo
-      });
-      
-      if (filters.paymentMode !== 'All') {
-        params.append('mode', filters.paymentMode);
-      }
-
-      const response = await apiClient.get(`/admin/reports/fees/daily?${params}`);
-      
+      const response = await apiClient.get('/admin/fees/dropdowns')
       if (response.data.success) {
-        const formattedData = response.data.data.map((item, index) => ({
-          id: index + 1,
-          collectionDate: new Date(item.collectionDate).toLocaleDateString(),
-          paymentsCount: Number(item.paymentsCount || 0),
-          totalCollectedValue: Number(item.totalCollected || 0),
-          allocatedAmountValue: Number(item.allocatedAmount || 0),
-          unallocatedAmountValue: Number(item.unallocatedAmount || 0),
-          totalCollected: formatCurrency(item.totalCollected),
-          allocatedAmount: formatCurrency(item.allocatedAmount),
-          unallocatedAmount: formatCurrency(item.unallocatedAmount)
-        }));
-
-        const totals = formattedData.reduce((sum, item) => ({
-          paymentsCount: sum.paymentsCount + item.paymentsCount,
-          totalCollectedValue: sum.totalCollectedValue + item.totalCollectedValue,
-          allocatedAmountValue: sum.allocatedAmountValue + item.allocatedAmountValue,
-          unallocatedAmountValue: sum.unallocatedAmountValue + item.unallocatedAmountValue
-        }), {
-          paymentsCount: 0,
-          totalCollectedValue: 0,
-          allocatedAmountValue: 0,
-          unallocatedAmountValue: 0
-        });
-
-        setData([
-          ...formattedData,
-          {
-            id: 'total',
-            collectionDate: 'Total',
-            paymentsCount: totals.paymentsCount,
-            totalCollectedValue: totals.totalCollectedValue,
-            allocatedAmountValue: totals.allocatedAmountValue,
-            unallocatedAmountValue: totals.unallocatedAmountValue,
-            totalCollected: formatCurrency(totals.totalCollectedValue),
-            allocatedAmount: formatCurrency(totals.allocatedAmountValue),
-            unallocatedAmount: formatCurrency(totals.unallocatedAmountValue)
-          }
-        ]);
+        setClasses((response.data.data?.classes || []).filter((c) => c.isActive !== false))
+        const sess = (response.data.data?.sessions || []).filter((s) => s.isActive !== false)
+        setSessions(sess)
+        const latest = pickLatestSessionId(sess)
+        setDefaultSessionId(latest)
+        setSessionId(latest)
       }
-    } catch (error) {
-      console.error('Error fetching daily collection:', error);
-      alert('Error fetching daily collection data');
+    } catch {
+      toast.error('Failed to load filters')
     } finally {
-      setLoading(false);
+      setReady(true)
     }
-  };
+  }
+
+  const loadSectionsForClass = async (id) => {
+    if (!id) {
+      setSections([])
+      return
+    }
+    try {
+      const res = await getSections(id)
+      setSections(res.success ? (res.data || []) : [])
+    } catch {
+      setSections([])
+    }
+  }
+
+  const buildParams = ({ includePaging = true } = {}) => {
+    const params = new URLSearchParams({
+      from: dateFrom,
+      to: dateTo
+    })
+    if (paymentMode !== 'All') params.append('mode', paymentMode)
+    if (classId) params.append('classId', classId)
+    if (sectionId) params.append('sectionId', sectionId)
+    if (sessionId) params.append('sessionId', sessionId)
+    if (debouncedSearch) params.append('search', debouncedSearch)
+    if (includePaging) {
+      params.append('page', String(currentPage))
+      params.append('size', String(pageSize))
+    }
+    return params
+  }
+
+  const normalizeSummary = (raw) => {
+    if (!raw) return { ...emptySummary }
+    return {
+      paymentsCount: Number(raw.paymentsCount ?? raw.PaymentsCount ?? 0),
+      totalCollected: Number(raw.totalCollected ?? raw.TotalCollected ?? 0),
+      termCollected: Number(raw.termCollected ?? raw.TermCollected ?? 0),
+      oldCollected: Number(raw.oldCollected ?? raw.OldCollected ?? 0)
+    }
+  }
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get(`/admin/reports/fees/daily?${buildParams()}`)
+      if (response.data.success) {
+        const data = response.data.data
+        setRows(data?.rows || [])
+        setTotalCount(data?.totalCount ?? data?.rows?.length ?? 0)
+        setSummary(normalizeSummary(data?.summary))
+      } else {
+        setRows([])
+        setTotalCount(0)
+        setSummary({ ...emptySummary })
+      }
+    } catch {
+      toast.error('Failed to load daily collection')
+      setRows([])
+      setTotalCount(0)
+      setSummary({ ...emptySummary })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const clearFilters = () => {
+    setClassId('')
+    setSectionId('')
+    setSections([])
+    setDateFrom(defaultFromDate())
+    setDateTo(todayIso())
+    setPaymentMode('All')
+    setStudentSearch('')
+    setDebouncedSearch('')
+    setSessionId(defaultSessionId || pickLatestSessionId(sessions))
+    setCurrentPage(1)
+  }
 
   const handleExportCSV = async () => {
-    setExportLoading(true);
+    if (!dateFrom || !dateTo) {
+      toast.error('From and To dates are required')
+      return
+    }
+    setExportLoading(true)
     try {
-      const params = new URLSearchParams({
-        from: filters.dateFrom,
-        to: filters.dateTo
-      });
-      
-      if (filters.paymentMode !== 'All') {
-        params.append('mode', filters.paymentMode);
-      }
-
-      const response = await apiClient.get(`/admin/reports/fees/daily/csv/stream?${params}`, {
+      const response = await apiClient.get(`/admin/reports/fees/daily/csv/stream?${buildParams({ includePaging: false })}`, {
         responseType: 'blob'
-      });
-      
-      const blob = new Blob([response.data], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `daily-collection-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV file');
+      })
+      const blob = new Blob([response.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `daily-collection-${dateFrom}-${dateTo}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error exporting CSV')
     } finally {
-      setExportLoading(false);
+      setExportLoading(false)
     }
-  };
+  }
 
-  const columnDefs = [
+  const cols = useMemo(() => [
+    { headerName: 'Receipt No', field: 'receiptNo', valueGetter: (p) => p.data?.receiptNo || p.data?.ReceiptNo || '—' },
     {
-      headerName: 'Collection Date',
-      field: 'collectionDate',
-      sortable: true,
-      filter: true,
-      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+      headerName: 'Payment Date',
+      field: 'paymentDate',
+      valueGetter: (p) => {
+        const d = p.data?.paymentDate || p.data?.PaymentDate
+        return d ? new Date(d).toLocaleDateString('en-IN') : '—'
+      }
+    },
+    { headerName: 'Student', field: 'studentName', valueGetter: (p) => p.data?.studentName || p.data?.StudentName || '—' },
+    { headerName: 'Admission No', field: 'admissionNo', valueGetter: (p) => p.data?.admissionNo || p.data?.AdmissionNo || '—' },
+    { headerName: 'Class', field: 'className', valueGetter: (p) => p.data?.className || p.data?.ClassName || '—' },
+    { headerName: 'Section', field: 'sectionName', valueGetter: (p) => p.data?.sectionName || p.data?.SectionName || '—' },
+    { headerName: 'Payment Mode', field: 'paymentMode', valueGetter: (p) => p.data?.paymentMode || p.data?.PaymentMode || '—' },
+    {
+      headerName: 'Payment Target',
+      field: 'paymentTarget',
+      valueGetter: (p) => paymentTargetLabel(p.data?.paymentTarget || p.data?.PaymentTarget)
     },
     {
-      headerName: 'Payments Count',
-      field: 'paymentsCount',
-      sortable: true,
-      filter: true,
-      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
+      headerName: 'Amount',
+      field: 'totalPaidAmount',
+      valueGetter: (p) => formatCurrency(p.data?.totalPaidAmount ?? p.data?.TotalPaidAmount)
     },
-    {
-      headerName: 'Total Collected',
-      field: 'totalCollected',
-      sortable: true,
-      filter: true,
-      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
-    },
-    {
-      headerName: 'Allocated Amount',
-      field: 'allocatedAmount',
-      sortable: true,
-      filter: true,
-      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
-    },
-    {
-      headerName: 'Unallocated Amount',
-      field: 'unallocatedAmount',
-      sortable: true,
-      filter: true,
-      cellClass: (params) => params.data?.id === 'total' ? 'font-bold bg-emerald-50 dark:bg-emerald-900/20' : ''
-    }
-  ];
+    { headerName: 'Reference No', field: 'referenceNo', valueGetter: (p) => p.data?.referenceNo || p.data?.ReferenceNo || '—' }
+  ], [])
 
   return (
-    <div className="space-y-6">
-      {/* Header Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700 rounded-2xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 text-white rounded-xl shadow-lg">
-              📊
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Daily Collection Report</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">Track and analyze daily fee collections</p>
-            </div>
+    <LoadingOverlay isLoading={loading}>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Daily Collection</h1>
+            <p className="text-sm text-slate-600">Payment-level detail for the selected filters</p>
           </div>
           <button
+            type="button"
             onClick={handleExportCSV}
-            disabled={exportLoading || data.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none"
-            title="Export to CSV"
+            disabled={exportLoading || (!rows.length && !summary.paymentsCount)}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white rounded-lg text-sm font-medium"
           >
-            {exportLoading ? (
-              <>
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                <span>Exporting...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Export CSV</span>
-              </>
-            )}
+            {exportLoading ? 'Exporting…' : 'Export CSV'}
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Collection</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(summary.totalCollected)}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filters.dateFrom} to {filters.dateTo}</p>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="block text-xs font-medium mb-1">From date</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
+            />
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Allocated Amount</p>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(summary.allocatedAmount)}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{summary.recordsCount} collection records</p>
+          <div>
+            <label className="block text-xs font-medium mb-1">To date</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
+            />
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Unallocated Amount</p>
-            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(summary.unallocatedAmount)}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Balance for selected range</p>
+          <div>
+            <label className="block text-xs font-medium mb-1">Payment mode</label>
+            <select
+              value={paymentMode}
+              onChange={(e) => {
+                setPaymentMode(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
+            >
+              {['All', 'Cash', 'UPI', 'QR'].map((mode) => (
+                <option key={mode} value={mode}>{mode}</option>
+              ))}
+            </select>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Payments Count</p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">{summary.paymentsCount.toLocaleString('en-IN')}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filters.paymentMode === 'All' ? 'All payment modes' : filters.paymentMode}</p>
+          <div>
+            <label className="block text-xs font-medium mb-1">Class</label>
+            <select
+              value={classId}
+              onChange={async (e) => {
+                const id = e.target.value
+                setClassId(id)
+                setSectionId('')
+                setCurrentPage(1)
+                await loadSectionsForClass(id)
+              }}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
+            >
+              <option value="">All Classes</option>
+              {classes.map((c) => <option key={c.classId} value={c.classId}>{c.className}</option>)}
+            </select>
           </div>
-        </div>
-        
-        {/* Filters Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-inner border border-gray-200 dark:border-gray-700">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {sections.length > 0 && (
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <span className="text-blue-500">📅</span>
-                Date From
-              </label>
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                className="input-primary w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <span className="text-blue-500">📅</span>
-                Date To
-              </label>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                className="input-primary w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                <span className="text-blue-500">💳</span>
-                Payment Mode
-              </label>
+              <label className="block text-xs font-medium mb-1">Section</label>
               <select
-                value={filters.paymentMode}
-                onChange={(e) => setFilters(prev => ({ ...prev, paymentMode: e.target.value }))}
-                className="input-primary w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={sectionId}
+                onChange={(e) => {
+                  setSectionId(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
               >
-                {paymentModes.map(mode => (
-                  <option key={mode} value={mode}>{mode}</option>
-                ))}
+                <option value="">All</option>
+                {sections.map((s) => <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>)}
               </select>
             </div>
-            
-            <div className="flex items-end">
-              <button
-                onClick={handleSearch}
-                disabled={loading}
-                className="btn-primary w-full flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    <span>Searching...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <span>Search</span>
-                  </>
-                )}
-              </button>
-            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium mb-1">Session</label>
+            <select
+              value={sessionId}
+              onChange={(e) => {
+                setSessionId(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700"
+            >
+              <option value="">All Sessions</option>
+              {sessions.map((s) => <option key={s.sessionId} value={s.sessionId}>{s.sessionName}</option>)}
+            </select>
           </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Search</label>
+            <input
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              placeholder="Name / admission / receipt"
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 min-w-[200px]"
+            />
+          </div>
+          <button type="button" onClick={clearFilters} className="px-4 py-2 border rounded-lg text-sm">
+            Clear
+          </button>
         </div>
-      </div>
 
-      {/* Results Section */}
-      {data.length > 0 ? (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg overflow-hidden">
-          <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-600">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📈</span>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Collection Results</h3>
-                <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded-full font-medium">
-                  {data.length} records
-                </span>
-              </div>
+        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex flex-nowrap gap-6 px-4 py-2.5 min-w-max items-baseline text-sm">
+            <div>
+              <span className="text-xs text-slate-500 mr-2">Total Collected</span>
+              <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(summary.totalCollected)}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500 mr-2">Payments</span>
+              <span className="font-semibold tabular-nums">{summary.paymentsCount.toLocaleString('en-IN')}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500 mr-2">Term Fee</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(summary.termCollected)}</span>
+            </div>
+            <div>
+              <span className="text-xs text-slate-500 mr-2">Old Fee</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(summary.oldCollected)}</span>
             </div>
           </div>
-          <AgGridBox
-            rowData={data}
-            columnDefs={columnDefs}
-            pagination={true}
-            paginationPageSize={20}
-          />
         </div>
-      ) : (
-        !loading && (
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-lg p-12 text-center">
-            <div className="text-6xl mb-4">📊</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Data Found</h3>
-            <p className="text-gray-600 dark:text-gray-400">No collection records found for the selected criteria. Try adjusting your filters.</p>
-          </div>
-        )
-      )}
-    </div>
-  );
+
+        <AgGridBox
+          title="Daily Collection"
+          columnDefs={cols}
+          rowData={rows}
+          serverPagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalRecords={totalCount}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setCurrentPage(1)
+          }}
+        />
+      </div>
+      <Toaster position="top-right" />
+    </LoadingOverlay>
+  )
 }

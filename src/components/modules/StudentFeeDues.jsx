@@ -40,11 +40,11 @@ const pickCurrentSessionId = (sess) => {
 
 const money = (v) => Number(v ?? 0).toFixed(2)
 
-const SummaryCard = ({ label, value }) => (
-  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
-    <p className="text-xs text-slate-500 mb-1">{label}</p>
-    <p className="text-lg font-semibold tabular-nums">₹ {money(value)}</p>
-  </div>
+const SummaryStat = ({ label, value }) => (
+  <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+    <span className="text-xs text-slate-500">{label}</span>
+    <span className="text-sm font-semibold tabular-nums">₹{money(value)}</span>
+  </span>
 )
 
 export default function StudentFeeDues() {
@@ -327,28 +327,26 @@ export default function StudentFeeDues() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <SummaryCard label="School Total Fee" value={summary.schoolFeeTotal} />
-          <SummaryCard label="School Total Paid" value={summary.schoolFeePaid} />
-          <SummaryCard label="School Total Left" value={summary.schoolFeeLeft} />
-          <SummaryCard label="Concession Total" value={summary.concessionTotal} />
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Yearly Fee</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <SummaryCard label="Total Amount" value={summary.yearlyFeeTotal} />
-            <SummaryCard label="Total Amount Paid" value={summary.termFeePaid} />
-            <SummaryCard label="Total Amount Left" value={summary.termFeeLeft} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Old Yearly Fee</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <SummaryCard label="Total Amount" value={summary.oldFeeTotal} />
-            <SummaryCard label="Total Amount Paid" value={summary.oldFeePaid} />
-            <SummaryCard label="Total Amount Left" value={summary.oldFeeLeft} />
+        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex flex-col gap-1.5 px-3 py-2 min-w-max text-sm">
+            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">School</span>
+              <SummaryStat label="Total Fee" value={summary.schoolFeeTotal} />
+              <SummaryStat label="Paid" value={summary.schoolFeePaid} />
+              <SummaryStat label="Left" value={summary.schoolFeeLeft} />
+              <SummaryStat label="Concession" value={summary.concessionTotal} />
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-t border-slate-200/80 dark:border-slate-600/80 pt-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">Yearly</span>
+              <SummaryStat label="Total" value={summary.yearlyFeeTotal} />
+              <SummaryStat label="Paid" value={summary.termFeePaid} />
+              <SummaryStat label="Left" value={summary.termFeeLeft} />
+              <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 shrink-0">Old</span>
+              <SummaryStat label="Total" value={summary.oldFeeTotal} />
+              <SummaryStat label="Paid" value={summary.oldFeePaid} />
+              <SummaryStat label="Left" value={summary.oldFeeLeft} />
+            </div>
           </div>
         </div>
 

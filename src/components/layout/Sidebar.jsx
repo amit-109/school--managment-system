@@ -7,7 +7,10 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
   const [role, setRole] = useState('operator');
   const [expandedModules, setExpandedModules] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const disabledSubmoduleIds = new Set(['parents', 'parent', 'generate-invoice', 'invoices', 'payments', 'concessions']);
+  const disabledSubmoduleIds = new Set([
+    'parents', 'parent', 'generate-invoice', 'invoices', 'payments', 'concessions',
+    'class-outstanding', 'student-outstanding', 'fee-type-collection', 'student-ledger'
+  ]);
   const hiddenModuleIds = new Set(['subject-management']);
 
   // Update local role state when Redux userRole changes

@@ -400,10 +400,10 @@ export default function App() {
             {tab === 'payment-receipts' && <CollectPayment />}
             {tab === 'payment-methods' && <PaymentMethods />}
             {tab === 'daily-collection' && <DailyCollection />}
-            {tab === 'class-outstanding' && <ClassOutstanding />}
-            {tab === 'student-outstanding' && <StudentOutstanding />}
-            {tab === 'fee-type-collection' && <FeeTypeCollection />}
-            {tab === 'student-ledger' && <StudentLedger />}
+            {tab === 'class-outstanding' && <DailyCollection />}
+            {tab === 'student-outstanding' && <DailyCollection />}
+            {tab === 'fee-type-collection' && <DailyCollection />}
+            {tab === 'student-ledger' && <DailyCollection />}
             {tab === 'student-fee-dues' && <StudentFeeDues />}
             {tab === 'student-fee-due' && <StudentFeeDues />}
             {/* Legacy invoice tabs redirected to collect payment */}
