@@ -735,8 +735,8 @@ export default function Students() {
   ], []);
 
   const toolbar = (
-    <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
-      <div className="relative">
+    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full">
+      <div className="relative w-full sm:w-auto">
         <input
           type="text"
           placeholder="Search students..."
@@ -745,7 +745,7 @@ export default function Students() {
             setSearchTerm(e.target.value);
             setCurrentPage(1);
           }}
-          className="w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+          className="w-full sm:w-56 md:w-64 px-3 py-1.5 pl-9 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
         />
         <svg className="absolute left-3 top-2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -755,7 +755,7 @@ export default function Students() {
       <select
         value={statusFilter}
         onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        className="w-full sm:w-auto px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
       >
         <option value="All">All Status</option>
         <option value="Active">Active</option>
@@ -765,7 +765,7 @@ export default function Students() {
       <select
         value={classFilter}
         onChange={(e) => { setClassFilter(e.target.value); setCurrentPage(1); }}
-        className="px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
+        className="w-full sm:w-auto px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-slate-700 dark:text-slate-100"
       >
         <option value="">All Classes</option>
         {(classes || []).filter((c) => c.isActive !== false).map((cls) => (
@@ -822,8 +822,8 @@ export default function Students() {
         />
 
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[92vh] overflow-y-auto">
               <h3 className="text-lg font-semibold mb-4">
                 {editMode ? 'Edit Student' : 'Add New Student'}
               </h3>
@@ -1163,8 +1163,8 @@ export default function Students() {
         )}
 
         {showOldFeeModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4">
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold">Map Old Fee — {oldFeeForm.studentName}</h3>
               {oldFeeForm.oldFeeId > 0 && (
                 <p className="text-sm text-slate-600">
@@ -1222,8 +1222,8 @@ export default function Students() {
         )}
 
         {showConcessionModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4">
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-semibold">Map Concession — {concessionForm.studentName}</h3>
               <div>
                 <label className="block text-sm font-medium mb-1">Session</label>

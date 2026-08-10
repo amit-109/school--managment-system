@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import AgGridBox from '../shared/AgGridBox'
 import LoadingOverlay from '../shared/LoadingOverlay'
@@ -48,6 +49,8 @@ const SummaryStat = ({ label, value }) => (
 )
 
 export default function StudentFeeDues() {
+  const { userRole, userRoles } = useSelector((state) => state.auth)
+  const isAdmin = userRole === 'Admin' || (Array.isArray(userRoles) && userRoles.includes('Admin'))
   const [loading, setLoading] = useState(false)
   const [classes, setClasses] = useState([])
   const [sessions, setSessions] = useState([])
@@ -237,7 +240,7 @@ export default function StudentFeeDues() {
           <p className="text-sm text-slate-600">Current session by default — filter by class, dates, or student</p>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-3 items-end [&>div]:w-full [&>div]:sm:w-auto">
           <div>
             <label className="block text-xs font-medium mb-1">Class</label>
             <select
@@ -315,7 +318,7 @@ export default function StudentFeeDues() {
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
               placeholder="Name / admission no."
-              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 min-w-[180px]"
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto sm:min-w-[160px]"
             />
           </div>
           <button
@@ -327,28 +330,30 @@ export default function StudentFeeDues() {
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <div className="flex flex-col gap-1.5 px-3 py-2 min-w-max text-sm">
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">School</span>
-              <SummaryStat label="Total Fee" value={summary.schoolFeeTotal} />
-              <SummaryStat label="Paid" value={summary.schoolFeePaid} />
-              <SummaryStat label="Left" value={summary.schoolFeeLeft} />
-              <SummaryStat label="Concession" value={summary.concessionTotal} />
-            </div>
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-t border-slate-200/80 dark:border-slate-600/80 pt-1.5">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">Yearly</span>
-              <SummaryStat label="Total" value={summary.yearlyFeeTotal} />
-              <SummaryStat label="Paid" value={summary.termFeePaid} />
-              <SummaryStat label="Left" value={summary.termFeeLeft} />
-              <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-500 shrink-0">Old</span>
-              <SummaryStat label="Total" value={summary.oldFeeTotal} />
-              <SummaryStat label="Paid" value={summary.oldFeePaid} />
-              <SummaryStat label="Left" value={summary.oldFeeLeft} />
+        {isAdmin && (
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div className="flex flex-col gap-1.5 px-3 py-2 min-w-max text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">School</span>
+                <SummaryStat label="Total Fee" value={summary.schoolFeeTotal} />
+                <SummaryStat label="Paid" value={summary.schoolFeePaid} />
+                <SummaryStat label="Left" value={summary.schoolFeeLeft} />
+                <SummaryStat label="Concession" value={summary.concessionTotal} />
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 border-t border-slate-200/80 dark:border-slate-600/80 pt-1.5">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500 w-14 shrink-0">Yearly</span>
+                <SummaryStat label="Total" value={summary.yearlyFeeTotal} />
+                <SummaryStat label="Paid" value={summary.termFeePaid} />
+                <SummaryStat label="Left" value={summary.termFeeLeft} />
+                <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500 shrink-0">Old</span>
+                <SummaryStat label="Total" value={summary.oldFeeTotal} />
+                <SummaryStat label="Paid" value={summary.oldFeePaid} />
+                <SummaryStat label="Left" value={summary.oldFeeLeft} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <AgGridBox
           title="Fee Dues"
@@ -366,8 +371,8 @@ export default function StudentFeeDues() {
         />
 
         {detailsOpen && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-lg p-4 sm:p-6 space-y-4 max-h-[85vh] overflow-y-auto">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Payments — {detailsTitle}</h3>
                 <button type="button" onClick={() => setDetailsOpen(false)} className="px-3 py-1 border rounded-lg">Close</button>

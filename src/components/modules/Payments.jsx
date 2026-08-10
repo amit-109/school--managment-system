@@ -172,26 +172,43 @@ export default function Payments() {
       }
     }
 
+    let sumConfigured = 0
+    let sumPaid = 0
+    let sumBalance = 0
+
     const lineRows = allocations.length
       ? allocations.map((a) => {
           const feeType = a.feeTypeName || a.FeeTypeName || (paymentTarget === 'OldFee' ? 'Old Fee' : 'Fee')
           const term = a.termName || a.TermName || ''
-          const amount = Number(a.allocatedAmount ?? a.AllocatedAmount ?? 0)
+          const configured = Number(a.configuredAmount ?? a.ConfiguredAmount ?? a.allocatedAmount ?? a.AllocatedAmount ?? 0)
+          const paid = Number(a.paidAmount ?? a.PaidAmount ?? a.allocatedAmount ?? a.AllocatedAmount ?? 0)
+          const balance = Number(a.balanceAmount ?? a.BalanceAmount ?? Math.max(configured - paid, 0))
+          sumConfigured += configured
+          sumPaid += paid
+          sumBalance += balance
           return `
             <tr>
               <td>${feeType}${term ? ` (${term})` : ''}</td>
-              <td class="amount">₹ ${amount.toFixed(2)}</td>
-              <td class="amount">₹ ${amount.toFixed(2)}</td>
-              <td class="amount">₹ 0.00</td>
+              <td class="amount">₹ ${configured.toFixed(2)}</td>
+              <td class="amount"></td>
+              <td class="amount"></td>
             </tr>`
         }).join('')
-      : `
+      : (() => {
+          sumConfigured = totalPaid
+          sumPaid = totalPaid
+          sumBalance = 0
+          return `
           <tr>
             <td>${paymentTarget === 'OldFee' ? 'Old Fee' : 'Fee Payment'}</td>
             <td class="amount">₹ ${totalPaid.toFixed(2)}</td>
-            <td class="amount">₹ ${totalPaid.toFixed(2)}</td>
-            <td class="amount">₹ 0.00</td>
+            <td class="amount"></td>
+            <td class="amount"></td>
           </tr>`
+        })()
+
+    const displayPaid = totalPaid > 0 ? totalPaid : sumPaid
+    const totalLabel = paymentTarget === 'OldFee' ? 'TOTAL (Old Fee)' : 'TOTAL (Yearly Fee)'
 
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
@@ -277,10 +294,10 @@ export default function Payments() {
           <tbody>
             ${lineRows}
             <tr class="total-row">
-              <td><strong>TOTAL</strong></td>
-              <td class="amount"><strong>₹ ${totalPaid.toFixed(2)}</strong></td>
-              <td class="amount"><strong>₹ ${totalPaid.toFixed(2)}</strong></td>
-              <td class="amount"><strong>₹ 0.00</strong></td>
+              <td><strong>${totalLabel}</strong></td>
+              <td class="amount"><strong>₹ ${sumConfigured.toFixed(2)}</strong></td>
+              <td class="amount"><strong>₹ ${displayPaid.toFixed(2)}</strong></td>
+              <td class="amount"><strong>₹ ${sumBalance.toFixed(2)}</strong></td>
             </tr>
           </tbody>
         </table>

@@ -234,7 +234,7 @@ export default function DailyCollection() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-wrap gap-3 items-end [&>div]:w-full [&>div]:sm:w-auto">
           <div>
             <label className="block text-xs font-medium mb-1">From date</label>
             <input
@@ -327,7 +327,7 @@ export default function DailyCollection() {
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
               placeholder="Name / admission / receipt"
-              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 min-w-[200px]"
+              className="px-3 py-2 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto sm:min-w-[160px]"
             />
           </div>
           <button type="button" onClick={clearFilters} className="px-4 py-2 border rounded-lg text-sm">

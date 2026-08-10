@@ -257,11 +257,11 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
       ) }
       {/* <aside className={`fixed inset-y-0 left-0 md:relative w-56 h-[calc(100vh-56px)] border-r p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static`}> */ }
       <aside
-        className={ `fixed inset-y-0 left-0 md:relative w-72 sm:w-64 md:w-56 lg:w-52 xl:w-56 h-screen border-r p-2 sm:p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 ${open ? 'translate-x-0' : '-translate-x-full'} md:static` }
+        className={`fixed inset-y-0 left-0 md:relative shrink-0 w-72 sm:w-64 md:w-56 lg:w-52 xl:w-56 h-[calc(100vh-56px)] md:h-full border-r p-2 sm:p-3 bg-white dark:bg-slate-900 transform transition-transform duration-300 ease-in-out md:z-auto md:translate-x-0 z-50 flex flex-col overflow-hidden ${open ? 'translate-x-0' : '-translate-x-full'} md:static`}
       >
 
         {/* Search Box */}
-        <div className="px-2 mb-4">
+        <div className="px-2 mb-4 shrink-0">
           <div className="relative">
             <input
               type="text"
@@ -276,7 +276,7 @@ export default function Sidebar({ current, onNavigate, open, onClose }) {
           </div>
         </div>
 
-        <nav className="px-2 space-y-2">
+        <nav className="px-2 space-y-2 flex-1 overflow-y-auto overscroll-contain pb-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
           {filteredMenuItems.map(menu => {
             if (menu.hasSubmodules) {
               return (

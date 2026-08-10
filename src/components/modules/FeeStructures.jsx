@@ -562,8 +562,8 @@ export default function FeeStructures() {
 
         {/* Add Modal - Term-based expandable panels */}
         {showModal && !editMode && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-5xl p-3 sm:p-6 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-semibold">Add Fee Structure</h3>
@@ -864,8 +864,8 @@ export default function FeeStructures() {
 
         {/* Edit Modal - Matrix by Class + Term */}
         {showModal && editMode && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-5xl p-3 sm:p-6 max-h-[92vh] overflow-y-auto">
 
               {/* Header */}
               <div className="flex items-center justify-between mb-6">

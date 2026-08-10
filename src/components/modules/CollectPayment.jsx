@@ -381,12 +381,12 @@ export default function CollectPayment() {
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1) }}
           toolbar={(
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center w-full">
               <input
                 value={paymentSearchTerm}
                 onChange={(e) => setPaymentSearchTerm(e.target.value)}
                 placeholder="Search receipt / student / ref..."
-                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto sm:min-w-[180px] flex-1"
               />
               <select
                 value={filters.classId}
@@ -396,7 +396,7 @@ export default function CollectPayment() {
                   setCurrentPage(1)
                   await loadSections(classId, false)
                 }}
-                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto"
               >
                 <option value="">All Classes</option>
                 {classes.map((c) => <option key={c.classId} value={c.classId}>{c.className}</option>)}
@@ -408,7 +408,7 @@ export default function CollectPayment() {
                     setFilters((f) => ({ ...f, sectionId: e.target.value }))
                     setCurrentPage(1)
                   }}
-                  className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                  className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto"
                 >
                   <option value="">All Sections</option>
                   {filterSections.map((s) => (
@@ -419,7 +419,7 @@ export default function CollectPayment() {
               <select
                 value={filters.paymentMode}
                 onChange={(e) => { setFilters((f) => ({ ...f, paymentMode: e.target.value })); setCurrentPage(1) }}
-                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto"
               >
                 <option value="">All Modes</option>
                 {modeOptions.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -428,21 +428,21 @@ export default function CollectPayment() {
                 type="date"
                 value={filters.fromDate}
                 onChange={(e) => { setFilters((f) => ({ ...f, fromDate: e.target.value })); setCurrentPage(1) }}
-                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto"
               />
               <input
                 type="date"
                 value={filters.toDate}
                 onChange={(e) => { setFilters((f) => ({ ...f, toDate: e.target.value })); setCurrentPage(1) }}
-                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700"
+                className="px-3 py-1.5 border rounded-lg text-sm dark:bg-slate-700 w-full sm:w-auto"
               />
-              <button type="button" onClick={clearFilters} className="px-3 py-1.5 border rounded-lg text-sm">
+              <button type="button" onClick={clearFilters} className="px-3 py-1.5 border rounded-lg text-sm w-full sm:w-auto">
                 Clear
               </button>
               <button
                 type="button"
                 onClick={openCollectModal}
-                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm"
+                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm w-full sm:w-auto"
               >
                 + Collect Payment
               </button>
@@ -451,9 +451,9 @@ export default function CollectPayment() {
         />
 
         {showModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setStudentDropdownOpen(false)}>
+          <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50" onClick={() => setStudentDropdownOpen(false)}>
             <div
-              className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+              className="bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-2xl p-4 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center">

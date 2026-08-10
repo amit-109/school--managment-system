@@ -64,12 +64,13 @@ export async function printFeeReceipt(paymentData, orgData) {
         sumConfigured += configured
         sumPaid += paid
         sumBalance += balance
+        // Hide per-line Paid/Balance split only (highlighted bifurcation)
         return `
           <tr>
             <td>${feeType}${term ? ` (${term})` : ''}</td>
             <td class="amount">₹ ${configured.toFixed(2)}</td>
-            <td class="amount">₹ ${paid.toFixed(2)}</td>
-            <td class="amount">₹ ${balance.toFixed(2)}</td>
+            <td class="amount"></td>
+            <td class="amount"></td>
           </tr>`
       }).join('')
     : (() => {
@@ -80,10 +81,13 @@ export async function printFeeReceipt(paymentData, orgData) {
           <tr>
             <td>${paymentTarget === 'OldFee' ? 'Old Fee' : 'Fee Payment'}</td>
             <td class="amount">₹ ${totalPaid.toFixed(2)}</td>
-            <td class="amount">₹ ${totalPaid.toFixed(2)}</td>
-            <td class="amount">₹ 0.00</td>
+            <td class="amount"></td>
+            <td class="amount"></td>
           </tr>`
       })()
+
+  const displayPaid = totalPaid > 0 ? totalPaid : sumPaid
+  const totalLabel = paymentTarget === 'OldFee' ? 'TOTAL (Old Fee)' : 'TOTAL (Yearly Fee)'
 
   const bifurcationNote = paymentTarget === 'OldFee'
     ? 'Old Fee payment — full or partial; balance is amount still left.'
@@ -110,7 +114,7 @@ export async function printFeeReceipt(paymentData, orgData) {
           </tr>
           <tr>
             <td colspan="3">Paid on this receipt</td>
-            <td class="amount">₹ ${sumPaid.toFixed(2)}</td>
+            <td class="amount">₹ ${displayPaid.toFixed(2)}</td>
           </tr>
           <tr class="total-row">
             <td colspan="3"><strong>Balance after Concession</strong></td>
@@ -246,9 +250,9 @@ export async function printFeeReceipt(paymentData, orgData) {
         <tbody>
           ${lineRows}
           <tr class="total-row">
-            <td><strong>TOTAL (Yearly Fee)</strong></td>
+            <td><strong>${totalLabel}</strong></td>
             <td class="amount"><strong>₹ ${sumConfigured.toFixed(2)}</strong></td>
-            <td class="amount"><strong>₹ ${sumPaid.toFixed(2)}</strong></td>
+            <td class="amount"><strong>₹ ${displayPaid.toFixed(2)}</strong></td>
             <td class="amount"><strong>₹ ${sumBalance.toFixed(2)}</strong></td>
           </tr>
           ${concessionRows}

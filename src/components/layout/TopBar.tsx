@@ -37,7 +37,12 @@ interface AuthState {
 }
 import toast from 'react-hot-toast';
 
-const muiTheme = createTheme(); 
+/** Align MUI `md` with Tailwind `md` (768px) so hamburger/sidebar match on tablet */
+const muiTheme = createTheme({
+  breakpoints: {
+    values: { xs: 0, sm: 600, md: 768, lg: 1200, xl: 1536 },
+  },
+}); 
 
 interface TopBarProps {
   role: string;
@@ -285,6 +290,14 @@ export default function TopBar({
               <Typography variant="body2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
                 {role.charAt(0).toUpperCase() + role.slice(1).replace('admin', ' Admin')}
               </Typography>
+            </MenuItem>
+            <MenuItem sx={{ display: { md: 'none' } }} onClick={toggleLanguage}>
+              <Translate sx={{ mr: 1 }} />
+              Language
+            </MenuItem>
+            <MenuItem sx={{ display: { md: 'none' } }} onClick={toggleTheme}>
+              {getThemeIcon()}
+              <Box component="span" sx={{ ml: 1 }}>Theme</Box>
             </MenuItem>
             <MenuItem>
               <Settings sx={{ mr: 1 }} />

@@ -356,10 +356,10 @@ export default function App() {
     <LoadingOverlay isLoading={isLoading}>
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-primary-50 dark:from-neutral-900 dark:to-primary-900/20 text-neutral-900 dark:text-neutral-100 font-inter">
       <TopBar role={role} setRole={setRole} user={user} theme={theme} toggleTheme={toggleTheme} language={language} toggleLanguage={toggleLanguage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} orgData={orgData} />
-      <div className="mx-auto w-full max-w-7xl px-3 sm:px-5">
-        <div className="flex h-[calc(100vh-56px)]">
+      <div className="mx-auto w-full max-w-7xl px-2 sm:px-5">
+        <div className="flex h-[calc(100vh-56px)] min-w-0 overflow-hidden">
           <Sidebar current={tab} onNavigate={handleNavigate} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <main className="flex-1 p-3 sm:p-6 space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          <main className="flex-1 min-w-0 p-2 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
             {/* Show ALL components during development */}
             {tab === 'dashboard' && <Dashboard role={role} />}
             {tab === 'users' && <UserManagement />}

@@ -120,8 +120,9 @@ const AgGridBox: FC<AgGridBoxProps> = ({
     sortable: true,
     filter: true,
     resizable: true,
-    minWidth: 120,
+    minWidth: 100,
     flex: 1,
+    suppressSizeToFit: false,
   }), []);
 
   const finalColumnDefs = useMemo(() => {
@@ -131,8 +132,9 @@ const AgGridBox: FC<AgGridBoxProps> = ({
         headerName: 'Actions',
         field: 'actions',
         width: 120,
-        minWidth: 120,
+        minWidth: 100,
         maxWidth: 160,
+        flex: 0,
         cellRenderer: (params: any) => (
           <ActionRenderer
             data={params.data}
@@ -154,57 +156,68 @@ const AgGridBox: FC<AgGridBoxProps> = ({
     return cols;
   }, [columnDefs, onEdit, onView, onDelete, onPrint, showActions]);
 
-  const autoSizeAll = useCallback(() => {
+  const fitColumnsForViewport = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
+    // On narrow screens, keep column minWidths and scroll horizontally instead of crushing.
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return;
+    }
     api.sizeColumnsToFit();
   }, []);
 
   return (
-    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300">
-      <header className="px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-b border-slate-200 dark:border-slate-600 flex items-center justify-between">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-xl shadow-lg">
+    <section className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow duration-300 min-w-0">
+      <header className="px-3 sm:px-6 py-3 sm:py-5 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border-b border-slate-200 dark:border-slate-600 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 bg-gradient-to-br from-primary-500 to-secondary-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-lg sm:text-xl shadow-lg">
             📊
           </div>
-          <div>
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-xl font-bold text-slate-900 dark:text-slate-100 truncate">{title}</h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{effectiveTotalRecords || 0} total records</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          {toolbar}
-        </div>
+        {toolbar && (
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto min-w-0">
+            {toolbar}
+          </div>
+        )}
       </header>
-      <div className="p-3 sm:p-6">
-        <div className="ag-theme-quartz w-full overflow-x-auto border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl shadow-inner">
-          <AgGridReact
-            ref={gridRef}
-            rowData={rowData}
-            columnDefs={finalColumnDefs}
-            defaultColDef={defaultColDef}
-            animateRows
-            rowSelection="single"
-            suppressCellFocus
-            pagination={!serverPagination}
-            paginationPageSize={safePageSize}
-            paginationPageSizeSelector={pageSizeOptions}
-            domLayout="autoHeight"
-            onGridReady={(params) => {
-              setTimeout(() => {
-                autoSizeAll();
-              }, 100);
-            }}
-          />
+      <div className="p-2 sm:p-6 min-w-0">
+        <div className="ag-theme-quartz w-full min-w-0 overflow-x-auto border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl shadow-inner">
+          <div className="min-w-[640px] md:min-w-0">
+            <AgGridReact
+              ref={gridRef}
+              rowData={rowData}
+              columnDefs={finalColumnDefs}
+              defaultColDef={defaultColDef}
+              animateRows
+              rowSelection="single"
+              suppressCellFocus
+              pagination={!serverPagination}
+              paginationPageSize={safePageSize}
+              paginationPageSizeSelector={pageSizeOptions}
+              domLayout="autoHeight"
+              onGridReady={() => {
+                setTimeout(() => {
+                  fitColumnsForViewport();
+                }, 100);
+              }}
+              onGridSizeChanged={() => {
+                fitColumnsForViewport();
+              }}
+            />
+          </div>
         </div>
       </div>
       {serverPagination && (
         <div className="px-3 sm:px-6 pb-4 sm:pb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
-            <div>
+            <div className="text-xs sm:text-sm">
               Showing {startRecord} to {endRecord} of {effectiveTotalRecords} entries
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs sm:text-sm">Page Size:</span>
                 <select
@@ -223,7 +236,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
                 type="button"
                 onClick={() => onPageChange?.(safeCurrentPage - 1)}
                 disabled={safeCurrentPage <= 1 || effectiveTotalRecords === 0}
-                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="px-3 py-1.5 min-h-[36px] border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Prev
               </button>
@@ -234,7 +247,7 @@ const AgGridBox: FC<AgGridBoxProps> = ({
                 type="button"
                 onClick={() => onPageChange?.(safeCurrentPage + 1)}
                 disabled={safeCurrentPage >= totalPages || effectiveTotalRecords === 0}
-                className="px-3 py-1 border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
+                className="px-3 py-1.5 min-h-[36px] border border-slate-300 dark:border-slate-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 Next
               </button>
