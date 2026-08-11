@@ -266,7 +266,13 @@ export default function Payments() {
           <div class="detail-section">
             <h3>Receipt Details</h3>
             <div class="detail-item"><span class="detail-label">Receipt No:</span> ${receiptNo}</div>
-            <div class="detail-item"><span class="detail-label">Payment Date:</span> ${paymentDate ? new Date(paymentDate).toLocaleDateString() : ''}</div>
+            <div class="detail-item"><span class="detail-label">Payment Date:</span> ${paymentDate ? (() => {
+              const d = new Date(paymentDate)
+              if (Number.isNaN(d.getTime())) return ''
+              const dd = String(d.getDate()).padStart(2, '0')
+              const mm = String(d.getMonth() + 1).padStart(2, '0')
+              return `${dd}/${mm}/${d.getFullYear()}`
+            })() : ''}</div>
             <div class="detail-item"><span class="detail-label">Payment Mode:</span> ${mode}</div>
             <div class="detail-item"><span class="detail-label">Target:</span> ${paymentTarget}</div>
             <div class="detail-item"><span class="detail-label">Status:</span> <span class="status-badge status-paid">Paid</span></div>
@@ -310,7 +316,15 @@ export default function Payments() {
 
         <div class="footer">
           <p>This is a computer generated receipt. No signature required.</p>
-          <p>Generated on ${new Date().toLocaleString()}</p>
+          <p>Generated on ${(() => {
+            const d = new Date()
+            const dd = String(d.getDate()).padStart(2, '0')
+            const mm = String(d.getMonth() + 1).padStart(2, '0')
+            const hh = String(d.getHours()).padStart(2, '0')
+            const min = String(d.getMinutes()).padStart(2, '0')
+            const ss = String(d.getSeconds()).padStart(2, '0')
+            return `${dd}/${mm}/${d.getFullYear()}, ${hh}:${min}:${ss}`
+          })()}</p>
         </div>
       </body>
       </html>

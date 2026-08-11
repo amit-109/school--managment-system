@@ -1,6 +1,29 @@
 import toast from 'react-hot-toast'
 import apiClient from '../Auth/base'
 
+/** Format date as DD/MM/YYYY (local calendar day). */
+function formatDateDDMMYYYY(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+}
+
+/** Format datetime as DD/MM/YYYY, HH:mm:ss */
+function formatDateTimeDDMMYYYY(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const date = formatDateDDMMYYYY(d)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const ss = String(d.getSeconds()).padStart(2, '0')
+  return `${date}, ${hh}:${min}:${ss}`
+}
+
 async function loadLogoBase64(orgData) {
   let logoBase64 = ''
   const logoPath = orgData?.logo || orgData?.logoUrl || '/src/assets/logo.svg'
@@ -223,7 +246,7 @@ export async function printFeeReceipt(paymentData, orgData) {
         <div class="detail-section">
           <h3>Receipt Details</h3>
           <div class="detail-item"><span class="detail-label">Receipt No:</span> ${receiptNo}</div>
-          <div class="detail-item"><span class="detail-label">Payment Date:</span> ${paymentDate ? new Date(paymentDate).toLocaleDateString() : ''}</div>
+          <div class="detail-item"><span class="detail-label">Payment Date:</span> ${paymentDate ? formatDateDDMMYYYY(paymentDate) : ''}</div>
           <div class="detail-item"><span class="detail-label">Payment Mode:</span> ${mode}</div>
           <div class="detail-item"><span class="detail-label">Status:</span> <span class="status-badge status-paid">Paid</span></div>
           ${referenceNo ? `<div class="detail-item"><span class="detail-label">Reference:</span> ${referenceNo}</div>` : ''}
@@ -277,7 +300,7 @@ export async function printFeeReceipt(paymentData, orgData) {
 
       <div class="footer">
         <p>This is a computer generated receipt. No signature required.</p>
-        <p>Generated on ${new Date().toLocaleString()}</p>
+        <p>Generated on ${formatDateTimeDDMMYYYY(new Date())}</p>
       </div>
     </body>
     </html>
